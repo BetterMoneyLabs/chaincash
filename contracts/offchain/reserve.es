@@ -6,7 +6,7 @@
     // Data:
     //  - token #0 - identifying singleton token
     //  - R4 - signing key (as a group element)
-    //  - R5 - tree of notes spent (to avoid double spending)
+    //  - R5 - tree of notes spent (to avoid double spending, it should have insert-only flag set)
     //  - R6 - key of payment server (as a group element) // todo: support multiple payment servers by using a tree
     //
     // Actions:
