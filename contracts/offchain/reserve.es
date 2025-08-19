@@ -8,6 +8,7 @@
     //  - R4 - signing key (as a group element)
     //  - R5 - tree of notes spent (to avoid double spending, it should have insert-only flag set)
     //  - R6 - key of payment server (as a group element) // todo: support multiple payment servers by using a tree
+    //  - R7 - refund start height
     //
     // Actions:
     //  - redeem note (#0)
@@ -88,6 +89,24 @@
         (selfOut.value - SELF.value >= 1000000000)  && // at least 1 ERG added
         selfOut.R5[AvlTree].get == SELF.R5[AvlTree].get
       )
+    } else if (action == 2) {
+      // init refund
+      val correctHeight = selfOut.R7[Int].get >= HEIGHT - 5
+      val correctValue = selfOut.value >= SELF.value
+      // todo: recheck registers preservation
+      sigmaProp(selfPreserved && correctHeight && correctValue) && proveDlog(ownerKey)
+    } else if (action == 3) {
+      // cancel refund
+      val correctHeight = !(selfOut.R7[Int].isDefined)
+      val correctValue = selfOut.value >= SELF.value
+      // todo: recheck registers preservation
+      sigmaProp(selfPreserved && correctHeight && correctValue) && proveDlog(ownerKey)
+    } else if (action == 4) {
+      // complete refund
+      val refundNotificationPeriod = 14400 // 20 days
+      val correctHeight = (SELF.R5[Int].get + refundNotificationPeriod) <= HEIGHT
+      // todo: recheck registers preservation
+      sigmaProp(selfPreserved && correctHeight && correctValue) && proveDlog(ownerKey) // todo: check is it ok to check no other conditions
     } else {
       sigmaProp(false)
     }
