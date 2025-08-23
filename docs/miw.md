@@ -1,7 +1,7 @@
 Magic Internet Gold Wallet
 ==========================
 
-There is huge need for unfreezeable, stable-priced cash solution with known security guarantees but also simple, which can be 
+There is huge need for unfreezeable, stable-priced electronic cash solution with known security guarantees, but also simple, which can be 
 freely created on demand in communities, but also provide backed or trusted (such as USDT) stablecoins when counterparty 
 is not well known. We present such unified solution called Magic Internet Gold Wallet - ChainCash-based wallet with 
 support for on-chain and offchain payments, and money creation freely in community circles, or backed by blockchain 
@@ -9,15 +9,13 @@ assets.
 
 The wallet will have further sections in the UI :
 
-Current status
---------------
+* **Current status**
 
 Shows total balance of notes, value of backing which can be redeemed, liabilities.
 
 Also, recent incoming payments.
 
-My Wallets
-----------
+* **My Wallets**
 
 Contains three wallets: backed, non-backed, and fast. Public key is the same for all the wallets.
 
@@ -26,10 +24,23 @@ other options.
 
 There is possibility to see notes for every wallet.
 
+* **Circles management**
 
 
-
-How-To
-------
+* **How-To**
 
 Contains some guides for popular use-cases.
+
+
+Fees
+----
+
+Privacy
+-------
+
+Onchain contracts
+-----------------
+
+Offchain Infrastructure
+-----------------------
+
