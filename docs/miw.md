@@ -18,7 +18,7 @@ Also, recent incoming payments.
 
 * **My Wallets**
 
-Contains three wallets: backed, non-backed, and fast. Public key is the same for all the wallets.
+Contains three wallets: fast, backed, non-backed. Public key is the same for all the wallets.
 
 Backed show reserves associated with it has increase reserve option. If reserve is not created yet, there is option to create it, with ERG or 
 other options.
@@ -35,8 +35,6 @@ white and black lists. Mutual credit clearing will allow to analyze loops in mut
 
 Contains some guides for popular use-cases, such as local trading, issuing 
 tokenized commodities backed money.
-
-Simplicity vs 
 
 Onchain contracts
 -----------------
