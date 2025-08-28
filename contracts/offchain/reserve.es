@@ -3,6 +3,10 @@
     // aka Basis
     // https://www.ergoforum.org/t/basis-a-foundational-on-chain-reserve-approach-to-support-a-variety-of-offchain-protocols/5153
 
+    // Here are some properties of Basis:
+    // * offchain notes with no onchain registration, only redemption is onchain
+    // 
+
     // Data:
     //  - token #0 - identifying singleton token
     //  - R4 - signing key (as a group element)
