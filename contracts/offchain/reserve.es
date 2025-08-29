@@ -1,11 +1,15 @@
 {
-    // Contract for on-chain reserve (in ERG only) backing offchain notes
+    // Contract for on-chain reserve (in ERG only for now) backing offchain notes
     // aka Basis
     // https://www.ergoforum.org/t/basis-a-foundational-on-chain-reserve-approach-to-support-a-variety-of-offchain-protocols/5153
 
+    // Main use-cases:
+    // * micropayments
+    // * payments in p2p networks
+    // * agent-to-agent payments
+
     // Here are some properties of Basis:
     // * offchain notes with no onchain registration, only redemption is onchain
-    // 
 
     // Data:
     //  - token #0 - identifying singleton token
