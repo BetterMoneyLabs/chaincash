@@ -8,8 +8,13 @@
     // * payments in p2p networks
     // * agent-to-agent payments
 
-    // Here are some properties of Basis:
-    // * offchain notes with no onchain registration, only redemption is onchain
+
+    // Here are some properties of Basis design:
+    // * offchain notes with no onchain registration, only redemption is happening on chain
+    // * on-chain reserve always allowing for top-up, refund is possible but in two stages, first, reserve owner is
+    //    announcing refund and then two weeks after may withdraw
+    // * unlike Lightning network, there is no strict p2p channel based interaction. A note is freely transferrable.
+    // 
 
     // Data:
     //  - token #0 - identifying singleton token
