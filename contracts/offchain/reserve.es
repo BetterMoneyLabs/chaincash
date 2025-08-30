@@ -14,7 +14,14 @@
     // * on-chain reserve always allowing for top-up, refund is possible but in two stages, first, reserve owner is
     //    announcing refund and then two weeks after may withdraw
     // * unlike Lightning network, there is no strict p2p channel based interaction. A note is freely transferrable.
-    // 
+    // * a note can be created at any time, notes created by an owner of a reserve are not necessarily backed by
+         the reserve
+    // * to track notes which are issued, we have trackers. Everyone can be a tracker (the only thing needed is to run
+         open source software). One reserve can be tracked by one tracker only. One tracker can be run my multiple
+         parties potentially (using threshold Schnorr signature scheme, such as FROST)
+    // * if tracker is going offline, // todo: what
+    // * notes are transferrable, // todo: how
+    // * to create a note, // todo: what to do
 
     // Data:
     //  - token #0 - identifying singleton token
