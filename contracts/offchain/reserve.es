@@ -4,6 +4,7 @@
     // https://www.ergoforum.org/t/basis-a-foundational-on-chain-reserve-approach-to-support-a-variety-of-offchain-protocols/5153
 
     // Main use-cases:
+    // * payments for content (such as 402 HTTP code processing)
     // * micropayments
     // * payments in p2p networks
     // * agent-to-agent payments
@@ -22,6 +23,9 @@
     // * if tracker is going offline, // todo: what
     // * notes are transferrable, // todo: how
     // * to create a note, // todo: what to do
+    // * to create reserve, reserve's public key holder is asking a tracker whether it will track operations with the
+         key, if the tracker is replying positively, the key holder may start operations (with or without creating reserve)
+
 
     // Data:
     //  - token #0 - identifying singleton token
