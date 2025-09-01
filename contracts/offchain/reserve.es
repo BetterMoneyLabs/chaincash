@@ -21,7 +21,8 @@
          open source software). One reserve can be tracked by one tracker only. One tracker can be run my multiple
          parties potentially (using threshold Schnorr signature scheme, such as FROST)
     // * if tracker is going offline, // todo: what
-    // * notes are transferrable, // todo: how
+    // * notes are transferrable, divisible and mergeable within a single reserve (notes backed by different reserves cant
+    //   be merged as they have different backing)
     // * to create a note, // todo: what to do
     // * to create reserve, reserve's public key holder is asking a tracker whether it will track operations with the
          key, if the tracker is replying positively, the key holder may start operations (with or without creating reserve)
@@ -127,8 +128,9 @@
       sigmaProp(selfPreserved && correctHeight && correctValue) && proveDlog(ownerKey)
     } else if (action == 4) {
       // complete refund
+      val refundStartHeight = SELF.R5[Int].get
       val refundNotificationPeriod = 14400 // 20 days
-      val correctHeight = (SELF.R5[Int].get + refundNotificationPeriod) <= HEIGHT
+      val correctHeight = (refundStartHeight + refundNotificationPeriod) <= HEIGHT
       // todo: recheck registers preservation
       sigmaProp(selfPreserved && correctHeight && correctValue) && proveDlog(ownerKey) // todo: check is it ok to check no other conditions
     } else {
