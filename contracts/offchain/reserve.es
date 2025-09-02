@@ -9,7 +9,6 @@
     // * payments in p2p networks
     // * agent-to-agent payments
 
-
     // Here are some properties of Basis design:
     // * offchain notes with no onchain registration, only redemption is happening on chain
     // * on-chain reserve always allowing for top-up, refund is possible but in two stages, first, reserve owner is
@@ -18,12 +17,18 @@
     // * a note can be created at any time, notes created by an owner of a reserve are not necessarily backed by
          the reserve
     // * to track notes which are issued, we have trackers. Everyone can be a tracker (the only thing needed is to run
-         open source software). One reserve can be tracked by one tracker only. One tracker can be run my multiple
-         parties potentially (using threshold Schnorr signature scheme, such as FROST)
-    // * if tracker is going offline, // todo: what
+         open source software). One reserve can be tracked by one tracker only (at least, for now, in the future it would
+         be possible maybe to run a reserve tracked by multiple parties). One tracker can be run my multiple
+         parties potentially (using threshold Schnorr signature scheme, such as FROST). A tracker can be based on rollup or
+         merged-mined sidechain even. What is needed on-chain, that is, periodically refreshed box committing to notes
+         which are spent and unspent for reserves it is tracking.
+    // * if tracker is going offline, the state which is committed on-chain still can be used for note redemptions
+    //   after some time.
     // * notes are transferrable, divisible and mergeable within a single reserve (notes backed by different reserves cant
-    //   be merged as they have different backing)
-    // * to create a note, // todo: what to do
+    //   be merged as they have different backing). They form virtual TXO set baically, but we use efficient encoding for
+    //   virtual "boxes" (notes)
+    // * to create a note, it is enough to sign its amount and set to tracker
+    // * to prevent double-spending of a note on-chain, resrve is tracking a set of notes being redeemed.
     // * to create reserve, reserve's public key holder is asking a tracker whether it will track operations with the
          key, if the tracker is replying positively, the key holder may start operations (with or without creating reserve)
 
