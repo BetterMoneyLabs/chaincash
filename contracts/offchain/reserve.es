@@ -1,5 +1,5 @@
 {
-    // Contract for on-chain reserve (in ERG only for now) backing offchain notes
+    // Contract for on-chain reserve (in ERG only for now) backing offchain payments
     // aka Basis
     // https://www.ergoforum.org/t/basis-a-foundational-on-chain-reserve-approach-to-support-a-variety-of-offchain-protocols/5153
 
@@ -10,27 +10,25 @@
     // * agent-to-agent payments
 
     // Here are some properties of Basis design:
-    // * offchain notes with no onchain registration, only redemption is happening on chain
-    // * on-chain reserve always allowing for top-up, refund is possible but in two stages, first, reserve owner is
-    //    announcing refund and then two weeks after may withdraw
-    // * unlike Lightning network, there is no strict p2p channel based interaction. A note is freely transferrable.
-    // * a note can be created at any time, notes created by an owner of a reserve are not necessarily backed by
-         the reserve
-    // * to track notes which are issued, we have trackers. Everyone can be a tracker (the only thing needed is to run
-         open source software). One reserve can be tracked by one tracker only (at least, for now, in the future it would
-         be possible maybe to run a reserve tracked by multiple parties). One tracker can be run my multiple
-         parties potentially (using threshold Schnorr signature scheme, such as FROST). A tracker can be based on rollup or
-         merged-mined sidechain even. What is needed on-chain, that is, periodically refreshed box committing to notes
-         which are spent and unspent for reserves it is tracking.
-    // * if tracker is going offline, the state which is committed on-chain still can be used for note redemptions
-    //   after some time.
-    // * notes are transferrable, divisible and mergeable within a single reserve (notes backed by different reserves cant
-    //   be merged as they have different backing). They form virtual TXO set baically, but we use efficient encoding for
-    //   virtual "boxes" (notes)
-    // * to create a note, it is enough to sign its amount and set to tracker
-    // * to prevent double-spending of a note on-chain, resrve is tracking a set of notes being redeemed.
-    // * to create reserve, reserve's public key holder is asking a tracker whether it will track operations with the
-         key, if the tracker is replying positively, the key holder may start operations (with or without creating reserve)
+    // * offchain payments with no need to create anything on-chain first, so possibility to create credit
+    // * usage of minimally trusted trackers to track state of mutual debt offchain
+    // * onchain contract based redemption with prevention of double redemptions
+
+    // How does that work:
+    //  * a tracker holds A -> B debt (as positive number), along with ever increasing (on every operation nonce).
+    //    A key->value dictionary is used to store the data as AB -> (amount, nonce, sig_A), where AB is concatenation of public
+    //    keys A and B, "amount" is amount of debt of A before B, nonce is operation nonce, sig_A is signature of A for
+    //    A for message (B, amount, sig_A).
+    //  * to make a (new payment) to B, A is taking current AB record, increasing debt, signing the updated record and
+    //    sending it to the tracker
+    //  * tracker is periodically committing to its state (dictionary) by posting its digest on chain
+    //  * at any moment it is possible to redeem A debt to B by calling redemption action of the reserve contract below
+    //    B -> nonce pair is written into the contract box. Calling the contract after with nonce <= written on is
+    //    prohibited. Tracker signature is needed to redeem. On next operation with tracker, debt of A is decreased.
+    //    If not, A is refusing to sign updated records.
+    //  * if tracker is going offline, possible to redeem without its signature, when at least one week passed
+    //  * always possible to top up the reserve, possible to refund after two weeks of delay
+
 
 
     // Data:
@@ -60,6 +58,10 @@
 
     if (action == 0) {
       // redemption path
+
+      // tracker box is holding information about set of notes via a tree (AVL+ tree is used)
+      // root tree is storing (pk, noteNonce)
+      // val tracker = CONTEXT.dataInputs(0)
 
       val g: GroupElement = groupGenerator
 
