@@ -63,18 +63,25 @@ object Constants {
   val noteErgoTree = compile(noteContract)
   val noteAddress = getAddressFromErgoTree(noteErgoTree)
 
+  // Basis contracts
+
+  val basisContract = readContract("offchain/basis.es", Map())
+  val basisErgoTree = compile(basisContract)
+  val basisAddress = getAddressFromErgoTree(basisErgoTree)
+
   // contracts below are experimental and not finished ChainCash-on-Layer2 contracts
 
-  val redemptionContract = scala.io.Source.fromFile("contracts/layer2/redemption.es", "utf-8").getLines.mkString("\n")
+  val redemptionContract = scala.io.Source.fromFile("contracts/layer2-old/redemption.es", "utf-8").getLines.mkString("\n")
   val redemptionErgoTree = compile(redemptionContract)
   val redemptionAddress = getAddressFromErgoTree(redemptionErgoTree)
 
-  val redemptionProducerContract = scala.io.Source.fromFile("contracts/layer2/redproducer.es", "utf-8").getLines.mkString("\n")
+  val redemptionProducerContract = scala.io.Source.fromFile("contracts/layer2-old/redproducer.es", "utf-8").getLines.mkString("\n")
   val redemptionProducerErgoTree = compile(redemptionProducerContract)
   val redemptionProducerAddress = getAddressFromErgoTree(redemptionProducerErgoTree)
 }
 
 object Printer extends App {
+  println("Basis p2s address: " + Constants.basisAddress)
   println("Redemption p2s address: " + Constants.redemptionAddress)
   println("Redemption producer p2s address: " + Constants.redemptionProducerAddress)
 }
