@@ -25,7 +25,15 @@ we have to deal with some security relaxation in the case of offchain notes.
 As a simple but pretty secure solution, the following design is proposed, which can then be improved in many directions 
 (see "Future Extensions" section):
 
-* only reserves 
+* every participant has a public key over elliptic curve supported by Ergo blockchain (Secp256k1, the same curve is used
+ in Bitcoin)
+* only reserves are on-chain. A reserve can be created at any time. A reserve is bound to public key of its owner. 
+Anyone (presumably, owner in most cases) can top the reserve up. Owner can withdraw any amount from the reserve, 
+in two steps (on-chain transactions), first, the owner is announcing that he is going to withdraw, and two weeks after 
+the withdrawal may be completed (or cancelled at any time).
+* for keeping offchain cash ledgers, we have trackers. Anyone can launch a tracker service (just running open-source
+ software on top of powerful enough hardware is needed for that). With time a tracker is getting trust and userbase if 
+ behaves honestly. The design is trying to minimize trust in tracker.
 
 
 ## Basis Contract
@@ -35,5 +43,10 @@ As a simple but pretty secure solution, the following design is proposed, which 
 ## Wallet
 
 ## Future Extensions
+
+* Programmable cash
+* Multi-tracker reserve
+
+## Economy
 
 ## References
