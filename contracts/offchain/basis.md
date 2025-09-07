@@ -36,8 +36,9 @@ the withdrawal may be completed (or cancelled at any time).
  behaves honestly. The design is trying to minimize trust in tracker. For example, a tracker cant redeem IOU notes made 
  to other parties, as they are signed, and the signature is check in redemption on-chain contract. If tracker is 
  disappearing, after some period last tracker state snapshot committed on-chain becomes redeemable without it. If tracker
- is starting censoring notes associated with a public key, by not including them into on-chain update, it is still 
- possible to redeem them. There could be different improvements to the tracker design, see "Future Extensions" section,
+  is starting censoring notes associated with a public key, by not including them into on-chain update, it is still
+  possible to redeem them. There could be different improvements to the tracker design, see "Future Extensions" section.
+* 
 
 ## Basis Contract
 
@@ -46,6 +47,14 @@ the withdrawal may be completed (or cancelled at any time).
 ## Wallet
 
 ## Future Extensions
+
+* Anti-Censorship Protection
+
+If tracker is starting censoring notes associated with a public key, by not including them into on-chain update, it is still
+possible to redeem them with anti-censorship protection. For that, tracker box should be protected with a contract which
+has condition to include spent tracker input's id into a tree stored in a register. Then tracker is storing commitment to
+all it previous states, basically, and we can use that to add a condition to the reserve contract to allow withdrawal of 
+a note which was tracked before but not tracked now, and also not withdrawn. 
 
 * Federated trackers
 * Tracking sidechains
