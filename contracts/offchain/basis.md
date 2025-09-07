@@ -33,8 +33,11 @@ in two steps (on-chain transactions), first, the owner is announcing that he is 
 the withdrawal may be completed (or cancelled at any time).
 * for keeping offchain cash ledgers, we have trackers. Anyone can launch a tracker service (just running open-source
  software on top of powerful enough hardware is needed for that). With time a tracker is getting trust and userbase if 
- behaves honestly. The design is trying to minimize trust in tracker.
-
+ behaves honestly. The design is trying to minimize trust in tracker. For example, a tracker cant redeem IOU notes made 
+ to other parties, as they are signed, and the signature is check in redemption on-chain contract. If tracker is 
+ disappearing, after some period last tracker state snapshot committed on-chain becomes redeemable without it. If tracker
+ is starting censoring notes associated with a public key, by not including them into on-chain update, it is still 
+ possible to redeem them. There could be different improvements to the tracker design, see "Future Extensions" section,
 
 ## Basis Contract
 
@@ -44,6 +47,8 @@ the withdrawal may be completed (or cancelled at any time).
 
 ## Future Extensions
 
+* Federated trackers
+* Tracking sidechains
 * Programmable cash
 * Multi-tracker reserve
 
