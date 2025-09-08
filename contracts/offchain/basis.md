@@ -38,11 +38,13 @@ the withdrawal may be completed (or cancelled at any time).
  disappearing, after some period last tracker state snapshot committed on-chain becomes redeemable without it. If tracker
   is starting censoring notes associated with a public key, by not including them into on-chain update, it is still
   possible to redeem them. There could be different improvements to the tracker design, see "Future Extensions" section.
-* 
+* IOU note from A to B is represented as (B_pubkey, amount, nonce, sig_A) record, where sig_A is a signature for 
+(B_pubkey, amount, nonce). Only one updateable note is stored by a tracker, and redeemable onchain. A tracker is storing
+(amount)
 
 ## Basis Contract
 
-## Basis Offchain Logic
+## Offchain Logic
 
 ## Wallet
 
@@ -80,5 +82,9 @@ For most reserves that does not make sense probably, but multi-tracker reserves 
 different trackers, to rebalance liquidity etc. 
 
 ## Economy
+
+## Implementation Roadmap
+
+
 
 ## References

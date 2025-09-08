@@ -27,8 +27,7 @@
     //    prohibited. Tracker signature is needed to redeem. On next operation with tracker, debt of A is decreased.
     //    If not, A is refusing to sign updated records. Tracker cant steal A's funds as A's signature is checked.
     //  * if tracker is going offline, possible to redeem without its signature, when at least one week passed
-    //  * always possible to top up the reserve, possible to refund after two weeks of delay
-
+    //  * always possible to top up the reserve
 
 
     // Data:
@@ -36,7 +35,6 @@
     //  - R4 - signing key (as a group element)
     //  - R5 - tree of nonces redeemed (to avoid double spending, it should have insert-only flag set)
     //  - R6 - NFT id of tracker server (bytes) // todo: support multiple payment servers by using a tree
-    //  - R7 - refund start height
     //
     // Actions:
     //  - redeem note (#0)
@@ -50,7 +48,7 @@
     val action = v / 10
     val index = v % 10
 
-    val ownerKey = SELF.R4[GroupElement].get // reserve owner's key, used in notes and unlock/lock/refund actions
+    val ownerKey = SELF.R4[GroupElement].get // reserve owner's key
     val selfOut = OUTPUTS(index)
 
     // common checks for all the paths (not incl. ERG value check)
@@ -98,10 +96,11 @@
       val nextTree: AvlTree = SELF.R5[AvlTree].get.insert(Coll(nonceKeyVal), proof).get // todo: tree can have insert or update flags
       val properNonceTree = nextTree == selfOut.R5[AvlTree].get // todo: check that the nonce has increased
 
-      // todo: add min spending height ?
+      val lastBlockTime = CONTEXT.headers(0).timestamp
+      val enoughTimeSpent = (nonce > 0) && (lastBlockTime - nonce) > 7 * 86400000 // 7 days in milliseconds passed
 
       val redeemed = SELF.value - selfOut.value
-      val properlyRedeemed = redeemed <= debtAmount
+      val properlyRedeemed = (redeemed <= debtAmount) && enoughTimeSpent
 
       val message = key ++ longToByteArray(debtAmount) ++ longToByteArray(nonce)
 
@@ -146,25 +145,6 @@
         (selfOut.value - SELF.value >= 1000000000)  && // at least 1 ERG added
         selfOut.R5[AvlTree].get == SELF.R5[AvlTree].get
       )
-    } else if (action == 2) {
-      // init refund
-      val correctHeight = selfOut.R7[Int].get >= HEIGHT - 5
-      val correctValue = selfOut.value >= SELF.value
-      // todo: recheck registers preservation
-      sigmaProp(selfPreserved && correctHeight && correctValue) && proveDlog(ownerKey)
-    } else if (action == 3) {
-      // cancel refund
-      val correctHeight = !(selfOut.R7[Int].isDefined)
-      val correctValue = selfOut.value >= SELF.value
-      // todo: recheck registers preservation
-      sigmaProp(selfPreserved && correctHeight && correctValue) && proveDlog(ownerKey)
-    } else if (action == 4) {
-      // complete refund
-      val refundStartHeight = SELF.R5[Int].get
-      val refundNotificationPeriod = 14400 // 20 days
-      val correctHeight = (refundStartHeight + refundNotificationPeriod) <= HEIGHT
-      // todo: recheck registers preservation
-      sigmaProp(selfPreserved && correctHeight) && proveDlog(ownerKey) // todo: check is it ok to check no other conditions
     } else {
       sigmaProp(false)
     }
