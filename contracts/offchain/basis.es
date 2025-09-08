@@ -63,77 +63,93 @@
     if (action == 0) {
       // redemption path
 
-      // tracker box is holding information about debt as AB -> (amt, timestamp)
-      val tracker = CONTEXT.dataInputs(0)
-      val trackerNftId = tracker.tokens(0)._1
-      val trackerTree = tracker.R5[AvlTree].get
-      val expectedTrackerId = SELF.R6[Coll[Byte]].get
-      val trackerIdCorrect = trackerNftId == expectedTrackerId
-      val trackerPubKey = tracker.R4[GroupElement].get
+      // Tracker box holds the debt information as key-value pairs: AB -> (amount, timestamp)
+      val tracker = CONTEXT.dataInputs(0) // Data input: tracker box containing debt records
+      val trackerNftId = tracker.tokens(0)._1 // NFT token ID identifying the tracker
+      val trackerTree = tracker.R5[AvlTree].get // AVL tree storing debt commitments from tracker
+      val expectedTrackerId = SELF.R6[Coll[Byte]].get // Expected tracker ID stored in reserve contract
+      val trackerIdCorrect = trackerNftId == expectedTrackerId // Verify tracker identity matches
+      val trackerPubKey = tracker.R4[GroupElement].get // Tracker's public key for signature verification
 
-      val g: GroupElement = groupGenerator
+      val g: GroupElement = groupGenerator // Base point for elliptic curve operations
 
+      // Receiver of the redemption (creditor)
       val receiver = getVar[GroupElement](10).get // todo : check id
-      val receiverBytes = receiver.getEncoded
+      val receiverBytes = receiver.getEncoded // Receiver's public key bytes
 
-      val ownerKeyBytes = ownerKey.getEncoded
+      val ownerKeyBytes = ownerKey.getEncoded // Reserve owner's public key bytes
 
+      // Create key for debt record: hash(ownerKey || receiverKey)
       val key = blake2b256(ownerKeyBytes ++ receiverBytes)
       
+      // Reserve owner's signature for the debt record
       val reserveSigBytes = getVar[Coll[Byte]](4).get
 
+      // Debt amount and timestamp from the debt record
       val debtAmount = getVar[Long](11).get // todo : check id
       val timestamp = getVar[Long](11).get // todo : check id
       val value = longToByteArray(debtAmount) ++ longToByteArray(timestamp) ++ reserveSigBytes
 
-      val reserveId = SELF.tokens(0)._1
+      val reserveId = SELF.tokens(0)._1 // Reserve singleton token ID
 
+      // Output box where redeemed funds are sent
       val redemptionOut = OUTPUTS(index + 1)
       val redemptionTreeHash = blake2b256(redemptionOut.propositionBytes)
       val afterFees = redemptionOut.value
 
-      // todo: store amount to avoid offchain settlement?
-      val timestampKeyVal = (key, longToByteArray(timestamp))  // key -> value
-      val proof = getVar[Coll[Byte]](2).get
+      // Update timestamp tree to prevent double redemption
+      // Store timestamp to mark it as redeemed
+      val timestampKeyVal = (key, longToByteArray(timestamp))  // key -> timestamp value
+      val proof = getVar[Coll[Byte]](2).get // Merkle proof for tree insertion
+      // Insert redeemed timestamp into AVL tree
       val nextTree: AvlTree = SELF.R5[AvlTree].get.insert(Coll(timestampKeyVal), proof).get // todo: tree can have insert or update flags
+      // Verify tree was properly updated in output
       val properTimestampTree = nextTree == selfOut.R5[AvlTree].get // todo: check that the timestamp has increased
 
+      // Check if enough time has passed for emergency redemption (without tracker signature)
       val lastBlockTime = CONTEXT.headers(0).timestamp
       val enoughTimeSpent = (timestamp > 0) && (lastBlockTime - timestamp) > 7 * 86400000 // 7 days in milliseconds passed
 
+      // Calculate amount being redeemed and verify it doesn't exceed debt
       val redeemed = SELF.value - selfOut.value
       val properlyRedeemed = (redeemed <= debtAmount) && enoughTimeSpent
 
+      // Message to verify signatures: key || amount || timestamp
       val message = key ++ longToByteArray(debtAmount) ++ longToByteArray(timestamp)
 
+      // Tracker's signature authorizing the redemption
       val trackerSigBytes = getVar[Coll[Byte]](3).get
 
-      val trackerABytes = trackerSigBytes.slice(0, 33)
-      val trackerZBytes = trackerSigBytes.slice(33, trackerSigBytes.size)
-      val trackerA = decodePoint(trackerABytes)
-      val trackerZ = byteArrayToBigInt(trackerZBytes)
+      // Split tracker signature into components (Schnorr signature: (a, z))
+      val trackerABytes = trackerSigBytes.slice(0, 33) // Random point a
+      val trackerZBytes = trackerSigBytes.slice(33, trackerSigBytes.size) // Response z
+      val trackerA = decodePoint(trackerABytes) // Decode random point
+      val trackerZ = byteArrayToBigInt(trackerZBytes) // Convert response to big integer
 
-      // Computing challenge
+      // Compute challenge for tracker signature verification (Fiat-Shamir)
       val trackerE: Coll[Byte] = blake2b256(trackerABytes ++ message ++ trackerPubKey.getEncoded) // strong Fiat-Shamir
       val trackerEInt = byteArrayToBigInt(trackerE) // challenge as big integer
 
-      // Signature is valid if g^z = a * x^e
+      // Verify tracker Schnorr signature: g^z = a * x^e
       val properTrackerSignature = (g.exp(trackerZ) == trackerA.multiply(ownerKey.exp(trackerEInt)))
 
-      val reserveABytes = reserveSigBytes.slice(0, 33)
-      val reserveZBytes = reserveSigBytes.slice(33, reserveSigBytes.size)
-      val reserveA = decodePoint(reserveABytes)
-      val reserveZ = byteArrayToBigInt(reserveZBytes)
+      // Split reserve owner signature into components (Schnorr signature: (a, z))
+      val reserveABytes = reserveSigBytes.slice(0, 33) // Random point a
+      val reserveZBytes = reserveSigBytes.slice(33, reserveSigBytes.size) // Response z
+      val reserveA = decodePoint(reserveABytes) // Decode random point
+      val reserveZ = byteArrayToBigInt(reserveZBytes) // Convert response to big integer
 
-      // Computing challenge
+      // Compute challenge for reserve signature verification (Fiat-Shamir)
       val reserveE: Coll[Byte] = blake2b256(reserveABytes ++ message ++ ownerKey.getEncoded) // strong Fiat-Shamir
       val reserveEInt = byteArrayToBigInt(reserveE) // challenge as big integer
 
-      // Signature is valid if g^z = a * x^e
+      // Verify reserve owner Schnorr signature: g^z = a * x^e
       val properReserveSignature = (g.exp(reserveZ) == reserveA.multiply(ownerKey.exp(reserveEInt)))
 
+      // Verify receiver's proposition (creditor must be able to spend the redemption output)
       val receiverCondition = proveDlog(receiver)
 
+      // Combine all validation conditions
       sigmaProp(selfPreserved &&
                 properTimestampTree &&
                 properTrackerSignature &&

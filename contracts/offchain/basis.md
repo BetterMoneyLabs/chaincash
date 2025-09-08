@@ -48,7 +48,7 @@ the withdrawal may be completed (or cancelled at any time).
  contract UTXO is storing tree of hash(AB) -> timestamp pairs. It is impossible to withdraw a note with timestamp <= 
 redeemed again. After on-chain redemption, A and B should contact offchain to deduct before next payment from A to B done. 
 A note may be redeemed only one week after creation (timestamp of last block is one week ahead of timestamp in the note,
- at least).
+ at least), thus for services it makes sense to have a lot of rotating keys.
 
 ## Basis Contract
 
@@ -101,9 +101,21 @@ Possible to have reserve contract with support for multiple reserves, put under 
 For most reserves that does not make sense probably, but multi-tracker reserves can be used as gateways between 
 different trackers, to rebalance liquidity etc. 
 
+* Privacy 
+
+Not hard to do withdrawals to stealth addresses. 
+
 ## Economy
 
 ## Implementation Roadmap
+
+The following implementation plan is targeting catching micropayments in P2P networks, AI usage, etc ASAP and then 
+develop based on feedback:
+
+* Do tests for Basis contract, like ChainCashSpec or Dexy contracts (Scala)
+* Do a token-based variant of reserve contract (ErgoScript)
+* Do tracker service (Rust), which is collecting offchain notes and also tracking on-chain reserves, writing 
+periodically commitments on chain, informing clients about state of notes / reserves (collateralization etc)
 
 
 
