@@ -109,14 +109,16 @@ Not hard to do withdrawals to stealth addresses.
 
 ## Implementation Roadmap
 
-The following implementation plan is targeting catching micropayments in P2P networks, AI usage, etc ASAP and then 
-develop based on feedback:
+The following implementation plan is targeting catching micropayments in P2P networks, agentic networks, etc ASAP and then 
+develop tools for community trading:
 
 * Do tests for Basis contract, like ChainCashSpec or Dexy contracts (Scala)
 * Do a token-based variant of reserve contract (ErgoScript)
 * Do tracker service (Rust), which is collecting offchain notes and also tracking on-chain reserves, writing 
 periodically commitments on chain, informing clients about state of notes / reserves (collateralization etc)
-
+* Do Celaut payment module, where peers can . Add support for agentic layer, so AI agents can buy computations 
+over Celaut, then requests to other APIs as well.
+* Do a wallet for community trading (maybe in form of telegram bots? like one wallet bot for one community)
 
 
 ## References
