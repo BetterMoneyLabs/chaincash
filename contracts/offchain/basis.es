@@ -92,7 +92,8 @@
       val redemptionTreeHash = blake2b256(redemptionOut.propositionBytes)
       val afterFees = redemptionOut.value
 
-      val timestampKeyVal = (key, Coll(1.toByte))  // key -> value
+      // todo: store amount to avoid offchain settlement?
+      val timestampKeyVal = (key, longToByteArray(timestamp))  // key -> value
       val proof = getVar[Coll[Byte]](2).get
       val nextTree: AvlTree = SELF.R5[AvlTree].get.insert(Coll(timestampKeyVal), proof).get // todo: tree can have insert or update flags
       val properTimestampTree = nextTree == selfOut.R5[AvlTree].get // todo: check that the timestamp has increased

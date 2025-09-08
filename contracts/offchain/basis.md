@@ -38,13 +38,33 @@ the withdrawal may be completed (or cancelled at any time).
  disappearing, after some period last tracker state snapshot committed on-chain becomes redeemable without it. If tracker
   is starting censoring notes associated with a public key, by not including them into on-chain update, it is still
   possible to redeem them. There could be different improvements to the tracker design, see "Future Extensions" section.
-* IOU note from A to B is represented as (B_pubkey, amount, nonce, sig_A) record, where sig_A is a signature for 
-(B_pubkey, amount, nonce). Only one updateable note is stored by a tracker, and redeemable onchain. A tracker is storing
-(amount)
+* IOU note from A to B is represented as (B_pubkey, amount, timestamp, sig_A) record, where amount is the **total** amount of
+ A's debt before B, timestamp is timestamp of latest payment from A to B, and sig_A is a signature for (B_pubkey, amount, 
+ nonce). Only one updateable note is stored by a tracker, and redeemable onchain. Thus a tracker is storing 
+ (amount, timestamp) pairs for all A->B debt relationships. The tracker commits on-chain to the data by storing a digest 
+ of a tree where hash(A ++ B) acts as a key, and (amount, timestamp) acts as a value. 
+ 
+* If A has on-chain reserve, B may redeem offchain from A->B note, by providing proof of (amount, timestamp). Reserve
+ contract UTXO is storing tree of hash(AB) -> timestamp pairs. It is impossible to withdraw a note with timestamp <= 
+redeemed again. After on-chain redemption, A and B should contact offchain to deduct before next payment from A to B done. 
+A note may be redeemed only one week after creation (timestamp of last block is one week ahead of timestamp in the note,
+ at least).
 
 ## Basis Contract
 
 ## Offchain Logic
+
+## Security Assumptions
+
+We assume that tracker is honestly collecting and announcing notes it has. However, malicious trackers may deviate from
+honest behaviour.
+
+Tracker can simply go offline, but then the latest state committed on-chain is still redeemable,
+
+Tracker may remove debt notes of protocol participants. This problem can be tackled with the anti-censorship protection
+from "Future Extensions" section.
+
+Tracker may collude with a reserve holder to inject 
 
 ## Wallet
 
