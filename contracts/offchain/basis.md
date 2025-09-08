@@ -57,9 +57,27 @@ all it previous states, basically, and we can use that to add a condition to the
 a note which was tracked before but not tracked now, and also not withdrawn. 
 
 * Federated trackers
+
+Instead of a single tracker, we may have federation, like done in Oracle Pools, or double layered federation like done
+in Rosen bridge.
+
 * Tracking sidechains
+
+As a continuation of federation tracker idea, we may have tracking sidechains, for example, merged-mined sidechains, to
+reduce multisig security to majority-of-Ergo-hashrate-following-sidechain security.
+
 * Programmable cash
+
+We may store redeeming condition script hash instead of recipient pubkey just in IOU notes, and add the condition to 
+other redeeming conditions in onchain redemption action.
+
 * Multi-tracker reserve
+
+Possible to have reserve contract with support for multiple reserves, put under AVL+ tree or just in collection if there
+ are few of them.
+
+For most reserves that does not make sense probably, but multi-tracker reserves can be used as gateways between 
+different trackers, to rebalance liquidity etc. 
 
 ## Economy
 
