@@ -15,25 +15,26 @@
     // * onchain contract based redemption with prevention of double redemptions
 
     // How does that work:
-    //  * a tracker holds A -> B debt (as positive number), along with ever increasing (on every operation nonce).
-    //    A key->value dictionary is used to store the data as hash(AB) -> (amount, nonce, sig_A), where AB is concatenation of public
-    //    keys A and B, "amount" is amount of debt of A before B, nonce is operation nonce, sig_A is signature of A for
-    //    A for message (hash(AB), amount, nonce).
+    //  * a tracker holds A -> B debt (as positive number), along with ever increasing (on every operation) timestamp.
+    //    A key->value dictionary is used to store the data as hash(AB) -> (amount, timestamp, sig_A), where AB is concatenation of public
+    //    keys A and B, "amount" is amount of debt of A before B, timestamp is operation timestamp (in milliseconds), sig_A is signature of A for
+    //    A for message (hash(AB), amount, timestamp).
     //  * to make a (new payment) to B, A is taking current AB record, increasing debt, signing the updated record and
     //    sending it to the tracker
     //  * tracker is periodically committing to its state (dictionary) by posting its digest on chain
     //  * at any moment it is possible to redeem A debt to B by calling redemption action of the reserve contract below
-    //    B -> nonce pair is written into the contract box. Calling the contract after with nonce <= written on is
+    //    B -> timestamp pair is written into the contract box. Calling the contract after with timestamp <= written on is
     //    prohibited. Tracker signature is needed to redeem. On next operation with tracker, debt of A is decreased.
     //    If not, A is refusing to sign updated records. Tracker cant steal A's funds as A's signature is checked.
     //  * if tracker is going offline, possible to redeem without its signature, when at least one week passed
-    //  * always possible to top up the reserve
+    //  * always possible to top up the reserve, to redeem, reserve holder is making an offchain payment to self (A -> A)
+    //    and then redeem
 
 
     // Data:
     //  - token #0 - identifying singleton token
     //  - R4 - signing key (as a group element)
-    //  - R5 - tree of nonces redeemed (to avoid double spending, it should have insert-only flag set)
+    //  - R5 - tree of timestamps redeemed (to avoid double spending, it should have insert-only flag set)
     //  - R6 - NFT id of tracker server (bytes) // todo: support multiple payment servers by using a tree
     //
     // Actions:
@@ -62,7 +63,7 @@
     if (action == 0) {
       // redemption path
 
-      // tracker box is holding information about debt as AB -> (amt, nonce)
+      // tracker box is holding information about debt as AB -> (amt, timestamp)
       val tracker = CONTEXT.dataInputs(0)
       val trackerNftId = tracker.tokens(0)._1
       val trackerTree = tracker.R5[AvlTree].get
@@ -82,8 +83,8 @@
       val reserveSigBytes = getVar[Coll[Byte]](4).get
 
       val debtAmount = getVar[Long](11).get // todo : check id
-      val nonce = getVar[Long](11).get // todo : check id
-      val value = longToByteArray(debtAmount) ++ longToByteArray(nonce) ++ reserveSigBytes
+      val timestamp = getVar[Long](11).get // todo : check id
+      val value = longToByteArray(debtAmount) ++ longToByteArray(timestamp) ++ reserveSigBytes
 
       val reserveId = SELF.tokens(0)._1
 
@@ -91,18 +92,18 @@
       val redemptionTreeHash = blake2b256(redemptionOut.propositionBytes)
       val afterFees = redemptionOut.value
 
-      val nonceKeyVal = (key, Coll(1.toByte))  // key -> value
+      val timestampKeyVal = (key, Coll(1.toByte))  // key -> value
       val proof = getVar[Coll[Byte]](2).get
-      val nextTree: AvlTree = SELF.R5[AvlTree].get.insert(Coll(nonceKeyVal), proof).get // todo: tree can have insert or update flags
-      val properNonceTree = nextTree == selfOut.R5[AvlTree].get // todo: check that the nonce has increased
+      val nextTree: AvlTree = SELF.R5[AvlTree].get.insert(Coll(timestampKeyVal), proof).get // todo: tree can have insert or update flags
+      val properTimestampTree = nextTree == selfOut.R5[AvlTree].get // todo: check that the timestamp has increased
 
       val lastBlockTime = CONTEXT.headers(0).timestamp
-      val enoughTimeSpent = (nonce > 0) && (lastBlockTime - nonce) > 7 * 86400000 // 7 days in milliseconds passed
+      val enoughTimeSpent = (timestamp > 0) && (lastBlockTime - timestamp) > 7 * 86400000 // 7 days in milliseconds passed
 
       val redeemed = SELF.value - selfOut.value
       val properlyRedeemed = (redeemed <= debtAmount) && enoughTimeSpent
 
-      val message = key ++ longToByteArray(debtAmount) ++ longToByteArray(nonce)
+      val message = key ++ longToByteArray(debtAmount) ++ longToByteArray(timestamp)
 
       val trackerSigBytes = getVar[Coll[Byte]](3).get
 
@@ -133,7 +134,7 @@
       val receiverCondition = proveDlog(receiver)
 
       sigmaProp(selfPreserved &&
-                properNonceTree &&
+                properTimestampTree &&
                 properTrackerSignature &&
                 properReserveSignature &&
                 properlyRedeemed &&
