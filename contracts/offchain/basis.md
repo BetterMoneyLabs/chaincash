@@ -50,6 +50,8 @@ A note may be redeemed only one week after creation (timestamp of last block is 
 
 ## Basis Contract
 
+A basic contract corresponding to the design outlined in the previous section, is available @ [basis.es](basis.es).
+
 ## Offchain Logic
 
 ## Security Assumptions
@@ -62,7 +64,9 @@ Tracker can simply go offline, but then the latest state committed on-chain is s
 Tracker may remove debt notes of protocol participants. This problem can be tackled with the anti-censorship protection
 from "Future Extensions" section.
 
-Tracker may collude with a reserve holder to inject 
+Tracker may collude with a reserve holder to inject a note with fake timestamp in the past to redeem immediately. 
+Tracker would be caught in this case. For making this case impossible with contract, technique similar to anti-censorship 
+protection can be used.
 
 ## Wallet
 
@@ -73,7 +77,7 @@ Tracker may collude with a reserve holder to inject
 If tracker is starting censoring notes associated with a public key, by not including them into on-chain update, it is still
 possible to redeem them with anti-censorship protection. For that, tracker box should be protected with a contract which
 has condition to include spent tracker input's id into a tree stored in a register. Then tracker is storing commitment to
-all it previous states, basically, and we can use that to add a condition to the reserve contract to allow withdrawal of 
+all it previous states, basically, and we can use that to add a condition to the reserve contract to allow redemption of 
 a note which was tracked before but not tracked now, and also not withdrawn. 
 
 * Federated trackers
@@ -101,7 +105,7 @@ different trackers, to rebalance liquidity etc.
 
 * Privacy 
 
-Not hard to do withdrawals to stealth addresses. 
+Not hard to do redemptions to stealth addresses. 
 
 ## Economy
 
