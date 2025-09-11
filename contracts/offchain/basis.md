@@ -60,8 +60,8 @@ Tracker is publishing following events via NOSTR protocol as relay:
 
 * note - new or updated note, along with proof of tracker state transformation and digest after operation
 * commitment - posting data for on-chain tracker state commitment update (header, proof of UTXO against header, UTXO with commitment)
-* 80% alert - tracker is posting it when collateralization level of some key reaching 80% 
-* 100% alert - tracker is posting it when collateralization level of some key reaching 100%
+* 80% alert - tracker is posting it when debt level of some pubkey reaching 80% of collateral 
+* 100% alert - tracker is posting it when debt level of some pubkey reaching 100% of collateral
 
 Then it also supports following API requests which can be run separately from relay potentially:
 
@@ -135,9 +135,12 @@ develop tools for community trading:
 * Do a token-based variant of reserve contract (ErgoScript)
 * Do tracker service (Rust), which is collecting offchain notes and also tracking on-chain reserves, writing 
 periodically commitments on chain, informing clients about state of notes / reserves (collateralization etc)
-* Do Celaut payment module, where peers can . Add support for agentic layer, so AI agents can buy computations 
+* Do Celaut payment module, where peers can set credit limits and pay each other. Add support for agentic layer, so AI agents can buy computations 
 over Celaut, then requests to other APIs as well.
+* Do showcase for agent-to-agent payments
 * Do a wallet for community trading (maybe in form of telegram bots? like one wallet bot for one community)
+* Do alternative for NOSTR zaps
 
+and so on
 
 ## References
