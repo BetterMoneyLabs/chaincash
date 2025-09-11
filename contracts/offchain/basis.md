@@ -59,6 +59,8 @@ A basic contract corresponding to the design outlined in the previous section, i
 Tracker is publishing following events via NOSTR protocol as relay:
 
 * note - new or updated note, along with proof of tracker state transformation and digest after operation
+* redemption - redemption done from a reserve
+* reserve top-up
 * commitment - posting data for on-chain tracker state commitment update (header, proof of UTXO against header, UTXO with commitment)
 * 80% alert - tracker is posting it when debt level of some pubkey reaching 80% of collateral 
 * 100% alert - tracker is posting it when debt level of some pubkey reaching 100% of collateral
