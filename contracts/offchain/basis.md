@@ -54,6 +54,23 @@ A basic contract corresponding to the design outlined in the previous section, i
 
 ## Offchain Logic
 
+### Tracker
+
+Tracker is publishing following events via NOSTR protocol as relay:
+
+* note - new or updated note, along with proof of tracker state transformation and digest after operation
+* commitment - posting data for on-chain tracker state commitment update (header, proof of UTXO against header, UTXO with commitment)
+* 80% alert - tracker is posting it when collateralization level of some key reaching 80% 
+* 100% alert - tracker is posting it when collateralization level of some key reaching 100%
+
+Then it also supports following API requests which can be run separately from relay potentially:
+
+* getNotesForKey - returns all the notes sssociated with a pubkey
+* getProof - get proof for a note against latest digest published by the tracker (not necessarily committed on-chain)
+* getKeyStatus - returns current collateralization of a pubkey along with other important information. Useful for light
+wallets and clients which are ready 
+* POST noteUpdate - create or update a note
+
 ## Security Assumptions
 
 We assume that tracker is honestly collecting and announcing notes it has. However, malicious trackers may deviate from
