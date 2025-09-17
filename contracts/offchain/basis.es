@@ -74,7 +74,7 @@
       val g: GroupElement = groupGenerator // Base point for elliptic curve operations
 
       // Receiver of the redemption (creditor)
-      val receiver = getVar[GroupElement](10).get // todo : check id
+      val receiver = getVar[GroupElement](1).get
       val receiverBytes = receiver.getEncoded // Receiver's public key bytes
 
       val ownerKeyBytes = ownerKey.getEncoded // Reserve owner's public key bytes
@@ -83,11 +83,11 @@
       val key = blake2b256(ownerKeyBytes ++ receiverBytes)
       
       // Reserve owner's signature for the debt record
-      val reserveSigBytes = getVar[Coll[Byte]](4).get
+      val reserveSigBytes = getVar[Coll[Byte]](2).get
 
       // Debt amount and timestamp from the debt record
-      val debtAmount = getVar[Long](11).get // todo : check id
-      val timestamp = getVar[Long](11).get // todo : check id
+      val debtAmount = getVar[Long](3).get
+      val timestamp = getVar[Long](4).get
       val value = longToByteArray(debtAmount) ++ longToByteArray(timestamp) ++ reserveSigBytes
 
       val reserveId = SELF.tokens(0)._1 // Reserve singleton token ID
@@ -100,7 +100,7 @@
       // Update timestamp tree to prevent double redemption
       // Store timestamp to mark it as redeemed
       val timestampKeyVal = (key, longToByteArray(timestamp))  // key -> timestamp value
-      val proof = getVar[Coll[Byte]](2).get // Merkle proof for tree insertion
+      val proof = getVar[Coll[Byte]](5).get // Merkle proof for tree insertion
       // Insert redeemed timestamp into AVL tree
       val nextTree: AvlTree = SELF.R5[AvlTree].get.insert(Coll(timestampKeyVal), proof).get // todo: tree can have insert or update flags
       // Verify tree was properly updated in output
@@ -118,7 +118,7 @@
       val message = key ++ longToByteArray(debtAmount) ++ longToByteArray(timestamp)
 
       // Tracker's signature authorizing the redemption
-      val trackerSigBytes = getVar[Coll[Byte]](3).get
+      val trackerSigBytes = getVar[Coll[Byte]](6).get
 
       // Split tracker signature into components (Schnorr signature: (a, z))
       val trackerABytes = trackerSigBytes.slice(0, 33) // Random point a
