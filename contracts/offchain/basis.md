@@ -91,6 +91,28 @@ protection can be used.
 
 ## Future Extensions
 
+* Anti-Collusion Protection
+
+Let's suppose that, at time t1, we have:
+
+(Bob -> Alice, 2, 9), with the 9th note signed by Bob.
+
+And, at time t2, we have:
+
+(Bob -> Alice, 3, 10), with the 10th note signed by Bob.
+
+Bob (at least, he incentivized to) informing tracker, and the tracker commits on-chain 
+the latest nonce seen. Also, tracker's signature is required for normal redemption.
+
+So at the moment t2:
+
+1) if committed state is (Bob -> Alice, 3, 10) , Alice can't withdraw (Bob -> Alice, 2, 9)
+2) if committed state is (Bob -> Alice, 3, 9) , Alice can withdraw by colluding with the tracker , 
+    and the misbehavior has onchain footprint
+
+Possible to introduce protection from the collusion by making debt amount ever increasing (so then it is amount of 
+offchain debt of Bob before Alice, including redeemed), and  storing redeemed amount in Bob's reserve contract as well.
+
 * Anti-Censorship Protection
 
 If tracker is starting censoring notes associated with a public key, by not including them into on-chain update, it is still
