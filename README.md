@@ -74,6 +74,28 @@ Join discussion groups for developers and users:
 
 * Telegram: [https://t.me/chaincashtalks](https://t.me/chaincashtalks)
 
+## Deployment Utilities
+
+### Basis Reserve Contract Deployment
+
+The repository includes deployment utilities for the Basis reserve contract:
+
+```scala
+// Run deployment utility
+sbt 'runMain chaincash.contracts.BasisDeployer'
+
+// Or use the contract printer
+sbt 'runMain chaincash.contracts.Constants$Printer'
+```
+
+This generates deployment requests for the Basis reserve contract, which supports:
+- Off-chain payments with credit creation
+- Redemption with 2% fee
+- Emergency redemption after 7 days
+- Tracker-based debt tracking
+
+See `src/main/scala/chaincash/contracts/README.md` for detailed usage.
+
 ## TODO
 
 * update ReserveData.liabilities and reserveKeys in offchain code

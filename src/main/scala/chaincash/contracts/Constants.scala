@@ -84,4 +84,9 @@ object Printer extends App {
   println("Basis p2s address: " + Constants.basisAddress)
   println("Redemption p2s address: " + Constants.redemptionAddress)
   println("Redemption producer p2s address: " + Constants.redemptionProducerAddress)
+  
+  // Example deployment info
+  println("\nTo deploy Basis reserve:")
+  println("1. Run BasisDeployer.main() for deployment requests")
+  println("2. Use createBasisDeploymentRequest() with actual values")
 }
