@@ -30,7 +30,10 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
 
   val fakeScript = "sigmaProp(true)"
 
-  val emptyTree = Constants.emptyTree
+  val chainCashPlasmaParameters = PlasmaParameters(32, None)
+  def emptyPlasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, chainCashPlasmaParameters)
+  val emptyTreeErgoValue: ErgoValue[AvlTree] = emptyPlasmaMap.ergoValue
+  val emptyTree: AvlTree = emptyTreeErgoValue.getValue
 
   val basisTokenId = "4b2d8b7beb3eaac8234d9e61792d270898a43934d6a27275e4f3a044609c9f2a"
   val trackerNFT = "3c45f29a5165b030fdb5eaf5d81f8108f9d8f507b31487dd51f4ae08fe07cf4a"
@@ -165,6 +168,13 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       val reserveSigBytes = GroupElementSerializer.toBytes(reserveSig._1) ++ reserveSig._2.toByteArray
       val trackerSigBytes = GroupElementSerializer.toBytes(trackerSig._1) ++ trackerSig._2.toByteArray
 
+
+      val reservePlasmaParameters = PlasmaParameters(32, None)
+      val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, reservePlasmaParameters)
+      val insertRes = plasmaMap.insert(key -> Longs.toByteArray(timestamp))
+      val insertProof = insertRes.proof
+      val outTree = plasmaMap.ergoValue.getValue
+
       // Create basis input with empty tree
       val basisInput =
         ctx
@@ -172,7 +182,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .outBoxBuilder
           .value(minValue + debtAmount + feeValue)
           .tokens(new ErgoToken(basisTokenId, 1))
-          .registers(ErgoValue.of(ownerPk), Constants.emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes))
+          .registers(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes))
           .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
           .build()
           .convertToInputWith(fakeTxId1, fakeIndex)
@@ -182,9 +192,10 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
             new ContextVar(2, ErgoValue.of(reserveSigBytes)),
             new ContextVar(3, ErgoValue.of(debtAmount)),
             new ContextVar(4, ErgoValue.of(timestamp)),
-            new ContextVar(5, ErgoValue.of(Array.empty[Byte])), // Empty proof - will cause failure
+            new ContextVar(5, ErgoValue.of(insertProof.bytes)),
             new ContextVar(6, ErgoValue.of(trackerSigBytes))
           )
+
 
       // Tracker data input
       val trackerDataInput =
@@ -202,7 +213,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       val basisOutput = createOut(
         Constants.basisContract,
         minValue + feeValue, // debt amount redeemed
-        Array(ErgoValue.of(ownerPk), Constants.emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes)),
+        Array(ErgoValue.of(ownerPk), ErgoValue.of(outTree), ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1))
       )
 
@@ -222,14 +233,14 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       // is being executed. The transaction fails due to AVL tree proof incompatibility,
       // but this demonstrates that the signature verification and basic redemption logic
       // are working correctly.
-      an[Exception] should be thrownBy {
+      noException should be thrownBy {
         createTx(
           inputs,
           dataInputs,
           outputs,
           fee = None,
           changeAddress,
-          Array[String](ownerSecret.toString()),
+          Array[String](receiverSecret.toString()),
           false
         )
       }

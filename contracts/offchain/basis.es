@@ -106,14 +106,6 @@
       // Verify tree was properly updated in output
       val properTimestampTree = nextTree == selfOut.R5[AvlTree].get // todo: check that the timestamp has increased
 
-      // Check if enough time has passed for emergency redemption (without tracker signature)
-      val lastBlockTime = CONTEXT.headers(0).timestamp
-      val enoughTimeSpent = (timestamp > 0) && (lastBlockTime - timestamp) > 7 * 86400000 // 7 days in milliseconds passed
-
-      // Calculate amount being redeemed and verify it doesn't exceed debt
-      val redeemed = SELF.value - selfOut.value
-      val properlyRedeemed = (redeemed <= debtAmount) && enoughTimeSpent
-
       // Message to verify signatures: key || amount || timestamp
       val message = key ++ longToByteArray(debtAmount) ++ longToByteArray(timestamp)
 
@@ -132,6 +124,14 @@
 
       // Verify tracker Schnorr signature: g^z = a * x^e
       val properTrackerSignature = (g.exp(trackerZ) == trackerA.multiply(trackerPubKey.exp(trackerEInt)))
+
+      // Check if enough time has passed for emergency redemption (without tracker signature)
+      val lastBlockTime = CONTEXT.headers(0).timestamp
+      val enoughTimeSpent = (timestamp > 0) && (lastBlockTime - timestamp) > 7 * 86400000 // 7 days in milliseconds passed
+
+      // Calculate amount being redeemed and verify it doesn't exceed debt
+      val redeemed = SELF.value - selfOut.value
+      val properlyRedeemed = (redeemed <= debtAmount) && (enoughTimeSpent || properTrackerSignature)
 
       // Split reserve owner signature into components (Schnorr signature: (a, z))
       val reserveABytes = reserveSigBytes.slice(0, 33) // Random point a
@@ -152,7 +152,6 @@
       // Combine all validation conditions
       sigmaProp(selfPreserved &&
                 properTimestampTree &&
-                properTrackerSignature &&
                 properReserveSignature &&
                 properlyRedeemed &&
                 receiverCondition)
