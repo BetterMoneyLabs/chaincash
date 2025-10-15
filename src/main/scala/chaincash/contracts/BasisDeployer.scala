@@ -1,19 +1,15 @@
 package chaincash.contracts
 
 import org.ergoplatform.ErgoAddressEncoder
-import org.ergoplatform.appkit.{AppkitHelpers, ErgoClient, ErgoContract, NetworkType}
-import org.ergoplatform.restapi.client.{Asset, ErgoTransactionOutput}
+import org.ergoplatform.appkit.NetworkType
+
 import scorex.crypto.encode.Base16
-import scorex.util.encode.Base64
-import sigmastate.Values.{AvlTreeConstant, BooleanConstant, GroupElementConstant, IntConstant, LongConstant}
-import sigmastate.basics.DLogProtocol.ProveDlog
-import sigmastate.eval.CAvlTree
+import sigmastate.Values.{AvlTreeConstant, GroupElementConstant}
+
 import sigmastate.serialization.{GroupElementSerializer, ValueSerializer}
 import work.lithos.plasma.PlasmaParameters
 import work.lithos.plasma.collections.PlasmaMap
 
-import java.util
-import scala.collection.JavaConverters._
 
 /**
  * Utility for deploying Basis reserve contract on Ergo blockchain mainnet
@@ -121,32 +117,6 @@ object BasisDeployer extends App {
   }
 
   /**
-   * Creates deployment request for top-up operation
-   * @param reserveTokenId Singleton token ID for the reserve
-   * @param additionalCollateral Additional ERG collateral in nanoERG
-   * @return JSON string for top-up request
-   */
-  def createTopUpRequest(
-    reserveTokenId: String,
-    additionalCollateral: Long
-  ): String = {
-    s"""
-      |[
-      |  {
-      |    "address": "${basisAddress.toString}",
-      |    "value": $additionalCollateral,
-      |    "assets": [
-      |      {
-      |        "tokenId": "$reserveTokenId",
-      |        "amount": 1
-      |      }
-      |    ]
-      |  }
-      |]
-      |""".stripMargin
-  }
-
-  /**
    * Prints deployment information for Basis contract
    */
   def printDeploymentInfo(): Unit = {
@@ -186,9 +156,6 @@ object BasisDeployer extends App {
   println("Example Deployment Request:")
   println(createBasisDeploymentRequest(exampleOwnerKey, exampleTrackerNftId, exampleReserveTokenId))
   println()
-
-  println("Example Top-Up Request:")
-  println(createTopUpRequest(exampleReserveTokenId, 500000000L)) // 0.5 ERG
 
 }
 
