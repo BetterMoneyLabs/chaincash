@@ -131,7 +131,7 @@
       val trackerEInt = byteArrayToBigInt(trackerE) // challenge as big integer
 
       // Verify tracker Schnorr signature: g^z = a * x^e
-      val properTrackerSignature = (g.exp(trackerZ) == trackerA.multiply(ownerKey.exp(trackerEInt)))
+      val properTrackerSignature = (g.exp(trackerZ) == trackerA.multiply(trackerPubKey.exp(trackerEInt)))
 
       // Split reserve owner signature into components (Schnorr signature: (a, z))
       val reserveABytes = reserveSigBytes.slice(0, 33) // Random point a

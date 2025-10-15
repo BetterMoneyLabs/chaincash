@@ -31,7 +31,8 @@ object Constants {
   }
 
   def readContract(path: String, substitutionMap: Map[String, String] = Map.empty) = {
-    substitute(scala.io.Source.fromFile("contracts/" + path, "utf-8").getLines.mkString("\n"), substitutionMap)
+    val contract = scala.io.Source.fromFile("contracts/" + path, "utf-8").getLines.mkString("\n")
+    substitute(contract, substitutionMap)
   }
 
   def compile(ergoScript: String): ErgoTree = {
