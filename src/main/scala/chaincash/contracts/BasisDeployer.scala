@@ -56,11 +56,8 @@ object BasisDeployer extends App {
   val basisErgoTree = Constants.compile(basisContractScript)
   val basisAddress = Constants.getAddressFromErgoTree(basisErgoTree)
 
-  // Plasma parameters for empty AVL tree
-  val chainCashPlasmaParameters = PlasmaParameters(40, None)
-  def emptyPlasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](sigmastate.AvlTreeFlags.InsertOnly, chainCashPlasmaParameters)
-  val emptyTreeErgoValue = emptyPlasmaMap.ergoValue
-  val emptyTree = emptyTreeErgoValue.getValue
+  // Use the empty tree from Constants
+  val emptyTree = Constants.emptyTree
 
   /**
    * Creates deployment request for Basis reserve contract
