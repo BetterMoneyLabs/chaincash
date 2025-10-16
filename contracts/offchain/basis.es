@@ -5,7 +5,7 @@
 
     // Main use-cases:
     // * payments for content (such as 402 HTTP code processing)
-    // * micropayments
+    // * micropaymentsdebtAmount
     // * payments in p2p networks
     // * agent-to-agent payments
 
@@ -59,7 +59,6 @@
             selfOut.R4[GroupElement].get == SELF.R4[GroupElement].get &&
             selfOut.R6[Coll[Byte]].get == SELF.R6[Coll[Byte]].get
 
-    // todo: do withdrawal with no tracker (one week after)
     if (action == 0) {
       // redemption path
 
@@ -86,6 +85,8 @@
       val reserveSigBytes = getVar[Coll[Byte]](2).get
 
       // Debt amount and timestamp from the debt record
+      // todo: save debt being redeemed in the reserve tree, along with the timestamp, and then debtAmount is
+      // todo: total amount of debt, and only up to the delta can be redeemed
       val debtAmount = getVar[Long](3).get
       val timestamp = getVar[Long](4).get
       val value = longToByteArray(debtAmount) ++ longToByteArray(timestamp) ++ reserveSigBytes
@@ -126,6 +127,8 @@
       val properTrackerSignature = (g.exp(trackerZ) == trackerA.multiply(trackerPubKey.exp(trackerEInt)))
 
       // Check if enough time has passed for emergency redemption (without tracker signature)
+      // tracker signature is still provided but may be invalid
+      // todo: consider more efficient check where tracker signature is not needed at all
       val lastBlockTime = CONTEXT.headers(0).timestamp
       val enoughTimeSpent = (timestamp > 0) && (lastBlockTime - timestamp) > 7 * 86400000 // 7 days in milliseconds passed
 
