@@ -666,4 +666,512 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
     }
   }
 
+  property("basis redemption should fail with invalid action code") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
+
+      val debtAmount = 500000000L // 0.5 ERG
+      val timestamp = System.currentTimeMillis()
+
+      // Create key for debt record
+      val ownerKeyBytes = ownerPk.getEncoded
+      val receiverBytes = receiverPk.getEncoded
+      val key = Blake2b256(ownerKeyBytes.toArray ++ receiverBytes.toArray)
+
+      // Create message for signatures
+      val message = key ++ Longs.toByteArray(debtAmount) ++ Longs.toByteArray(timestamp)
+
+      // Create signatures
+      val reserveSig = SigUtils.sign(message, ownerSecret)
+      val trackerSig = SigUtils.sign(message, trackerSecret)
+
+      // Combine signatures into bytes
+      val reserveSigBytes = GroupElementSerializer.toBytes(reserveSig._1) ++ reserveSig._2.toByteArray
+      val trackerSigBytes = GroupElementSerializer.toBytes(trackerSig._1) ++ trackerSig._2.toByteArray
+
+      // Create plasma map for timestamp tree
+      val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, chainCashPlasmaParameters)
+      val initialTreeErgoValue = plasmaMap.ergoValue
+      
+      // Create proof for inserting into empty tree
+      val timestampKeyVal = (key, Longs.toByteArray(timestamp))
+      val insertRes = plasmaMap.insert(timestampKeyVal)
+      val insertProof = insertRes.proof
+      val nextTreeErgoValue = plasmaMap.ergoValue
+
+      // Basis reserve input with invalid action code (2)
+      val basisInput =
+        ctx
+          .newTxBuilder()
+          .outBoxBuilder
+          .value(minValue + debtAmount + feeValue)
+          .tokens(new ErgoToken(basisTokenId, 1))
+          .registers(ErgoValue.of(ownerPk), initialTreeErgoValue, ErgoValue.of(trackerNFTBytes))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .build()
+          .convertToInputWith(fakeTxId1, fakeIndex)
+          .withContextVars(
+            new ContextVar(0, ErgoValue.of(20: Byte)), // Invalid action code 2
+            new ContextVar(1, ErgoValue.of(receiverPk)),
+            new ContextVar(2, ErgoValue.of(reserveSigBytes)),
+            new ContextVar(3, ErgoValue.of(debtAmount)),
+            new ContextVar(4, ErgoValue.of(timestamp)),
+            new ContextVar(5, ErgoValue.of(insertProof.bytes)),
+            new ContextVar(6, ErgoValue.of(trackerSigBytes))
+          )
+
+      // Tracker data input
+      val trackerDataInput =
+        ctx
+          .newTxBuilder()
+          .outBoxBuilder
+          .value(minValue)
+          .tokens(new ErgoToken(trackerNFTBytes, 1))
+          .registers(ErgoValue.of(trackerPk), ErgoValue.of(emptyTree))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), "{false}"))
+          .build()
+          .convertToInputWith(fakeTxId2, fakeIndex)
+
+      // Basis output
+      val basisOutput = createOut(
+        Constants.basisContract,
+        minValue + feeValue,
+        Array(ErgoValue.of(ownerPk), nextTreeErgoValue, ErgoValue.of(trackerNFTBytes)),
+        Array(new ErgoToken(basisTokenId, 1))
+      )
+
+      // Redemption output
+      val redemptionOutput = createOut(
+        trueScript,
+        debtAmount,
+        Array(),
+        Array()
+      )
+
+      val inputs = Array[InputBox](basisInput)
+      val dataInputs = Array[InputBox](trackerDataInput)
+      val outputs = Array[OutBoxImpl](basisOutput, redemptionOutput)
+
+      a[Throwable] should be thrownBy {
+        createTx(
+          inputs,
+          dataInputs,
+          outputs,
+          fee = None,
+          changeAddress,
+          Array[String](ownerSecret.toString()),
+          false
+        )
+      }
+    }
+  }
+
+  property("basis redemption should fail with tracker identity mismatch") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
+
+      val debtAmount = 500000000L // 0.5 ERG
+      val timestamp = System.currentTimeMillis()
+
+      // Create key for debt record
+      val ownerKeyBytes = ownerPk.getEncoded
+      val receiverBytes = receiverPk.getEncoded
+      val key = Blake2b256(ownerKeyBytes.toArray ++ receiverBytes.toArray)
+
+      // Create message for signatures
+      val message = key ++ Longs.toByteArray(debtAmount) ++ Longs.toByteArray(timestamp)
+
+      // Create signatures
+      val reserveSig = SigUtils.sign(message, ownerSecret)
+      val trackerSig = SigUtils.sign(message, trackerSecret)
+
+      // Combine signatures into bytes
+      val reserveSigBytes = GroupElementSerializer.toBytes(reserveSig._1) ++ reserveSig._2.toByteArray
+      val trackerSigBytes = GroupElementSerializer.toBytes(trackerSig._1) ++ trackerSig._2.toByteArray
+
+      // Create plasma map for timestamp tree
+      val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, chainCashPlasmaParameters)
+      val initialTreeErgoValue = plasmaMap.ergoValue
+      
+      // Create proof for inserting into empty tree
+      val timestampKeyVal = (key, Longs.toByteArray(timestamp))
+      val insertRes = plasmaMap.insert(timestampKeyVal)
+      val insertProof = insertRes.proof
+      val nextTreeErgoValue = plasmaMap.ergoValue
+
+      // Different tracker NFT ID
+      val wrongTrackerNFT = "4c45f29a5165b030fdb5eaf5d81f8108f9d8f507b31487dd51f4ae08fe07cf4b"
+      val wrongTrackerNFTBytes = Base16.decode(wrongTrackerNFT).get
+
+      // Basis reserve input with wrong tracker NFT
+      val basisInput =
+        ctx
+          .newTxBuilder()
+          .outBoxBuilder
+          .value(minValue + debtAmount + feeValue)
+          .tokens(new ErgoToken(basisTokenId, 1))
+          .registers(ErgoValue.of(ownerPk), initialTreeErgoValue, ErgoValue.of(wrongTrackerNFTBytes))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .build()
+          .convertToInputWith(fakeTxId1, fakeIndex)
+          .withContextVars(
+            new ContextVar(0, ErgoValue.of(0: Byte)),
+            new ContextVar(1, ErgoValue.of(receiverPk)),
+            new ContextVar(2, ErgoValue.of(reserveSigBytes)),
+            new ContextVar(3, ErgoValue.of(debtAmount)),
+            new ContextVar(4, ErgoValue.of(timestamp)),
+            new ContextVar(5, ErgoValue.of(insertProof.bytes)),
+            new ContextVar(6, ErgoValue.of(trackerSigBytes))
+          )
+
+      // Tracker data input with correct NFT
+      val trackerDataInput =
+        ctx
+          .newTxBuilder()
+          .outBoxBuilder
+          .value(minValue)
+          .tokens(new ErgoToken(trackerNFTBytes, 1))
+          .registers(ErgoValue.of(trackerPk), ErgoValue.of(emptyTree))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), "{false}"))
+          .build()
+          .convertToInputWith(fakeTxId2, fakeIndex)
+
+      // Basis output
+      val basisOutput = createOut(
+        Constants.basisContract,
+        minValue + feeValue,
+        Array(ErgoValue.of(ownerPk), nextTreeErgoValue, ErgoValue.of(wrongTrackerNFTBytes)),
+        Array(new ErgoToken(basisTokenId, 1))
+      )
+
+      // Redemption output
+      val redemptionOutput = createOut(
+        trueScript,
+        debtAmount,
+        Array(),
+        Array()
+      )
+
+      val inputs = Array[InputBox](basisInput)
+      val dataInputs = Array[InputBox](trackerDataInput)
+      val outputs = Array[OutBoxImpl](basisOutput, redemptionOutput)
+
+      a[Throwable] should be thrownBy {
+        createTx(
+          inputs,
+          dataInputs,
+          outputs,
+          fee = None,
+          changeAddress,
+          Array[String](ownerSecret.toString()),
+          false
+        )
+      }
+    }
+  }
+
+  property("basis redemption should fail with invalid reserve owner signature") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
+
+      val debtAmount = 500000000L // 0.5 ERG
+      val timestamp = System.currentTimeMillis()
+
+      // Create key for debt record
+      val ownerKeyBytes = ownerPk.getEncoded
+      val receiverBytes = receiverPk.getEncoded
+      val key = Blake2b256(ownerKeyBytes.toArray ++ receiverBytes.toArray)
+
+      // Create message for signatures
+      val message = key ++ Longs.toByteArray(debtAmount) ++ Longs.toByteArray(timestamp)
+
+      // Create valid tracker signature but invalid reserve signature (using wrong secret)
+      val invalidReserveSig = SigUtils.sign(message, trackerSecret) // Wrong secret for reserve
+      val trackerSig = SigUtils.sign(message, trackerSecret)
+
+      // Combine signatures into bytes
+      val invalidReserveSigBytes = GroupElementSerializer.toBytes(invalidReserveSig._1) ++ invalidReserveSig._2.toByteArray
+      val trackerSigBytes = GroupElementSerializer.toBytes(trackerSig._1) ++ trackerSig._2.toByteArray
+
+      // Create plasma map for timestamp tree
+      val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, chainCashPlasmaParameters)
+      val initialTreeErgoValue = plasmaMap.ergoValue
+      
+      // Create proof for inserting into empty tree
+      val timestampKeyVal = (key, Longs.toByteArray(timestamp))
+      val insertRes = plasmaMap.insert(timestampKeyVal)
+      val insertProof = insertRes.proof
+      val nextTreeErgoValue = plasmaMap.ergoValue
+
+      // Basis reserve input
+      val basisInput =
+        ctx
+          .newTxBuilder()
+          .outBoxBuilder
+          .value(minValue + debtAmount + feeValue)
+          .tokens(new ErgoToken(basisTokenId, 1))
+          .registers(ErgoValue.of(ownerPk), initialTreeErgoValue, ErgoValue.of(trackerNFTBytes))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .build()
+          .convertToInputWith(fakeTxId1, fakeIndex)
+          .withContextVars(
+            new ContextVar(0, ErgoValue.of(0: Byte)),
+            new ContextVar(1, ErgoValue.of(receiverPk)),
+            new ContextVar(2, ErgoValue.of(invalidReserveSigBytes)),
+            new ContextVar(3, ErgoValue.of(debtAmount)),
+            new ContextVar(4, ErgoValue.of(timestamp)),
+            new ContextVar(5, ErgoValue.of(insertProof.bytes)),
+            new ContextVar(6, ErgoValue.of(trackerSigBytes))
+          )
+
+      // Tracker data input
+      val trackerDataInput =
+        ctx
+          .newTxBuilder()
+          .outBoxBuilder
+          .value(minValue)
+          .tokens(new ErgoToken(trackerNFTBytes, 1))
+          .registers(ErgoValue.of(trackerPk), ErgoValue.of(emptyTree))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), "{false}"))
+          .build()
+          .convertToInputWith(fakeTxId2, fakeIndex)
+
+      // Basis output
+      val basisOutput = createOut(
+        Constants.basisContract,
+        minValue + feeValue,
+        Array(ErgoValue.of(ownerPk), nextTreeErgoValue, ErgoValue.of(trackerNFTBytes)),
+        Array(new ErgoToken(basisTokenId, 1))
+      )
+
+      // Redemption output
+      val redemptionOutput = createOut(
+        trueScript,
+        debtAmount,
+        Array(),
+        Array()
+      )
+
+      val inputs = Array[InputBox](basisInput)
+      val dataInputs = Array[InputBox](trackerDataInput)
+      val outputs = Array[OutBoxImpl](basisOutput, redemptionOutput)
+
+      a[Throwable] should be thrownBy {
+        createTx(
+          inputs,
+          dataInputs,
+          outputs,
+          fee = None,
+          changeAddress,
+          Array[String](ownerSecret.toString()),
+          false
+        )
+      }
+    }
+  }
+
+  property("basis redemption should fail with emergency redemption time boundary") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
+
+      val debtAmount = 500000000L // 0.5 ERG
+      // Use timestamp that's exactly 7 days before block headers (not enough for emergency redemption)
+      val timestamp = 1576787597586L - (7 * 86400000L) // Exactly 7 days before block headers
+
+      // Create key for debt record
+      val ownerKeyBytes = ownerPk.getEncoded
+      val receiverBytes = receiverPk.getEncoded
+      val key = Blake2b256(ownerKeyBytes.toArray ++ receiverBytes.toArray)
+
+      // Create message for signatures
+      val message = key ++ Longs.toByteArray(debtAmount) ++ Longs.toByteArray(timestamp)
+
+      // Create valid reserve signature but invalid tracker signature
+      val reserveSig = SigUtils.sign(message, ownerSecret)
+      val invalidTrackerSig = SigUtils.sign(message, receiverSecret) // Wrong secret for tracker
+
+      // Combine signatures into bytes
+      val reserveSigBytes = GroupElementSerializer.toBytes(reserveSig._1) ++ reserveSig._2.toByteArray
+      val invalidTrackerSigBytes = GroupElementSerializer.toBytes(invalidTrackerSig._1) ++ invalidTrackerSig._2.toByteArray
+
+      // Create plasma map for timestamp tree
+      val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, chainCashPlasmaParameters)
+      val initialTreeErgoValue = plasmaMap.ergoValue
+      
+      // Create proof for inserting into empty tree
+      val timestampKeyVal = (key, Longs.toByteArray(timestamp))
+      val insertRes = plasmaMap.insert(timestampKeyVal)
+      val insertProof = insertRes.proof
+      val nextTreeErgoValue = plasmaMap.ergoValue
+
+      // Basis reserve input
+      val basisInput =
+        ctx
+          .newTxBuilder()
+          .outBoxBuilder
+          .value(minValue + debtAmount + feeValue)
+          .tokens(new ErgoToken(basisTokenId, 1))
+          .registers(ErgoValue.of(ownerPk), initialTreeErgoValue, ErgoValue.of(trackerNFTBytes))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .build()
+          .convertToInputWith(fakeTxId1, fakeIndex)
+          .withContextVars(
+            new ContextVar(0, ErgoValue.of(0: Byte)),
+            new ContextVar(1, ErgoValue.of(receiverPk)),
+            new ContextVar(2, ErgoValue.of(reserveSigBytes)),
+            new ContextVar(3, ErgoValue.of(debtAmount)),
+            new ContextVar(4, ErgoValue.of(timestamp)),
+            new ContextVar(5, ErgoValue.of(insertProof.bytes)),
+            new ContextVar(6, ErgoValue.of(invalidTrackerSigBytes))
+          )
+
+      // Tracker data input
+      val trackerDataInput =
+        ctx
+          .newTxBuilder()
+          .outBoxBuilder
+          .value(minValue)
+          .tokens(new ErgoToken(trackerNFTBytes, 1))
+          .registers(ErgoValue.of(trackerPk), ErgoValue.of(emptyTree))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), "{false}"))
+          .build()
+          .convertToInputWith(fakeTxId2, fakeIndex)
+
+      // Basis output
+      val basisOutput = createOut(
+        Constants.basisContract,
+        minValue + feeValue,
+        Array(ErgoValue.of(ownerPk), nextTreeErgoValue, ErgoValue.of(trackerNFTBytes)),
+        Array(new ErgoToken(basisTokenId, 1))
+      )
+
+      // Redemption output
+      val redemptionOutput = createOut(
+        trueScript,
+        debtAmount,
+        Array(),
+        Array()
+      )
+
+      val inputs = Array[InputBox](basisInput)
+      val dataInputs = Array[InputBox](trackerDataInput)
+      val outputs = Array[OutBoxImpl](basisOutput, redemptionOutput)
+
+      // This test should fail because exactly 7 days is not enough for emergency redemption
+      // (needs more than 7 days)
+      a[Throwable] should be thrownBy {
+        createTx(
+          inputs,
+          dataInputs,
+          outputs,
+          fee = None,
+          changeAddress,
+          Array[String](ownerSecret.toString()),
+          false
+        )
+      }
+    }
+  }
+
+  property("basis redemption should fail with invalid AVL tree proof") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
+
+      val debtAmount = 500000000L // 0.5 ERG
+      val timestamp = System.currentTimeMillis()
+
+      // Create key for debt record
+      val ownerKeyBytes = ownerPk.getEncoded
+      val receiverBytes = receiverPk.getEncoded
+      val key = Blake2b256(ownerKeyBytes.toArray ++ receiverBytes.toArray)
+
+      // Create message for signatures
+      val message = key ++ Longs.toByteArray(debtAmount) ++ Longs.toByteArray(timestamp)
+
+      // Create signatures
+      val reserveSig = SigUtils.sign(message, ownerSecret)
+      val trackerSig = SigUtils.sign(message, trackerSecret)
+
+      // Combine signatures into bytes
+      val reserveSigBytes = GroupElementSerializer.toBytes(reserveSig._1) ++ reserveSig._2.toByteArray
+      val trackerSigBytes = GroupElementSerializer.toBytes(trackerSig._1) ++ trackerSig._2.toByteArray
+
+      // Create plasma map for timestamp tree
+      val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, chainCashPlasmaParameters)
+      val initialTreeErgoValue = plasmaMap.ergoValue
+      
+      // Create proof for inserting into empty tree
+      val timestampKeyVal = (key, Longs.toByteArray(timestamp))
+      val insertRes = plasmaMap.insert(timestampKeyVal)
+      val insertProof = insertRes.proof
+      val nextTreeErgoValue = plasmaMap.ergoValue
+
+      // Create invalid proof (use proof for different key)
+      val wrongKey = Blake2b256(receiverBytes.toArray ++ ownerKeyBytes.toArray) // Reversed keys
+      val wrongPlasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, chainCashPlasmaParameters)
+      val wrongInsertRes = wrongPlasmaMap.insert((wrongKey, Longs.toByteArray(timestamp)))
+      val invalidProof = wrongInsertRes.proof
+
+      // Basis reserve input
+      val basisInput =
+        ctx
+          .newTxBuilder()
+          .outBoxBuilder
+          .value(minValue + debtAmount + feeValue)
+          .tokens(new ErgoToken(basisTokenId, 1))
+          .registers(ErgoValue.of(ownerPk), initialTreeErgoValue, ErgoValue.of(trackerNFTBytes))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .build()
+          .convertToInputWith(fakeTxId1, fakeIndex)
+          .withContextVars(
+            new ContextVar(0, ErgoValue.of(0: Byte)),
+            new ContextVar(1, ErgoValue.of(receiverPk)),
+            new ContextVar(2, ErgoValue.of(reserveSigBytes)),
+            new ContextVar(3, ErgoValue.of(debtAmount)),
+            new ContextVar(4, ErgoValue.of(timestamp)),
+            new ContextVar(5, ErgoValue.of(invalidProof.bytes)), // Invalid proof
+            new ContextVar(6, ErgoValue.of(trackerSigBytes))
+          )
+
+      // Tracker data input
+      val trackerDataInput =
+        ctx
+          .newTxBuilder()
+          .outBoxBuilder
+          .value(minValue)
+          .tokens(new ErgoToken(trackerNFTBytes, 1))
+          .registers(ErgoValue.of(trackerPk), ErgoValue.of(emptyTree))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), "{false}"))
+          .build()
+          .convertToInputWith(fakeTxId2, fakeIndex)
+
+      // Basis output
+      val basisOutput = createOut(
+        Constants.basisContract,
+        minValue + feeValue,
+        Array(ErgoValue.of(ownerPk), nextTreeErgoValue, ErgoValue.of(trackerNFTBytes)),
+        Array(new ErgoToken(basisTokenId, 1))
+      )
+
+      // Redemption output
+      val redemptionOutput = createOut(
+        trueScript,
+        debtAmount,
+        Array(),
+        Array()
+      )
+
+      val inputs = Array[InputBox](basisInput)
+      val dataInputs = Array[InputBox](trackerDataInput)
+      val outputs = Array[OutBoxImpl](basisOutput, redemptionOutput)
+
+      a[Throwable] should be thrownBy {
+        createTx(
+          inputs,
+          dataInputs,
+          outputs,
+          fee = None,
+          changeAddress,
+          Array[String](ownerSecret.toString()),
+          false
+        )
+      }
+    }
+  }
+
 }
