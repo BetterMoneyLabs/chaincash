@@ -1,12 +1,12 @@
 package chaincash.contracts
 
 import org.ergoplatform.ErgoAddressEncoder
-import org.ergoplatform.appkit.NetworkType
-
+import org.ergoplatform.appkit.{ErgoValue, NetworkType}
 import scorex.crypto.encode.Base16
+import sigmastate.AvlTreeFlags
 import sigmastate.Values.{AvlTreeConstant, GroupElementConstant}
-
 import sigmastate.serialization.{GroupElementSerializer, ValueSerializer}
+import special.sigma.AvlTree
 import work.lithos.plasma.PlasmaParameters
 import work.lithos.plasma.collections.PlasmaMap
 
@@ -52,8 +52,11 @@ object BasisDeployer extends App {
   val basisErgoTree = Constants.compile(basisContractScript)
   val basisAddress = Constants.getAddressFromErgoTree(basisErgoTree)
 
-  // Use the empty tree from Constants
-  val emptyTree = Constants.emptyTree
+  val chainCashPlasmaParameters = PlasmaParameters(32, None)
+  val InsertUpdate = AvlTreeFlags(insertAllowed = true, updateAllowed = true, removeAllowed = false)
+  def emptyPlasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](InsertUpdate, chainCashPlasmaParameters)
+  val emptyTreeErgoValue: ErgoValue[AvlTree] = emptyPlasmaMap.ergoValue
+  val emptyTree: AvlTree = emptyTreeErgoValue.getValue
 
   /**
    * Creates deployment request for Basis reserve contract
