@@ -32,12 +32,12 @@ object BasisDeployer extends App {
    * Example owner key using the specified public key
    */
   val exampleOwnerKey: GroupElementConstant = {
-    createOwnerKeyFromHex("025ffe0e1a282fc0249320946af4209eb2dd7f250c16946fdd615533092e054bca")
+    createOwnerKeyFromHex("025ffe0e1a282fc0249320946af4209eb2dd7f250c16946fdd615533092e054bca") // Alice
   }
 
   // Example values - these should be replaced with actual values
   val exampleTrackerNftId = "dbfbbaf91a98c22204de3745e1986463620dcf3525ad566c6924cf9e976f86f8"
-  val exampleReserveTokenId = "2a6e8132d6585f2ca35be52a7b7841cacf06cad4dca7e8fcf9c2c0b9842c8701"
+  val exampleReserveTokenId = "c7510cba80a9b7113e53968f7ff42ad250be2808fef1d36b71a89b0d644178c2"
 
   // Network configuration
   val networkType = NetworkType.MAINNET
