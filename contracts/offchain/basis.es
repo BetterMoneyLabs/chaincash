@@ -30,6 +30,7 @@
     //  * always possible to top up the reserve, to redeem, reserve holder is making an offchain payment to self (A -> A)
     //    and then redeem
 
+    // todo: consider privacy in payments
 
     // Data:
     //  - token #0 - identifying singleton token
