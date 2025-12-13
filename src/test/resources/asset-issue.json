@@ -1,0 +1,55 @@
+{
+  "constants": [
+    {
+      "name": "myAddress",
+      "type": "Address",
+      "value": "9hz1B19M44TNpmVe8MS4xvXyycehh5uP5aCfj4a6iAowj88hkd2"
+    },
+    {
+      "name": "numTokensToIssue",
+      "type": "Long",
+      "value": "10"
+    },
+    {
+      "name": "minStorageRent",
+      "type": "Long",
+      "value": "1000000"
+    }
+  ],
+  "inputs": [
+    {
+      "id": {
+        "name": "myBoxId"
+      },
+      "address": {
+        "value": "myAddress"
+      },
+      "nanoErgs": {
+        "name": "inputNanoErgs"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "address": {
+        "value": "myAddress"
+      },
+      "tokens": [
+        {
+          "index": 0,
+          "id": {
+            "value": "myBoxId"
+          },
+          "amount": {
+            "value": "numTokensToIssue"
+          }
+        }
+      ],
+      "nanoErgs": {
+        "value": "minStorageRent"
+      }
+    }
+  ],
+  "fee": 1000000
+}
+

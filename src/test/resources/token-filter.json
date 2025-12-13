@@ -1,0 +1,143 @@
+{
+  "constants": [
+    {
+      "name": "506dfb0a34d44f2baef77d99f9da03b1f122bdc4c7c31791a0c706e23f1207e7",
+      "type": "CollByte",
+      "value": "506dfb0a34d44f2baef77d99f9da03b1f122bdc4c7c31791a0c706e23f1207e7"
+    },
+    {
+      "name": "ae57e4add0f181f5d1e8fd462969e4cc04f13b0da183676660d280ad0b64563f",
+      "type": "CollByte",
+      "value": "ae57e4add0f181f5d1e8fd462969e4cc04f13b0da183676660d280ad0b64563f"
+    },
+    {
+      "name": "dbea46d988e86b1e60181b69936a3b927c3a4871aa6ed5258d3e4df155750bea",
+      "type": "CollByte",
+      "value": "dbea46d988e86b1e60181b69936a3b927c3a4871aa6ed5258d3e4df155750bea"
+    },
+    {
+      "name": "9f5ZKbECVTm25JTRQHDHGM5ehC8tUw5g1fCBQ4aaE792rWBFrjK",
+      "type": "Address",
+      "value": "9f5ZKbECVTm25JTRQHDHGM5ehC8tUw5g1fCBQ4aaE792rWBFrjK"
+    },
+    {
+      "name": "1234",
+      "type": "Long",
+      "value": "1234"
+    },
+    {
+      "name": "1",
+      "type": "Long",
+      "value": "1"
+    }
+  ],
+  "inputs": [
+    {
+      "id": {
+        "value": "dbea46d988e86b1e60181b69936a3b927c3a4871aa6ed5258d3e4df155750bea"
+      },
+      "address": {
+        "name": "myAddress"
+      },
+      "tokens": [
+        {
+          "index": 1,
+          "id": {
+            "name": "myTokenId"
+          },
+          "amount": {
+            "name": "myTokenAmount"
+          }
+        }
+      ],
+      "options": [
+        "Strict"
+      ]
+    },
+    {
+      "address": {
+        "value": "9f5ZKbECVTm25JTRQHDHGM5ehC8tUw5g1fCBQ4aaE792rWBFrjK"
+      },
+      "tokens": [
+        {
+          "index": 0,
+          "id": {
+            "name": "firstTokenId"
+          },
+          "amount": {
+            "value": "1234",
+            "filter": "Gt"
+          }
+        },
+        {
+          "index": 1,
+          "id": {
+            "name": "secondTokenId"
+          },
+          "amount": {
+            "value": "myTokenAmount"
+          }
+        },
+        {
+          "index": 2,
+          "id": {
+            "name": "thirdTokenId"
+          },
+          "amount": {
+            "name": "thirdTokenAmount"
+          }
+        },
+        {
+          "id": {
+            "value": "506dfb0a34d44f2baef77d99f9da03b1f122bdc4c7c31791a0c706e23f1207e7"
+          }
+        },
+        {
+          "id": {
+            "value": "ae57e4add0f181f5d1e8fd462969e4cc04f13b0da183676660d280ad0b64563f"
+          },
+          "amount": {
+            "value": "1"
+          }
+        },
+        {
+          "id": {
+            "value": "myTokenId"
+          },
+          "amount": {
+            "value": "1234",
+            "filter": "Lt"
+          }
+        },
+        {
+          "id": {
+            "value": "dbea46d988e86b1e60181b69936a3b927c3a4871aa6ed5258d3e4df155750bea"
+          }
+        }
+      ],
+      "nanoErgs": {
+        "value": "myTokenAmount+1234",
+        "filter": "Ge"
+      },
+      "options": [
+        "Strict"
+      ]
+    }
+  ],
+  "outputs": [],
+  "binaryOps": [
+    {
+      "name": "myTokenAmount+1234",
+      "first": "myTokenAmount",
+      "op": "Add",
+      "second": "1234"
+    }
+  ],
+  "postConditions": [
+    {
+      "first": "myTokenAmount",
+      "second": "thirdTokenAmount",
+      "op": "Gt"
+    }
+  ]
+}

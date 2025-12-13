@@ -1,0 +1,192 @@
+\documentclass{article}   % list options between brackets
+
+\usepackage{color}
+\usepackage{graphicx}
+%% The amssymb package provides various useful mathematical symbols
+\usepackage{amssymb}
+%% The amsthm package provides extended theorem environments
+%\usepackage{amsthm}
+\usepackage{amsmath}
+
+\usepackage{listings}
+
+\usepackage{hyperref}
+
+\usepackage{systeme}
+
+\def\shownotes{1}
+\def\notesinmargins{0}
+
+\ifnum\shownotes=1
+\ifnum\notesinmargins=1
+\newcommand{\authnote}[2]{\marginpar{\parbox{\marginparwidth}{\tiny %
+  \textsf{#1 {\textcolor{blue}{notes: #2}}}}}%
+  \textcolor{blue}{\textbf{\dag}}}
+\else
+\newcommand{\authnote}[2]{
+  \textsf{#1 \textcolor{blue}{: #2}}}
+\fi
+\else
+\newcommand{\authnote}[2]{}
+\fi
+
+\newcommand{\knote}[1]{{\authnote{\textcolor{green}{kushti notes}}{#1}}}
+\newcommand{\mnote}[1]{{\authnote{\textcolor{red}{scalahub notes}}{#1}}}
+
+\usepackage[dvipsnames]{xcolor}
+\usepackage[colorinlistoftodos,prependcaption,textsize=tiny]{todonotes}
+
+
+% type user-defined commands here
+\usepackage[T1]{fontenc}
+
+\usepackage{flushend}
+
+
+\newcommand{\cc}{ChainCash}
+
+\newcommand{\ma}{\mathcal{A}}
+\newcommand{\mb}{\mathcal{B}}
+\newcommand{\he}{\hat{e}}
+\newcommand{\sr}{\stackrel}
+\newcommand{\ra}{\rightarrow}
+\newcommand{\la}{\leftarrow}
+\newcommand{\state}{state}
+
+\newcommand{\ignore}[1]{} 
+\newcommand{\full}[1]{}
+\newcommand{\notfull}[1]{#1}
+\newcommand{\rand}{\stackrel{R}{\leftarrow}}
+\newcommand{\mypar}[1]{\smallskip\noindent\textbf{#1.}}
+
+\begin{document}
+
+\title{ChainCash - elastic peer-to-peer money creation via trust and blockchain assets}
+\author{kushti \\ \href{mailto:kushti@protonmail.ch}{kushti@protonmail.ch} \and scalahub}
+
+
+\maketitle
+
+\begin{abstract}
+In this paper we introduce ChainCash, a protocol to create money in self-sovereign way via trust or collateral. The
+protocol allows for elastic money creation in peer-to-peer environment, without any authority, being it authoritarian,
+democractic or algorithmic. For that, acceptance of notes created by other peers is an individual choice.
+\end{abstract}
+
+
+\section{Introduction}
+
+Currently, most of monetary value is created by private banks~(often, offshore banks as in so-called "eurodollar" system~\cite{machlup1970euro}) following central banks requirements. As an alternative, starting with Bitcoin~\cite{nakamoto2008peer} launch in 2009, a lot of cryptocurrencies 
+and DeFi applications on top of public blockchains are experimenting with algorithmic money issuance. As another option, we also have alternative, usually local, monetary systems, such as LETS~(local exchange trading systems~\cite{williams1996new}), timebanks, local government currencies~\cite{unterguggenbercer1934end}, and so on. Control in traditional fiat monetary systems is possessed by big players~(with rich getting richer effect) creating money in non-transparent ways~(especially in offshore circuits) without reasonable limits, on the other side, fiat monetary systems (in opposite to commodity money used before fiat, as well as alternative monetary systems) have best supply elasticity. Cryptocurrencies~(and, sometimes, other tokens on top of public blockchains) have strict algorithms emitting new money, thus they have publicly known emission schedule, which makes them perfect digital commodity assets, on the other hand, supply is disconnected from economic activity and not elastic. Local currencies usually considered more fair in segniorage distribution than fiat currencies, they are successfully boosting local economies often, but, in opposite to fiat and crypto-currencies, they are not global and
+ usually are dying without active core. Elasticity of supply is also limited simply due to entry barriers for external actors.
+
+In this paper, we propose \cc{}, a new global kind of money, with decentralized issuance, elastic supply. \cc{} notes are collectively backed by collateral and trust. \cc{} acts on top of Ergo blockchain~(possibly, other public blockchains as well,
+however, for efficient implementation there is requirement for primitives which can be found in Ergo only at the moment, to the best of our knowledge). Thus collateral for a \cc{} comes from reserves network peers may have, and on spending a note, a peer is attaching its
+reserve to collective backing. At the same time, a newly issued note could be accepted by a peer without any backing provided, for example, if such a note is issued by a friend or a trusted charity. Every peer in the system is having own individual rules
+for accepting notes~(widely accepted standards may exist at the same time), which provides basis for elasticity of supply. We are providing details in the next section.
+
+\section{\cc{} Design}
+\label{sec-design}
+
+We consider money here via its medium-of-exchange property. For existing currencies, there are usually many options to represent value, such as coins, paper or plastic banknotes, digital records in different ledgers, etc. For \cc{}, we define money as a set of digital notes, each has some nominal~(not fixed but arbitrary in our case). Value of a note is nominated in some existing widely recognizeable unit-of-account, for example, in milligrams of gold.
+
+We consider that an economy is consisting of known agents $a_1, ..., a_n$. Then we can define medium-of-exchange property of money via a set of agents accepting monetary objects~(i.e. notes). Usually, set of agents accepting some kind of money~(e.g. local or foreign currency) is fixed. That is, for every monetary object~(e.g. a note) which belongs to a fixed sort of money, an agent is accepting it as a mean of incoming payment, or reject. In opposite, for \cc{} money, similarly to~\cite{saito2003peer}, the set is individual for a note, so when agent $a_i$ sees a note $n$, it applies its personal predicate $P_i(n)$ to decide whether to accept the note or decline it.
+
+Then how notes are different in case of \cc{}? We consider that every note is collectively backed by all the previous spenders of the note. Every agent may create reserves to be used as collateral. When an agent spends note, whether received previously from another agent or just created by the agent itself, it is attaching its signature to it. A note could be redemeed at any time against any of reserves of agents previously signed the note. However,any agent after the first one in signatures chain is getting redemption receipt which is indicating debt of previous signers before him, and then he may redeem the receipt against a reserve of any previous signer, with a new redeemable receipt being generated. Also, redemption fee should be paid, and the fee is incentivizing reserves provision and also using the notes instead of redeeming them. The protocol does not impose collateralization requirements, it is allowed for an agent to issue and spend notes with empty reserve even. It is up to agent's counter-parties then whether to accept and so back an issued note with collateral or agent's trust or not.
+
+As an example, consider a small gold mining cooperative in Ghana issuing a note backed by (tokenized) gold. The note is then accepted by the national government as mean of tax payment. Then the government is using the note~(which is now backed by gold and also trust in Ghana government, so, e.g. convertible to Ghanaian Cedi as well) to buy oil from a Saudi oil company. Then the oil company, having its own oil reserve also, is using the note to buy equipment from China. Now a Chinese company has a note which is backed by gold, oil, and Cedis. It could be hard maybe for Chinese company to redeem from a small cooperative in Ghana, so it can redeem from Ghana government, and the government may redeem from the cooperative.
+
+Agent's note quality estimation predicate $P_i(n)$ is considering collaterals and trust of previous spenders. Different agents may have different 
+collateralization estimation algorithm~(by analyzing history of the single note $n$, or e.g. all the notes issued by previous signers of $n$, other options are also possible), different whitelists, blacklists, or trust scores assigned to previous spenders of the note $n$ etc. So in general case payment sender first need to consult with the receiver on whether the payment~(consisting of one or multiple notes) can be accepted. However, in the real world likely there will be standard predicates, thus payment receiver~(e.g. an online shop) may publish its predicate (or just predicate id) online, and then a payment can be done without prior interaction.
+
+We propose to implement \cc{} monetary system on top of a public blockchain as:
+
+\begin{itemize}
+  \item{} blockchain provides an instant solution for public-key infrastructure
+  \item{} public blockchain allows for a global ledger solution with minimal trust assumptions~\cite{kya}
+  \item{} as a consequence, global public ledger allows for simple analysis of notes in existence
+  \item{} smart contracts minimize trust issues in payment execution and redemption. If native blockchain currency and assets on top of it~(such as algorithmic stablecoins) used in reserves, trust issues in redemption could be eliminated at all. If tokenized real-world commodities and fiat currencies~(e.g. USDT) are used in reserves, redemption could not be completely trustless~(as smart contracts do not have power off the chain), but at least there is transparent accounting in on-chain part of redemption
+\end{itemize}
+
+We use Ergo as a Proof-of-Work blockchain to implement \cc{}, as it is built on minimal trust assumptions~\cite{kya}, and UTXO transactional model as well as AVL+ trees support are making notes implementation feasible.
+
+
+\section{\cc{} Implementation}
+
+For blockchain-based \cc{} implementation, we consider implementation of the following two main parts:
+
+\begin{itemize}
+  \item{} contracts for notes, reserves, and redemption receipts. Here, we consider on-chain contracts as the most
+  straightforward option. Then we may consider more scalable options, such as having reserves (and maybe receipts) only
+  on chain, and have notes making progress on a side-chain or off-chain (on top of some Layer 2 solution)
+  \item{} client software~(which we refer to as \cc{} Server as well), which is interacting with the blockchain (possibly, also a sidechain, or p2p network
+  where notes are making progress off-chain). This software is implementing $a_i$ agent's functionality from the Section~\ref{sec-design},
+  including note quality estimation predicate $P_i(n)$. For that, the client may potentially track all the reserves and notes.
+  Client's $P_i(n)$ may be configured via whitelists, blacklists, collateralization requirements provided in config.
+  \cc{} Server can be seen as a bank as in \"be your own bank\" used in Bitcoin community, however, in Bitcoin a node
+  is a passive and indistinguishable from others bank just validating common history, while \cc{} Server has individual behavior defined by its config.
+\end{itemize}
+
+On-chain contracts are available at~\cite{contracts}. Three contracts can be found there, namely, reserve, note and receipt contracts. Reserve contract locks ERG native tokens on top of Ergo blockchain and allow to redeem native or custom tokens when a note is presented. Note contract ensures that the note has proper history, that is, on every spending a valid signature of corresponding reserve owner is added. It also and allows for a note to be split into two parts~(payment and change), and allows for note redemption.
+On redemption, where both reserve and note contracts are involved, an output with receipt contract is created, which contains history of ownership copied from the note input, as well as position of reserve redeemed in ownership chain and note's value. With receipt it is possible then to redeem againt a re~(reserve contract allows for that).
+
+Reference \cc{} Server implementation (in Rust programming language) can be found at~\cite{server}.
+
+Basic contracts implementation described is good for starters, but can be extended in many ways.  We note that it is possible
+to add new features without need for the whole network to update. New features, such as new reserve and note contracts,
+can be proposed in form of CCIPs~(ChainCash Improvement Proposals). ChainCash
+Server may support new features, in particular, new forms of notes. If client is asked to accept a note with unknown
+contract, or a note backed by unknown contract, it is just refusing to accept the note.
+
+\section{Applications}
+\label{sec-apps}
+
+\cc{} could be seen as a powerful foundation for other monetary systems, and we are going to show it in this section. 
+
+\subsection{LETS}
+
+To implement a local exchange trading system on top of \cc{}, every LETS member needs to whitelist every over member, so they will accept notes of each other regardless reserves backing the notes, and thus LETS can create money within the community (the LETS circle) with no limits. On the other hand, unlike traditional LETS, notes can circulate outside the LETS circle easily as well. Implementations may vary from LETS members whitelisting unconditionally only notes issued by other members to members whitelisting notes ever signed by LETS members. 
+
+
+\subsection{Local Currencies}
+
+A local or even national government may issue notes and enforce their acceptance within its jurisdiction by enforcing economic agents to accept notes issued or spend by the government. As well as in a LETS implementation, enforced acceptance rules may vary. 
+
+Often local currencies are introducing redemption fee, to promote local usage. In \cc{}, similar goals can be achieved via modifying the reserve contract in a way that non-locals need to pay redemption fee while locals need not, alternatively, the note contract could be modified in a way that spending to non-local addresses incurs a fee. Local currencies are often associated with demurrage, after well-known Woergl experiment~\cite{unterguggenbercer1934end}. Demmurage could be implemented by modifying note contract. However, modifying note contract makes notes locked by it less appealing to others, but that is common for local currencies already.
+
+\subsection{Multilateral Trade-Credit Set-off}
+
+Multilateral Trade-Credit Set-off~\cite{mtcs} is a technique which allows invoices in closed loops to be cleared against one another.
+In \cc{}, it is possible to clear mutual debts by just burning atomically tokens backed by counter-partis in a single
+transaction. This will allow them to issue more notes after.
+
+\section{\cc{} Advantages and Drawbacks}
+
+In this section, we are providing some thoughts on possible advantages and drawbacks of \cc{}. Note that practice can show
+completely different picture from what we are providing here~(as often happens).
+
+Advantages:
+\begin{itemize}
+  \item ChainCash is quite unique, to the best of our knowledge, framework, where trust and backing with collateral are
+   seamlessly combined in money issuance.
+  \item unlike native cryptocurrrencies and algorithmic stablecoin, \cc{} provides elasticity of supply without enforcing
+  individual users to accept notes of lower quality - it is always up to users what to accept.
+  \item as Section~\ref{sec-apps} shows, a variety of known monetary systems can be built on top of \cc{}.
+\end{itemize}
+
+Drawbacks:
+\begin{itemize}
+  \item ChainCash notes are non-fungible, while they share the same unit-of-account, each note has unique backing. This prevents ChainCash usage
+  in many DeFi applications, such as liquidity pools, lending pools etc. We note that, similarly, DAI stablecoins issued against CDPs
+  (collateralized debt posistions) with different collateralization also should be priced differently. And like DAI is assigning the same price to
+  DAIs of different quality, there could be services on top of \cc{} combining notes of certain quality, buy e.g. exchanging them with service tokens
+  which then can be used in DeFi services.
+  \item There is no privacy in \cc{} payments now. This topic is fully left for further research.
+\end{itemize}
+
+
+\newpage
+\bibliography{sources}
+\bibliographystyle{ieeetr} 
+
+\end{document}

@@ -1,0 +1,14 @@
+rm conf.aux
+rm conf.out
+rm conf.log
+rm conf.bbl
+rm conf.blg
+pdflatex conf
+bibtex conf
+pdflatex conf
+pdflatex conf
+rm conf.aux
+rm conf.out
+rm conf.log
+rm conf.bbl
+rm conf.blg
