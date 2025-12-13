@@ -84,10 +84,9 @@
           val insertionPerformed = outHistory.digest == outputDigest && outHistory.enabledOperations == history.enabledOperations
           val sameScript = noteOut.propositionBytes == SELF.propositionBytes
           val nextHolderDefined = noteOut.R5[GroupElement].isDefined
-          val valuePreserved = noteOut.value >= SELF.value
           val positionIncreased = noteOut.R6[Long].get == (position + 1)
 
-          positionIncreased && insertionPerformed && sameScript && nextHolderDefined && valuePreserved
+          positionIncreased && insertionPerformed && sameScript && nextHolderDefined
       }
 
       val changeIdx = getVar[Byte](4) // optional index of change output
@@ -97,10 +96,13 @@
 
         // strict equality to prevent moving tokens to other contracts
         (selfOutput.tokens(0)._2 + changeOutput.tokens(0)._2) == SELF.tokens(0)._2 &&
+            (selfOutput.value + changeOutput.value) == SELF.value &&
             nextNoteCorrect(selfOutput) &&
             nextNoteCorrect(changeOutput)
       } else {
-        selfOutput.tokens(0) == SELF.tokens(0) && nextNoteCorrect(selfOutput)
+        selfOutput.tokens(0) == SELF.tokens(0) &&
+            selfOutput.value == SELF.value &&
+            nextNoteCorrect(selfOutput)
       }
 
       // proveDlog(holder) is needed to prevent changing output notes in the mempool

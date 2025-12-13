@@ -35,11 +35,13 @@ object TrackingTypes {
       map.insert(keyvals :_*)
       map
     }
+
+    def value: Long = currentUtxo.additionalTokens.toArray.headOption.map(_._2).getOrElse(0L)
   }
 
   case class ReserveData(reserveBox: ErgoBox,
                          signedUnspentNotes: IndexedSeq[NoteId],
-                         liabilites: Long) {
+                         liabilities: Map[ModifierId, Long]) {
     def reserveNftId: ReserveNftId = ModifierId @@ Base16.encode(reserveBox.additionalTokens.toArray.head._1.toArray)
   }
 

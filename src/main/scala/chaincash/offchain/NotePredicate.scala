@@ -31,7 +31,7 @@ class CoW1Predicate(whitelist: Set[EcPointType]) extends NotePredicate {
         def estimateReserve(reserveNftId: ReserveNftId): (Long, Long) = {
           val rd = DbEntities.reserves.get(reserveNftId).get
           val assets = rd.reserveBox.value
-          val liabilities = rd.liabilites * goldPrice.toLong
+          val liabilities = rd.liabilities.values.sum * goldPrice.toLong
           assets -> liabilities
         }
 

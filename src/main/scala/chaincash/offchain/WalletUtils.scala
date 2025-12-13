@@ -38,8 +38,8 @@ trait WalletUtils extends HttpUtils with JsonCodecs {
   }
 
   def myUnspentNotes(): Seq[ErgoBox] = {
-    // todo: inefficient scan through all the unspent notes here
-    DbEntities.unspentNotes.filter(_._2.holder == myPoint).map(_._2.currentUtxo).materialize
+    DbEntities.notesByHolder.get(myPoint).getOrElse(IndexedSeq.empty)
+      .flatMap(id => DbEntities.unspentNotes.get(id).map(_.currentUtxo))
   }
 
   def myBalance(): Long = {

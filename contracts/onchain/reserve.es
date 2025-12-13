@@ -123,12 +123,13 @@
       sigmaProp(selfPreserved && properOracle && redeemCorrect && properSignature && properReceipt && positionCorrect)
     } else if (action == 1) {
       // top up
-      // todo: check R5 preservation
-      sigmaProp(selfPreserved && (selfOut.value - SELF.value >= 1000000000)) // at least 1 ERG added
+      sigmaProp(selfPreserved &&
+                (selfOut.value - SELF.value >= 1000000000) && // at least 1 ERG added
+                selfOut.R5[AvlTree].get == SELF.R5[AvlTree].get
+      )
     } else if (action == 2) {
       // issue a note
-      // todo: check R5 preservation
-      sigmaProp(selfPreserved)
+      sigmaProp(selfPreserved && selfOut.R5[AvlTree].get == SELF.R5[AvlTree].get)
     } else {
       sigmaProp(false)
     }
