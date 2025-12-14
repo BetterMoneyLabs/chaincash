@@ -1,0 +1,38 @@
+[package]
+name = "basis-private-tracker"
+version = "0.1.0"
+edition = "2021"
+authors = ["ChainCash Labs"]
+description = "Tracker implementation for private Basis (Chaumian e-cash) off-chain notes"
+
+
+[dependencies]
+# Cryptography
+sha2 = "0.10"
+blake2 = "0.10"
+hex = "0.4"
+rand = "0.8"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# NOTE: Removed thiserror due to Windows build issues in test environment
+# Using simple String-based errors for PoC
+
+# Optional: For production, would use proper ECC library
+# For PoC, we'll use placeholder types
+# secp256k1 = "0.28"
+# k256 = "0.13"
+
+[dev-dependencies]
+# Testing
+proptest = "1.0"
+
+[lib]
+name = "basis_private_tracker"
+path = "src/lib.rs"
+
+[[bin]]
+name = "tracker_poc"
+path = "src/bin/tracker_poc.rs"
