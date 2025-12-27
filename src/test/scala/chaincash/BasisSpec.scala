@@ -15,7 +15,7 @@ import scorex.util.encode.{Base16, Base64}
 import sigmastate.AvlTreeFlags
 import sigmastate.basics.DLogProtocol.ProveDlog
 import sigmastate.eval._
-import sigmastate.serialization.GroupElementSerializer
+import sigmastate.serialization.{GroupElementSerializer, ValueSerializer}
 import special.sigma.{AvlTree, GroupElement}
 import work.lithos.plasma.PlasmaParameters
 import work.lithos.plasma.collections.{PlasmaMap, Proof}

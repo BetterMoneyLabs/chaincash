@@ -42,6 +42,7 @@ in the [whitepaper](https://github.com/ChainCashLabs/chaincash/blob/master/docs/
 
 More introductory materials: 
 
+* [Video presentation from 1st Stability Workshop](https://youtu.be/gTwKxizAXZQ)
 * [The World Needs For More Collateral](https://www.ergoforum.org/t/the-world-needs-for-more-collateral/4451) - forum thread
 * [Video presentation from Ergo Summit](https://www.youtube.com/watch?v=NxIlIpO6ZVI)
 * [Video: ChainCash, part two](https://www.youtube.com/watch?v=fk8ZFvNFDYc)

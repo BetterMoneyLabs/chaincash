@@ -1,4 +1,4 @@
-"SilverCents – a hybrid crypto currency
+SilverCents – a hybrid crypto currency
 ========================================
 
 SilverCents are the on-chain tokens in a cryptocurrency run on the Ergo Platform, using the Basis protocol (CCIP-1). 
@@ -7,8 +7,9 @@ and there are billions of these coins, distributed widely throughout the USA. Th
 business of the vendors that participate in the SilverCents economy.
 
 The supply of SilverCents is determined by the participation of vendor entities and their customers. Vendors can mint 
-new SilverCents by creating ChainCash notes that are 50% collateralized by DexySilver, and by a promise to redeem any 
-of their SilverCents for constitutional silver dimes and quarters, within certain guidelines.
+new SilverCents by creating notes against reserves that are 50% collateralized by DexySilver and 50% collateralized by 
+tokenized real-world silver, and by a promise to redeem any of their SilverCents for constitutional silver 
+dimes and quarters, within certain guidelines.
 
 Just like the actual junk silver, the SilverCents will circulate like an incompressible fluid in the local economies. 
 In fact, it will be more liquid because customers carry their phones about all the time, but not silver quarters. 
@@ -23,4 +24,4 @@ SilverCents could be traded online, and form the basis of an undercollateralized
 the purpose of SilverCents is facilitate local circular economies based upon familiar tokenization and availability of 
 constitutional silver dimes and quarters. SilverCents are for farmers markets, the county fair, food trucks, flea 
 markets, handyman services, and other small local business markets. SilverCents makes it easier for the customers to 
-pay with their phone, and makes it easier for Vendors to settle accounts with one another in silver coinage. 
+pay with their phone, and makes it easier for Vendors to settle accounts with one another in silver coinage.
