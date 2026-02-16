@@ -6,18 +6,19 @@
     // Main use-cases:
     // * digital payments with credit creation allowed
     // * especially with areas with no stable Inernet connection (over mesh networks)
+    // * agent-to-agent payments
     // * payments for content (such as 402 HTTP code processing)
     // * micropayments
     // * payments in p2p networks
-    // * agent-to-agent payments
+
 
     // Here are some properties of Basis design:
-    // * offchain payments with no need to create anything on-chain first, so possibility to create credit
+    // * offchain payments with no need to create on-chain reserves first, so possibility to create credit
     // * only minimally trusted trackers to track state of mutual debt offchain used, with no possibility to steal funds etc
     // * onchain contract based redemption with prevention of double redemptions
 
     // How does that work:
-    //  * a tracker holds ever created A -> B debt (as positive ever increasing number), along with ever increasing (on every operation) timestamp.
+    //  * a tracker holds ever created A -> B debt (as positive ever increasing number).
     //    A key->value dictionary is used to store the data as hash(AB) -> (amount, timestamp, sig_A), where AB is concatenation of public
     //    keys A and B, "amount" is amount of debt of A before B, timestamp is operation timestamp (in milliseconds), sig_A is signature of A for
     //    A for message (hash(AB), amount, timestamp).
@@ -25,12 +26,21 @@
     //    sending it to the tracker
     //  * tracker is periodically committing to its state (dictionary) by posting its digest on chain
     //  * at any moment it is possible to redeem A debt to B by calling redemption action of the reserve contract below
-    //    B -> timestamp pair is written into the contract box. Calling the contract after with timestamp <= written on is
-    //    prohibited. Tracker signature is needed to redeem.
-    //    If not, A is refusing to sign updated records. Tracker cant steal A's funds as A's signature is checked.
-    //  * if tracker is going offline, possible to redeem without its signature, when at least one week passed
+    //    The contract tracks cumulative amount of debt already redeemed for each (owner, receiver) pair in an AVL tree.
+    //    Tracker signature is needed to redeem normally.
+    //  * if tracker is going offline, possible to redeem without its signature, when at least 3 days passed since tracker creation
+    //    (NOTE: this affects ALL debts associated with the tracker simultaneously)
     //  * always possible to top up the reserve, to redeem, reserve holder is making an offchain payment to self (A -> A)
     //    and then redeem
+
+    // Security analysis and the role of the tracker:
+    //  * the usual problem is than A can pay to B and then create a note from A to self and redeem. Solved by tracker solely.
+    //  * double spending of a note is not possible by contract design
+
+    // Normal workflow:
+    //
+
+    // Demos:
 
 
     // Data:
@@ -67,9 +77,10 @@
       // #1 - receiver pubkey (as a group element)
       // #2 - reserve owner's signature for the debt record
       // #3 - current total debt amount
+      // #4 - [OPTIONAL] flag showing that tracker went offline
       // #5 - proof for insertion into reserve's AVL+ tree
       // #6 - tracker's signature
-      // #7 - proof for AVL+ tree lookup for lender-borrower pair
+      // #7 - [OPTIONAL] proof for AVL+ tree lookup for lender-borrower pair
 
       // Base point for elliptic curve operations
       val g: GroupElement = groupGenerator
@@ -98,10 +109,10 @@
 
       val totalDebt = getVar[Long](3).get
 
-      val lookupProof = getVar[Coll[Byte]](7).get
-      val redeemedDebtBytesOpt = SELF.R5[AvlTree].get.get(key, lookupProof)
-      val redeemedDebt = if(redeemedDebtBytesOpt.isDefined){
-        byteArrayToLong(redeemedDebtBytesOpt.get)
+      val lookupProofOpt = getVar[Coll[Byte]](7)
+      val redeemedDebt = if(lookupProofOpt.isDefined){
+        val redeemedDebtBytes = SELF.R5[AvlTree].get.get(key, lookupProofOpt.get).get
+        byteArrayToLong(redeemedDebtBytes)
       } else {
         0L
       }
@@ -128,7 +139,8 @@
       // Check if enough time has passed for emergency redemption (without tracker signature)
       // tracker signature is still provided but may be invalid
       // todo: consider more efficient check where tracker signature is not needed at all
-
+      // NOTE: All debts associated with this tracker (both new and old) become eligible
+      // for emergency redemption simultaneously after 3 days from tracker creation
       val trackerUpdateTime = tracker.creationInfo._1
       val enoughTimeSpent = (HEIGHT - trackerUpdateTime) > 3 * 720 // 3 days passed
 
@@ -172,8 +184,8 @@
       // top up
       sigmaProp(
         selfPreserved &&
-        selfOut.R5[AvlTree].get == SELF.R5[AvlTree].get && // as R5 register preservation is not checked in selfPreserved
-        (selfOut.value - SELF.value >= 1000000000) // at least 1 ERG added
+        selfOut.R5[AvlTree].get == SELF.R5[AvlTree].get // as R5 register preservation is not checked in selfPreserved
+        (selfOut.value - SELF.value >= 100000000) // at least 0.1 ERG added
       )
     } else {
       sigmaProp(false)
