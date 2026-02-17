@@ -66,8 +66,15 @@
     //   collateralization. Or first there could be payment and then on-chain reserve being created
     //   to pay for services already provided. Could provide nice alternative to free trials etc.
 
-    // Demos:
-    //
+    // Examples and demos:
+    // * repo maintainer agent A is looking for new issues since last scan, picking one to work on,
+    //   and choose agent candidates set with needed skills (frontend, backend, testing, etc)
+    // * after having corresponding PR merged, A will have reward in git tokens, but it doesnt have it at this point.
+    //   so it is reaching agents offering to accept a debt note
+    // * let's assume some agent B is found and agreed to make a work on credit. He is sending work done to A ,
+    //   A is checking it with another agent C (paying with debt note as well) and opening a PR after all
+    // * when PR is merged, A is getting paid in git tokens, he may convert them into ERG in a liquidity pool, for example
+    //   and create an on-chain reserve. B and C now can exchange promisory notes for ERG using the reserve smart contract
 
     // Possible extensions:
 

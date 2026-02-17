@@ -6,6 +6,7 @@ import sigmastate.eval._
 import sigmastate.basics.SecP256K1Group
 import java.security.SecureRandom
 import scala.annotation.tailrec
+import scorex.crypto.hash.Blake2b256
 
 object SigUtils {
 
@@ -24,7 +25,7 @@ object SigUtils {
 
     val r = randBigInt
     val a: GroupElement = g.exp(r.bigInteger)
-    val e = scorex.crypto.hash.Blake2b256(a.getEncoded.toArray ++ msg ++ pk.getEncoded.toArray)
+    val e = Blake2b256(a.getEncoded.toArray ++ msg ++ pk.getEncoded.toArray)
     val z = (r + secretKey * BigInt(e)) % CryptoConstants.groupOrder
 
     if(z.bitLength <= 255) {
@@ -34,4 +35,20 @@ object SigUtils {
     }
   }
 
+  /**
+   * Verifies a Schnorr signature
+   * @param msg Message that was signed
+   * @param publicKey Public key
+   * @param a Signature component (random point)
+   * @param z Signature component (response)
+   * @return true if signature is valid
+   */
+  def verify(msg: Array[Byte], publicKey: GroupElement, a: GroupElement, z: BigInt): Boolean = {
+    val g: GroupElement = CryptoConstants.dlogGroup.generator
+    val e = Blake2b256(a.getEncoded.toArray ++ msg ++ publicKey.getEncoded.toArray)
+    val eBigInt = BigInt(e)
+    val lhs = g.exp(z.bigInteger)
+    val rhs = a.multiply(publicKey.exp(eBigInt.bigInteger))
+    lhs == rhs
+  }
 }
