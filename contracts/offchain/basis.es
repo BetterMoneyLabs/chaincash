@@ -38,10 +38,38 @@
     //  * double spending of a note is not possible by contract design
 
     // Normal workflow:
-    //
+    // * A is willing to buy some services for B. He is asking B whether collateral (along with debt notes)
+    //     can be accepted (can be done non-interactively when B is publishing his acceptance predicated)
+    // * if A's debt note would be accepted, he is signing a debt note and sending it to a tracker. Tracker is providing
+    //   a signature on a bit modified message to be used in case of tracker going offline. A is sending debt note and
+    //   both signatures to B.
+    // * after some time (defined by offchain logic), B can redeem, fully or partially. For that, B is contacting tracker
+    //   to obtain a signature on debt note to present then A's and tracker's signatures along with the debt note to a contract
+    // * at any time A can make another payment to B, by signing a message with increased cumulative debt amount
+    // * if tracker is going offline, B can redeem using a special signature from tracker from above. Ideally, tracker
+    //   shouldnt' allow for another redemption before B's redemption transaction got confirmed on-chain, or some deadline,
+    //   whatever comes first
+    // * A can refund by redeeming like B. Actually, in pseudonymous environment it always impossible to say how many
+    //   alts A may have. So B should always track collateralization level. B can prepare redemption transaction in advance and
+    //   ask 3rd party service to submmit it when A is offline.
+
+    // Tracker's role here is to guarantee fairness of payments. Tracker can't steal A's onchain funds as A's signature is
+    // required. Tracker can re-order redemption trandactions though, thus affecting outcome for B when a note is
+    // undercollateralized (this can be improved). Ideally, tracker should  Tracker can be centralized entity or federation.
+
+    // Debt notes are not transferrable in current design. So B cant' really pay C with a debt note issued by A. B has
+    // to create a new debt note.
+
+    // With some trust involved in managing redemption process, some pros are coming :
+    // * no on-chain fees. Suitable for micropayments.
+    // * Unlike other offchain cash schemes (Lightning, Cashu/Fedimint etc), transaction can be done with no
+    //   collateralization. Or first there could be payment and then on-chain reserve being created
+    //   to pay for services already provided. Could provide nice alternative to free trials etc.
 
     // Demos:
+    //
 
+    // Possible extensions:
 
     // Data:
     //  - R4 - signing key (as a group element)
@@ -77,7 +105,6 @@
       // #1 - receiver pubkey (as a group element)
       // #2 - reserve owner's signature for the debt record
       // #3 - current total debt amount
-      // #4 - [OPTIONAL] flag showing that tracker went offline
       // #5 - proof for insertion into reserve's AVL+ tree
       // #6 - tracker's signature
       // #7 - [OPTIONAL] proof for AVL+ tree lookup for lender-borrower pair
@@ -117,8 +144,18 @@
         0L
       }
 
-      // Message to verify signatures: key || total debt
-      val message = key ++ longToByteArray(totalDebt)
+      // Check if enough time has passed for emergency redemption (without tracker signature)
+      // NOTE: All debts associated with this tracker (both new and old) become eligible
+      // for emergency redemption simultaneously after 3 days from tracker creation
+      val trackerUpdateTime = tracker.creationInfo._1
+      val enoughTimeSpent = (HEIGHT - trackerUpdateTime) > 3 * 720 // 3 days passed
+
+      // Message to verify signatures: key || total debt, in case of emergency exit key || total debt || 0
+      val message = if (enoughTimeSpent) {
+         key ++ longToByteArray(totalDebt) ++ longToByteArray(0L)
+      } else {
+         key ++ longToByteArray(totalDebt)
+      }
 
       // Tracker's signature authorizing the redemption
       val trackerSigBytes = getVar[Coll[Byte]](6).get
@@ -136,18 +173,10 @@
       // Verify tracker Schnorr signature: g^z = a * x^e
       val properTrackerSignature = (g.exp(trackerZ) == trackerA.multiply(trackerPubKey.exp(trackerEInt)))
 
-      // Check if enough time has passed for emergency redemption (without tracker signature)
-      // tracker signature is still provided but may be invalid
-      // todo: consider more efficient check where tracker signature is not needed at all
-      // NOTE: All debts associated with this tracker (both new and old) become eligible
-      // for emergency redemption simultaneously after 3 days from tracker creation
-      val trackerUpdateTime = tracker.creationInfo._1
-      val enoughTimeSpent = (HEIGHT - trackerUpdateTime) > 3 * 720 // 3 days passed
-
       // Calculate amount being redeemed and verify it doesn't exceed debt
       val redeemed = SELF.value - selfOut.value
       val debtDelta = (totalDebt - redeemedDebt)
-      val properlyRedeemed = (redeemed > 0) && (redeemed <= debtDelta) && (enoughTimeSpent || properTrackerSignature)
+      val properlyRedeemed = (redeemed > 0) && (redeemed <= debtDelta) && properTrackerSignature
 
       // Split reserve owner signature into components (Schnorr signature: (a, z))
       val reserveABytes = reserveSigBytes.slice(0, 33) // Random point a
@@ -184,7 +213,7 @@
       // top up
       sigmaProp(
         selfPreserved &&
-        selfOut.R5[AvlTree].get == SELF.R5[AvlTree].get // as R5 register preservation is not checked in selfPreserved
+        selfOut.R5[AvlTree].get == SELF.R5[AvlTree].get && // as R5 register preservation is not checked in selfPreserved
         (selfOut.value - SELF.value >= 100000000) // at least 0.1 ERG added
       )
     } else {

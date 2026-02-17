@@ -174,8 +174,8 @@ object BasisConstants {
   // Minimum top-up amount (1 ERG)
   val MIN_TOP_UP_AMOUNT: Long = 1000000000L
   
-  // Emergency redemption time (7 days in milliseconds)
-  val EMERGENCY_REDEMPTION_TIME: Long = 7L * 24L * 60L * 60L * 1000L
+  // Emergency redemption time (3 days in blocks, assuming ~2.5 min per block)
+  val EMERGENCY_REDEMPTION_TIME_IN_BLOCKS: Int = 3 * 720
   
   // Fee percentage for redemption (2%)
   val REDEMPTION_FEE_PERCENTAGE: Int = 2

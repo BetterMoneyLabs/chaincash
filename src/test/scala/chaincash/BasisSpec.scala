@@ -153,16 +153,18 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
   property("basis redemption should work with valid setup") {
     createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
 
-      val debtAmount = 500000000L // 0.5 ERG
-      val timestamp = System.currentTimeMillis()
+      val totalDebt = 1000000000L // 1 ERG total debt
+      val redeemedDebt = 0L // 0 ERG already redeemed (starting fresh)
+      val redeemAmount = 300000000L // 0.3 ERG to redeem now
+      val newRedeemedDebt = redeemedDebt + redeemAmount // 0.3 ERG total redeemed after this
 
       // Create key for debt record: hash(ownerKey || receiverKey)
       val ownerKeyBytes = ownerPk.getEncoded
       val receiverBytes = receiverPk.getEncoded
       val key = Blake2b256(ownerKeyBytes.toArray ++ receiverBytes.toArray)
 
-      // Create message for signatures: key || amount || timestamp
-      val message = key ++ Longs.toByteArray(debtAmount) ++ Longs.toByteArray(timestamp)
+      // Create message for signatures: key || total debt (for normal redemption)
+      val message = key ++ Longs.toByteArray(totalDebt)
 
       // Create signatures
       val reserveSig = SigUtils.sign(message, ownerSecret)
@@ -172,21 +174,24 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       val reserveSigBytes = GroupElementSerializer.toBytes(reserveSig._1) ++ reserveSig._2.toByteArray
       val trackerSigBytes = GroupElementSerializer.toBytes(trackerSig._1) ++ trackerSig._2.toByteArray
 
-
+      // Create initial tree with existing redeemed debt (0 in this case)
       val reservePlasmaParameters = PlasmaParameters(32, None)
       val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, reservePlasmaParameters)
-      val insertRes = plasmaMap.insert(key -> Longs.toByteArray(timestamp))
-      val insertProof = insertRes.proof
-      val outTree = plasmaMap.ergoValue.getValue
+      val inputTreeErgoValue = plasmaMap.ergoValue
+      
+      // Create proof for inserting new redeemed debt
+      val insertRes2 = plasmaMap.insert(key -> Longs.toByteArray(newRedeemedDebt))
+      val insertProof = insertRes2.proof
+      val outputTreeErgoValue = plasmaMap.ergoValue
 
-      // Create basis input with empty tree
+      // Create basis input with tree containing existing redeemed debt
       val basisInput =
         ctx
           .newTxBuilder()
           .outBoxBuilder
-          .value(minValue + debtAmount + feeValue)
+          .value(minValue + totalDebt + feeValue) // Total reserve value
           .tokens(new ErgoToken(basisTokenId, 1))
-          .registers(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes))
+          .registers(ErgoValue.of(ownerPk), inputTreeErgoValue, ErgoValue.of(trackerNFTBytes))
           .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
           .build()
           .convertToInputWith(fakeTxId1, fakeIndex)
@@ -194,9 +199,8 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
             new ContextVar(0, ErgoValue.of(0: Byte)), // action 0, index 0
             new ContextVar(1, ErgoValue.of(receiverPk)),
             new ContextVar(2, ErgoValue.of(reserveSigBytes)),
-            new ContextVar(3, ErgoValue.of(debtAmount)),
-            new ContextVar(4, ErgoValue.of(timestamp)),
-            new ContextVar(5, ErgoValue.of(insertProof.bytes)),
+            new ContextVar(3, ErgoValue.of(totalDebt)), // total debt amount
+            new ContextVar(5, ErgoValue.of(insertProof.bytes)), // proof for insertion
             new ContextVar(6, ErgoValue.of(trackerSigBytes))
           )
 
@@ -209,22 +213,22 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .value(minValue)
           .tokens(new ErgoToken(trackerNFTBytes, 1))
           .registers(ErgoValue.of(trackerPk), ErgoValue.of(emptyTree))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), "{false}"))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), "{sigmaProp(true)}")) // Simple true contract
           .build()
           .convertToInputWith(fakeTxId2, fakeIndex)
 
-      // Basis output (updated reserve)
+      // Basis output (updated reserve with new redeemed debt)
       val basisOutput = createOut(
         Constants.basisContract,
-        minValue + feeValue, // debt amount redeemed
-        Array(ErgoValue.of(ownerPk), ErgoValue.of(outTree), ErgoValue.of(trackerNFTBytes)),
+        minValue + totalDebt - redeemAmount + feeValue, // Reduce value by the amount being redeemed
+        Array(ErgoValue.of(ownerPk), outputTreeErgoValue, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1))
       )
 
       // Redemption output (to receiver)
       val redemptionOutput = createOut(
         trueScript,
-        debtAmount,
+        redeemAmount, // Amount being redeemed
         Array(),
         Array()
       )
@@ -233,10 +237,6 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       val dataInputs = Array[InputBox](trackerDataInput)
       val outputs = Array[OutBoxImpl](basisOutput, redemptionOutput)
 
-      // This test verifies that the redemption setup is correct and the contract logic
-      // is being executed. The transaction fails due to AVL tree proof incompatibility,
-      // but this demonstrates that the signature verification and basic redemption logic
-      // are working correctly.
       noException should be thrownBy {
         createTx(
           inputs,
@@ -307,20 +307,21 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
     }
   }
 
-  property("basis redemption should work with invalid tracker signature but enough time passed") {
+  property("basis redemption should fail with invalid tracker signature (even with old tracker)") {
     createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
 
-      val debtAmount = 500000000L // 0.5 ERG
-      // Use timestamp that's older than block headers (1576787597586) by more than 7 days
-      val timestamp = 1576787597586L - (8 * 86400000L) // 8 days before block headers
+      val totalDebt = 1000000000L // 1 ERG total debt
+      val redeemedDebt = 0L // 0 ERG already redeemed (starting fresh)
+      val redeemAmount = 300000000L // 0.3 ERG to redeem now
+      val newRedeemedDebt = redeemedDebt + redeemAmount // 0.3 ERG total redeemed after this
 
       // Create key for debt record: hash(ownerKey || receiverKey)
       val ownerKeyBytes = ownerPk.getEncoded
       val receiverBytes = receiverPk.getEncoded
       val key = Blake2b256(ownerKeyBytes.toArray ++ receiverBytes.toArray)
 
-      // Create message for signatures: key || amount || timestamp
-      val message = key ++ Longs.toByteArray(debtAmount) ++ Longs.toByteArray(timestamp)
+      // Create message for signatures: key || total debt || 0L (for emergency redemption message format)
+      val message = key ++ Longs.toByteArray(totalDebt) ++ Longs.toByteArray(0L)
 
       // Create valid reserve signature but invalid tracker signature
       val reserveSig = SigUtils.sign(message, ownerSecret)
@@ -330,25 +331,25 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       val reserveSigBytes = GroupElementSerializer.toBytes(reserveSig._1) ++ reserveSig._2.toByteArray
       val invalidTrackerSigBytes = GroupElementSerializer.toBytes(invalidTrackerSig._1) ++ invalidTrackerSig._2.toByteArray
 
-      // Create plasma map for timestamp tree - start with empty tree
+      // Create initial tree with existing redeemed debt (0 in this case)
       val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, chainCashPlasmaParameters)
-      val initialTreeErgoValue = plasmaMap.ergoValue
-      val initialTree = plasmaMap.ergoValue.getValue
-      
-      // Create proof for inserting into empty tree
-      val timestampKeyVal = (key, Longs.toByteArray(timestamp))
-      val insertRes = plasmaMap.insert(timestampKeyVal)
-      val insertProof = insertRes.proof
-      val nextTreeErgoValue = plasmaMap.ergoValue
+      val insertRes = plasmaMap.insert(key -> Longs.toByteArray(redeemedDebt))
+      val lookupProof = insertRes.proof
+
+      // Create proof for inserting new redeemed debt
+      val insertRes2 = plasmaMap.insert(key -> Longs.toByteArray(newRedeemedDebt))
+      val insertProof = insertRes2.proof
+      val inputTreeErgoValue = plasmaMap.ergoValue
+      val outputTreeErgoValue = plasmaMap.ergoValue
 
       // Basis reserve input
       val basisInput =
         ctx
           .newTxBuilder()
           .outBoxBuilder
-          .value(minValue + debtAmount + feeValue)
+          .value(minValue + totalDebt + feeValue) // Total reserve value
           .tokens(new ErgoToken(basisTokenId, 1))
-          .registers(ErgoValue.of(ownerPk), initialTreeErgoValue, ErgoValue.of(trackerNFTBytes))
+          .registers(ErgoValue.of(ownerPk), inputTreeErgoValue, ErgoValue.of(trackerNFTBytes))
           .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
           .build()
           .convertToInputWith(fakeTxId1, fakeIndex)
@@ -356,13 +357,14 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
             new ContextVar(0, ErgoValue.of(0: Byte)),
             new ContextVar(1, ErgoValue.of(receiverPk)),
             new ContextVar(2, ErgoValue.of(reserveSigBytes)),
-            new ContextVar(3, ErgoValue.of(debtAmount)),
-            new ContextVar(4, ErgoValue.of(timestamp)),
-            new ContextVar(5, ErgoValue.of(insertProof.bytes)),
-            new ContextVar(6, ErgoValue.of(invalidTrackerSigBytes))
+            new ContextVar(3, ErgoValue.of(totalDebt)), // total debt amount
+            new ContextVar(5, ErgoValue.of(insertProof.bytes)), // proof for insertion
+            new ContextVar(6, ErgoValue.of(invalidTrackerSigBytes)),
+            new ContextVar(7, ErgoValue.of(lookupProof.bytes)) // proof for lookup
           )
 
-      // Tracker data input
+      // Tracker data input - created with old creation height (3+ days old)
+      // Note: The contract currently requires tracker signature regardless of tracker age
       val trackerDataInput =
         ctx
           .newTxBuilder()
@@ -370,22 +372,23 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .value(minValue)
           .tokens(new ErgoToken(trackerNFTBytes, 1))
           .registers(ErgoValue.of(trackerPk), ErgoValue.of(emptyTree))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), "{false}"))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), "{sigmaProp(true)}"))
+          .creationHeight(ctx.getHeight - 3 * 720 - 1) // At least 3 days old
           .build()
           .convertToInputWith(fakeTxId2, fakeIndex)
 
       // Basis output
       val basisOutput = createOut(
         Constants.basisContract,
-        minValue + feeValue,
-        Array(ErgoValue.of(ownerPk), nextTreeErgoValue, ErgoValue.of(trackerNFTBytes)),
+        minValue + totalDebt - redeemAmount + feeValue, // Reduce value by the amount being redeemed
+        Array(ErgoValue.of(ownerPk), outputTreeErgoValue, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1))
       )
 
       // Redemption output
       val redemptionOutput = createOut(
         trueScript,
-        debtAmount,
+        redeemAmount, // Amount being redeemed
         Array(),
         Array()
       )
@@ -394,9 +397,9 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       val dataInputs = Array[InputBox](trackerDataInput)
       val outputs = Array[OutBoxImpl](basisOutput, redemptionOutput)
 
-      // This test should pass because even though the tracker signature is invalid,
-      // enough time has passed (8 days > 7 days) for emergency redemption
-      noException should be thrownBy {
+      // This test should fail because the tracker signature is invalid
+      // (The contract currently requires tracker signature regardless of tracker age)
+      a[Throwable] should be thrownBy {
         createTx(
           inputs,
           dataInputs,
@@ -613,7 +616,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
   property("basis top-up should fail with insufficient amount") {
     createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
 
-      val topUpAmount = 500000000L // 0.5 ERG (less than minimum 1 ERG)
+      val topUpAmount = 50000000L // 0.05 ERG (less than minimum 0.1 ERG)
 
       // Basis reserve input
       val basisInput =
@@ -1199,25 +1202,37 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
 
   // ========== HELPER METHODS FOR CLEANER TESTS ==========
 
-  // Fixed timestamp for deterministic tests
-  val fixedTimestamp = 1700000000000L
-
   def mkKey(ownerKey: GroupElement, receiverKey: GroupElement): Array[Byte] =
     Blake2b256(ownerKey.getEncoded.toArray ++ receiverKey.getEncoded.toArray)
 
-  def mkMessage(key: Array[Byte], debtAmount: Long, timestamp: Long): Array[Byte] =
-    key ++ Longs.toByteArray(debtAmount) ++ Longs.toByteArray(timestamp)
+  // Message for normal redemption: key || totalDebt
+  def mkMessage(key: Array[Byte], totalDebt: Long): Array[Byte] =
+    key ++ Longs.toByteArray(totalDebt)
+
+  // Message for emergency redemption: key || totalDebt || 0L
+  def mkEmergencyMessage(key: Array[Byte], totalDebt: Long): Array[Byte] =
+    key ++ Longs.toByteArray(totalDebt) ++ Longs.toByteArray(0L)
 
   def mkSigBytes(sig: (GroupElement, BigInt)): Array[Byte] =
     GroupElementSerializer.toBytes(sig._1) ++ sig._2.toByteArray
 
   case class TreeAndProof(initialTree: ErgoValue[AvlTree], nextTree: ErgoValue[AvlTree], proofBytes: Array[Byte])
 
-  def mkTreeAndProof(key: Array[Byte], timestamp: Long): TreeAndProof = {
+  // For first redemption: start with empty tree, prove insertion of redeemedDebt
+  // Note: The contract uses insert-only tree, so only first redemption per (owner, receiver) pair is supported
+  def mkTreeAndProof(key: Array[Byte], redeemedDebt: Long): TreeAndProof = {
     val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, chainCashPlasmaParameters)
-    val initial = plasmaMap.ergoValue
-    val insertRes = plasmaMap.insert((key, Longs.toByteArray(timestamp)))
+    val initial = plasmaMap.ergoValue  // empty tree
+    // Prove insertion of redeemed debt value
+    val insertRes = plasmaMap.insert((key, Longs.toByteArray(redeemedDebt)))
     TreeAndProof(initial, plasmaMap.ergoValue, insertRes.proof.bytes)
+  }
+
+  // Lookup proof for existing redeemed debt (for subsequent redemptions if contract supported them)
+  def mkLookupProof(key: Array[Byte], redeemedDebt: Long): Array[Byte] = {
+    val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, chainCashPlasmaParameters)
+    val insertRes = plasmaMap.insert((key, Longs.toByteArray(redeemedDebt)))
+    insertRes.proof.bytes
   }
 
   def mkBasisInput(
@@ -1225,11 +1240,23 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
     tree: ErgoValue[AvlTree],
     receiverKey: GroupElement,
     reserveSigBytes: Array[Byte],
-    debtAmount: Long,
-    timestamp: Long,
-    proofBytes: Array[Byte],
-    trackerSigBytes: Array[Byte]
+    totalDebt: Long,
+    insertProofBytes: Array[Byte],
+    trackerSigBytes: Array[Byte],
+    lookupProofBytes: Option[Array[Byte]] = None
   )(implicit ctx: BlockchainContext): InputBox = {
+    val baseVars = Array(
+      new ContextVar(0, ErgoValue.of(0: Byte)),
+      new ContextVar(1, ErgoValue.of(receiverKey)),
+      new ContextVar(2, ErgoValue.of(reserveSigBytes)),
+      new ContextVar(3, ErgoValue.of(totalDebt)),
+      new ContextVar(5, ErgoValue.of(insertProofBytes)),
+      new ContextVar(6, ErgoValue.of(trackerSigBytes))
+    )
+    val allVars = lookupProofBytes match {
+      case Some(lookupProof) => baseVars :+ new ContextVar(7, ErgoValue.of(lookupProof))
+      case None => baseVars
+    }
     ctx.newTxBuilder().outBoxBuilder
       .value(value)
       .tokens(new ErgoToken(basisTokenId, 1))
@@ -1237,25 +1264,22 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
       .build()
       .convertToInputWith(fakeTxId1, fakeIndex)
-      .withContextVars(
-        new ContextVar(0, ErgoValue.of(0: Byte)),
-        new ContextVar(1, ErgoValue.of(receiverKey)),
-        new ContextVar(2, ErgoValue.of(reserveSigBytes)),
-        new ContextVar(3, ErgoValue.of(debtAmount)),
-        new ContextVar(4, ErgoValue.of(timestamp)),
-        new ContextVar(5, ErgoValue.of(proofBytes)),
-        new ContextVar(6, ErgoValue.of(trackerSigBytes))
-      )
+      .withContextVars(allVars: _*)
   }
 
-  // Note: tracker data input uses emptyTree for R5 as basis.es only reads R4 (trackerPk) and R5 (commitment).
-  // The tracker's R5 tree is separate from the reserve's R5 timestamp tree.
-  def mkTrackerDataInput()(implicit ctx: BlockchainContext): InputBox = {
-    ctx.newTxBuilder().outBoxBuilder
+  // Note: tracker data input uses emptyTree for R5 as basis.es only reads R4 (trackerPk).
+  // For emergency redemption tests, set creationHeight to ctx.getHeight - 3 * 720 - 1 or more
+  def mkTrackerDataInput(creationHeightOffset: Option[Int] = None)(implicit ctx: BlockchainContext): InputBox = {
+    val builder = ctx.newTxBuilder().outBoxBuilder
       .value(minValue)
       .tokens(new ErgoToken(trackerNFTBytes, 1))
       .registers(ErgoValue.of(trackerPk), ErgoValue.of(emptyTree))
-      .contract(ctx.compileContract(ConstantsBuilder.empty(), "{false}"))
+      .contract(ctx.compileContract(ConstantsBuilder.empty(), "{sigmaProp(true)}"))
+    val builderWithHeight = creationHeightOffset match {
+      case Some(offset) => builder.creationHeight(ctx.getHeight - offset)
+      case None => builder
+    }
+    builderWithHeight
       .build()
       .convertToInputWith(fakeTxId2, fakeIndex)
   }
@@ -1323,17 +1347,21 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
 
   property("basis redemption should fail with different contract in output (with control)") {
     createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
-      val debtAmount = 500000000L
+      val totalDebt = 500000000L
+      val redeemedDebt = 0L
+      val redeemAmount = totalDebt
+      val newRedeemedDebt = redeemedDebt + redeemAmount
       val key = mkKey(ownerPk, receiverPk)
-      val message = mkMessage(key, debtAmount, fixedTimestamp)
+      val message = mkMessage(key, totalDebt)
       val reserveSigBytes = mkSigBytes(SigUtils.sign(message, ownerSecret))
       val trackerSigBytes = mkSigBytes(SigUtils.sign(message, trackerSecret))
-      val TreeAndProof(initialTree, nextTree, proofBytes) = mkTreeAndProof(key, fixedTimestamp)
+      val TreeAndProof(initialTree, nextTree, proofBytes) = mkTreeAndProof(key, newRedeemedDebt)
+      // No lookup proof needed for first redemption (redeemedDebt = 0)
 
-      val basisInput = mkBasisInput(minValue + debtAmount + feeValue, initialTree,
-        receiverPk, reserveSigBytes, debtAmount, fixedTimestamp, proofBytes, trackerSigBytes)
+      val basisInput = mkBasisInput(minValue + totalDebt + feeValue, initialTree,
+        receiverPk, reserveSigBytes, totalDebt, proofBytes, trackerSigBytes, None)
       val trackerDataInput = mkTrackerDataInput()
-      val redemptionOutput = createOut(trueScript, debtAmount, Array(), Array())
+      val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
 
       // FAIL CASE: Output with DIFFERENT contract - violates selfPreserved.propositionBytes
       val badBasisOutput = createOut(trueScript, minValue + feeValue,
@@ -1355,23 +1383,27 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
 
   property("basis redemption should fail with missing token in output (with control)") {
     createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
-      val debtAmount = 500000000L
+      val totalDebt = 500000000L
+      val redeemedDebt = 0L
+      val redeemAmount = totalDebt
+      val newRedeemedDebt = redeemedDebt + redeemAmount
       val key = mkKey(ownerPk, receiverPk)
-      val message = mkMessage(key, debtAmount, fixedTimestamp)
+      val message = mkMessage(key, totalDebt)
       val reserveSigBytes = mkSigBytes(SigUtils.sign(message, ownerSecret))
       val trackerSigBytes = mkSigBytes(SigUtils.sign(message, trackerSecret))
-      val TreeAndProof(initialTree, nextTree, proofBytes) = mkTreeAndProof(key, fixedTimestamp)
+      val TreeAndProof(initialTree, nextTree, proofBytes) = mkTreeAndProof(key, newRedeemedDebt)
+      // No lookup proof needed for first redemption (redeemedDebt = 0)
 
-      val basisInput = mkBasisInput(minValue + debtAmount + feeValue, initialTree,
-        receiverPk, reserveSigBytes, debtAmount, fixedTimestamp, proofBytes, trackerSigBytes)
+      val basisInput = mkBasisInput(minValue + totalDebt + feeValue, initialTree,
+        receiverPk, reserveSigBytes, totalDebt, proofBytes, trackerSigBytes, None)
       val trackerDataInput = mkTrackerDataInput()
-      val redemptionOutput = createOut(trueScript, debtAmount, Array(), Array())
+      val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
 
       // FAIL CASE: basis output missing token (moved to redemption) - violates selfPreserved.tokens
       val badBasisOutput = createOut(Constants.basisContract, minValue + feeValue,
         Array(ErgoValue.of(ownerPk), nextTree, ErgoValue.of(trackerNFTBytes)),
         Array()) // basis token missing here -> contract should fail
-      val redemptionOutputWithToken = createOut(trueScript, debtAmount,
+      val redemptionOutputWithToken = createOut(trueScript, redeemAmount,
         Array(), Array(new ErgoToken(basisTokenId, 1))) // token moved here so builder is happy
       assertTxFails(Array(basisInput), Array(trackerDataInput),
         Array(badBasisOutput, redemptionOutputWithToken), Array(receiverSecret.toString()))
@@ -1389,19 +1421,23 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
 
   property("basis redemption should fail with changed owner key in output (with control)") {
     createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
-      val debtAmount = 500000000L
+      val totalDebt = 500000000L
+      val redeemedDebt = 0L
+      val redeemAmount = totalDebt
+      val newRedeemedDebt = redeemedDebt + redeemAmount
       val key = mkKey(ownerPk, receiverPk)
-      val message = mkMessage(key, debtAmount, fixedTimestamp)
+      val message = mkMessage(key, totalDebt)
       val reserveSigBytes = mkSigBytes(SigUtils.sign(message, ownerSecret))
       val trackerSigBytes = mkSigBytes(SigUtils.sign(message, trackerSecret))
-      val TreeAndProof(initialTree, nextTree, proofBytes) = mkTreeAndProof(key, fixedTimestamp)
+      val TreeAndProof(initialTree, nextTree, proofBytes) = mkTreeAndProof(key, newRedeemedDebt)
+      // No lookup proof needed for first redemption (redeemedDebt = 0)
 
       val differentOwnerPk = Constants.g.exp(SigUtils.randBigInt.bigInteger)
 
-      val basisInput = mkBasisInput(minValue + debtAmount + feeValue, initialTree,
-        receiverPk, reserveSigBytes, debtAmount, fixedTimestamp, proofBytes, trackerSigBytes)
+      val basisInput = mkBasisInput(minValue + totalDebt + feeValue, initialTree,
+        receiverPk, reserveSigBytes, totalDebt, proofBytes, trackerSigBytes, None)
       val trackerDataInput = mkTrackerDataInput()
-      val redemptionOutput = createOut(trueScript, debtAmount, Array(), Array())
+      val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
 
       // FAIL CASE: Output with DIFFERENT owner key in R4 - violates selfPreserved.R4
       val badBasisOutput = createOut(Constants.basisContract, minValue + feeValue,
@@ -1423,19 +1459,23 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
 
   property("basis redemption should fail with changed tracker NFT ID in output (with control)") {
     createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
-      val debtAmount = 500000000L
+      val totalDebt = 500000000L
+      val redeemedDebt = 0L
+      val redeemAmount = totalDebt
+      val newRedeemedDebt = redeemedDebt + redeemAmount
       val key = mkKey(ownerPk, receiverPk)
-      val message = mkMessage(key, debtAmount, fixedTimestamp)
+      val message = mkMessage(key, totalDebt)
       val reserveSigBytes = mkSigBytes(SigUtils.sign(message, ownerSecret))
       val trackerSigBytes = mkSigBytes(SigUtils.sign(message, trackerSecret))
-      val TreeAndProof(initialTree, nextTree, proofBytes) = mkTreeAndProof(key, fixedTimestamp)
+      val TreeAndProof(initialTree, nextTree, proofBytes) = mkTreeAndProof(key, newRedeemedDebt)
+      // No lookup proof needed for first redemption (redeemedDebt = 0)
 
       val differentTrackerNFTBytes = Base16.decode("4c45f29a5165b030fdb5eaf5d81f8108f9d8f507b31487dd51f4ae08fe07cf4b").get
 
-      val basisInput = mkBasisInput(minValue + debtAmount + feeValue, initialTree,
-        receiverPk, reserveSigBytes, debtAmount, fixedTimestamp, proofBytes, trackerSigBytes)
+      val basisInput = mkBasisInput(minValue + totalDebt + feeValue, initialTree,
+        receiverPk, reserveSigBytes, totalDebt, proofBytes, trackerSigBytes, None)
       val trackerDataInput = mkTrackerDataInput()
-      val redemptionOutput = createOut(trueScript, debtAmount, Array(), Array())
+      val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
 
       // FAIL CASE: Output with DIFFERENT tracker NFT ID in R6 - violates selfPreserved.R6
       val badBasisOutput = createOut(Constants.basisContract, minValue + feeValue,
@@ -1462,30 +1502,34 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       // FAIL CASE: Input tree already has key, proof is for empty tree → mismatch
       // CONTROL: Use empty input tree with matching proof → succeeds
 
-      val debtAmount = 500000000L
+      val totalDebt = 500000000L
+      val redeemedDebt = 0L
+      val redeemAmount = totalDebt
+      val newRedeemedDebt = redeemedDebt + redeemAmount
       val key = mkKey(ownerPk, receiverPk)
-      val message = mkMessage(key, debtAmount, fixedTimestamp)
+      val message = mkMessage(key, totalDebt)
       val reserveSigBytes = mkSigBytes(SigUtils.sign(message, ownerSecret))
       val trackerSigBytes = mkSigBytes(SigUtils.sign(message, trackerSecret))
 
       // Tree that ALREADY has the key (simulating prior redemption)
       val existingPlasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, chainCashPlasmaParameters)
-      existingPlasmaMap.insert((key, Longs.toByteArray(fixedTimestamp - 1000)))
+      existingPlasmaMap.insert((key, Longs.toByteArray(redeemedDebt)))
       val treeWithExistingKey = existingPlasmaMap.ergoValue
 
       // Proof from empty tree (won't work with treeWithExistingKey)
       val freshPlasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, chainCashPlasmaParameters)
       val emptyTreeEV = freshPlasmaMap.ergoValue
-      val insertRes = freshPlasmaMap.insert((key, Longs.toByteArray(fixedTimestamp)))
+      val insertRes = freshPlasmaMap.insert((key, Longs.toByteArray(newRedeemedDebt)))
       val proofFromEmptyTree = insertRes.proof.bytes
       val treeAfterInsert = freshPlasmaMap.ergoValue
 
+      val lookupProofBytes = None  // No lookup proof needed for first redemption (redeemedDebt = 0)
       val trackerDataInput = mkTrackerDataInput()
-      val redemptionOutput = createOut(trueScript, debtAmount, Array(), Array())
+      val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
 
       // FAIL CASE: Input has existing key, but proof is for empty tree
       val badBasisInput = ctx.newTxBuilder().outBoxBuilder
-        .value(minValue + debtAmount + feeValue)
+        .value(minValue + totalDebt + feeValue)
         .tokens(new ErgoToken(basisTokenId, 1))
         .registers(ErgoValue.of(ownerPk), treeWithExistingKey, ErgoValue.of(trackerNFTBytes))
         .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
@@ -1495,10 +1539,10 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           new ContextVar(0, ErgoValue.of(0: Byte)),
           new ContextVar(1, ErgoValue.of(receiverPk)),
           new ContextVar(2, ErgoValue.of(reserveSigBytes)),
-          new ContextVar(3, ErgoValue.of(debtAmount)),
-          new ContextVar(4, ErgoValue.of(fixedTimestamp)),
+          new ContextVar(3, ErgoValue.of(totalDebt)),
           new ContextVar(5, ErgoValue.of(proofFromEmptyTree)),
           new ContextVar(6, ErgoValue.of(trackerSigBytes))
+          // No context var 7 (lookup proof) for first redemption
         )
       val badBasisOutput = createOut(Constants.basisContract, minValue + feeValue,
         Array(ErgoValue.of(ownerPk), treeAfterInsert, ErgoValue.of(trackerNFTBytes)),
@@ -1508,7 +1552,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
 
       // CONTROL: Use empty input tree with matching proof → succeeds
       val goodBasisInput = ctx.newTxBuilder().outBoxBuilder
-        .value(minValue + debtAmount + feeValue)
+        .value(minValue + totalDebt + feeValue)
         .tokens(new ErgoToken(basisTokenId, 1))
         .registers(ErgoValue.of(ownerPk), emptyTreeEV, ErgoValue.of(trackerNFTBytes))
         .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
@@ -1518,10 +1562,10 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           new ContextVar(0, ErgoValue.of(0: Byte)),
           new ContextVar(1, ErgoValue.of(receiverPk)),
           new ContextVar(2, ErgoValue.of(reserveSigBytes)),
-          new ContextVar(3, ErgoValue.of(debtAmount)),
-          new ContextVar(4, ErgoValue.of(fixedTimestamp)),
+          new ContextVar(3, ErgoValue.of(totalDebt)),
           new ContextVar(5, ErgoValue.of(proofFromEmptyTree)),
           new ContextVar(6, ErgoValue.of(trackerSigBytes))
+          // No context var 7 (lookup proof) for first redemption
         )
       val goodBasisOutput = createOut(Constants.basisContract, minValue + feeValue,
         Array(ErgoValue.of(ownerPk), treeAfterInsert, ErgoValue.of(trackerNFTBytes)),
@@ -1575,38 +1619,33 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
     }
   }
 
-  // ========== OR-BRANCH COVERAGE: properlyRedeemed = (redeemed <= debtAmount) && (enoughTimeSpent || properTrackerSignature) ==========
-  // Truth table for (enoughTimeSpent || properTrackerSignature):
-  //   A. trackerSig valid   + time NOT enough -> succeeds (properTrackerSignature = true)
-  //   B. trackerSig invalid + time enough     -> succeeds (enoughTimeSpent = true)
-  //   C. trackerSig invalid + time NOT enough -> fails    (both false)
-  // enoughTimeSpent requires: (lastBlockTime - timestamp) > 7 * 86400000 (604800000 ms)
+  // ========== OR-BRANCH COVERAGE: properlyRedeemed = (redeemed <= debtDelta) && properTrackerSignature ==========
+  // The contract now uses tracker signature only (no emergency redemption via HEIGHT).
+  // Truth table for properTrackerSignature:
+  //   A. trackerSig valid   -> succeeds
+  //   B. trackerSig invalid -> fails
+  // Note: Emergency redemption via HEIGHT was removed from the contract.
 
-  // Mock block timestamp from src/test/resources/mockwebserver/node_responses/response_LastHeaders.json
-  // Overrideable via -DmockBlockTimestamp=... for CI/local tweaks
-  val mockBlockTimestamp: Long =
-    sys.props.get("mockBlockTimestamp").map(_.toLong).getOrElse(1576787597586L)
-  val sevenDaysMs = 7L * 86400000L
-  val safeMarginMs = 60000L // 1 minute margin to avoid boundary flakiness
-
-  property("OR-branch A: valid tracker sig + time NOT enough -> succeeds") {
+  property("OR-branch A: valid tracker sig -> succeeds") {
     createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
-      val debtAmount = 500000000L
-      // Timestamp within 7 days of block time -> time NOT enough
-      val recentTimestamp = mockBlockTimestamp - (sevenDaysMs - safeMarginMs) // safely under 7 days
+      val totalDebt = 500000000L
+      val redeemedDebt = 0L
+      val redeemAmount = totalDebt
+      val newRedeemedDebt = redeemedDebt + redeemAmount
       val key = mkKey(ownerPk, receiverPk)
-      val message = mkMessage(key, debtAmount, recentTimestamp)
+      val message = mkMessage(key, totalDebt)
       val reserveSigBytes = mkSigBytes(SigUtils.sign(message, ownerSecret))
       val trackerSigBytes = mkSigBytes(SigUtils.sign(message, trackerSecret)) // VALID tracker sig
-      val TreeAndProof(initialTree, nextTree, proofBytes) = mkTreeAndProof(key, recentTimestamp)
+      val TreeAndProof(initialTree, nextTree, proofBytes) = mkTreeAndProof(key, newRedeemedDebt)
+      // No lookup proof needed for first redemption (redeemedDebt = 0)
 
-      val basisInput = mkBasisInput(minValue + debtAmount + feeValue, initialTree,
-        receiverPk, reserveSigBytes, debtAmount, recentTimestamp, proofBytes, trackerSigBytes)
+      val basisInput = mkBasisInput(minValue + totalDebt + feeValue, initialTree,
+        receiverPk, reserveSigBytes, totalDebt, proofBytes, trackerSigBytes, None)
       val trackerDataInput = mkTrackerDataInput()
       val basisOutput = createOut(Constants.basisContract, minValue + feeValue,
         Array(ErgoValue.of(ownerPk), nextTree, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
-      val redemptionOutput = createOut(trueScript, debtAmount, Array(), Array())
+      val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
 
       noException should be thrownBy {
         assertTxSucceeds(Array(basisInput), Array(trackerDataInput),
@@ -1622,58 +1661,62 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
     b
   }
 
-  property("OR-branch B: invalid tracker sig + time enough -> succeeds") {
+  property("OR-branch B: invalid tracker sig -> fails") {
     createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
-      val debtAmount = 500000000L
-      // Timestamp more than 7 days before block time -> time enough
-      val oldTimestamp = mockBlockTimestamp - (sevenDaysMs + safeMarginMs) // safely over 7 days
+      val totalDebt = 500000000L
+      val redeemedDebt = 0L
+      val redeemAmount = totalDebt
+      val newRedeemedDebt = redeemedDebt + redeemAmount
       val key = mkKey(ownerPk, receiverPk)
-      val message = mkMessage(key, debtAmount, oldTimestamp)
+      val message = mkMessage(key, totalDebt)
       val reserveSigBytes = mkSigBytes(SigUtils.sign(message, ownerSecret))
       val invalidTrackerSigBytes = corruptSig(SigUtils.sign(message, trackerSecret)) // corrupted sig
-      val TreeAndProof(initialTree, nextTree, proofBytes) = mkTreeAndProof(key, oldTimestamp)
+      val TreeAndProof(initialTree, nextTree, proofBytes) = mkTreeAndProof(key, newRedeemedDebt)
+      // No lookup proof needed for first redemption (redeemedDebt = 0)
 
-      val basisInput = mkBasisInput(minValue + debtAmount + feeValue, initialTree,
-        receiverPk, reserveSigBytes, debtAmount, oldTimestamp, proofBytes, invalidTrackerSigBytes)
+      val basisInput = mkBasisInput(minValue + totalDebt + feeValue, initialTree,
+        receiverPk, reserveSigBytes, totalDebt, proofBytes, invalidTrackerSigBytes, None)
       val trackerDataInput = mkTrackerDataInput()
       val basisOutput = createOut(Constants.basisContract, minValue + feeValue,
         Array(ErgoValue.of(ownerPk), nextTree, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
-      val redemptionOutput = createOut(trueScript, debtAmount, Array(), Array())
+      val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
 
-      noException should be thrownBy {
-        assertTxSucceeds(Array(basisInput), Array(trackerDataInput),
-          Array(basisOutput, redemptionOutput), Array(receiverSecret.toString()))
+      // Invalid tracker signature -> tx should fail
+      a[Throwable] should be thrownBy {
+        createTx(Array(basisInput), Array(trackerDataInput),
+          Array(basisOutput, redemptionOutput), fee = None, changeAddress,
+          Array(receiverSecret.toString()), broadcast = false)
       }
     }
   }
 
-  property("OR-branch C: invalid tracker sig + time NOT enough -> fails") {
+  property("OR-branch C: invalid tracker sig -> fails") {
     createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
-      val debtAmount = 500000000L
-      // Timestamp within 7 days of block time -> time NOT enough
-      val recentTimestamp = mockBlockTimestamp - (sevenDaysMs - safeMarginMs) // safely under 7 days
+      val totalDebt = 500000000L
+      val redeemedDebt = 0L
+      val redeemAmount = totalDebt
+      val newRedeemedDebt = redeemedDebt + redeemAmount
       val key = mkKey(ownerPk, receiverPk)
-      val message = mkMessage(key, debtAmount, recentTimestamp)
+      val message = mkMessage(key, totalDebt)
       val reserveSigBytes = mkSigBytes(SigUtils.sign(message, ownerSecret))
       val invalidTrackerSigBytes = corruptSig(SigUtils.sign(message, trackerSecret)) // corrupted sig
-      val TreeAndProof(initialTree, nextTree, proofBytes) = mkTreeAndProof(key, recentTimestamp)
+      val TreeAndProof(initialTree, nextTree, proofBytes) = mkTreeAndProof(key, newRedeemedDebt)
+      // No lookup proof needed for first redemption (redeemedDebt = 0)
 
-      val basisInput = mkBasisInput(minValue + debtAmount + feeValue, initialTree,
-        receiverPk, reserveSigBytes, debtAmount, recentTimestamp, proofBytes, invalidTrackerSigBytes)
+      val basisInput = mkBasisInput(minValue + totalDebt + feeValue, initialTree,
+        receiverPk, reserveSigBytes, totalDebt, proofBytes, invalidTrackerSigBytes, None)
       val trackerDataInput = mkTrackerDataInput()
       val basisOutput = createOut(Constants.basisContract, minValue + feeValue,
         Array(ErgoValue.of(ownerPk), nextTree, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
-      val redemptionOutput = createOut(trueScript, debtAmount, Array(), Array())
+      val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
 
-      // Both conditions false -> tx should fail
-      // Note: mock framework doesn't fully validate on-chain script conditions, but the prover
-      // will fail if we provide the wrong secret for proveDlog(receiver)
+      // Invalid tracker signature -> tx should fail
       a[Throwable] should be thrownBy {
         createTx(Array(basisInput), Array(trackerDataInput),
           Array(basisOutput, redemptionOutput), fee = None, changeAddress,
-          Array(ownerSecret.toString()), broadcast = false)
+          Array(receiverSecret.toString()), broadcast = false)
       }
     }
   }

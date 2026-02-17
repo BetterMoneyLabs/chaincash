@@ -44,7 +44,7 @@ class BasisDeployerSpec extends PropSpec with Matchers {
     BasisConstants.REDEEM_ACTION shouldBe 0
     BasisConstants.TOP_UP_ACTION shouldBe 1
     BasisConstants.MIN_TOP_UP_AMOUNT shouldBe 1000000000L
-    BasisConstants.EMERGENCY_REDEMPTION_TIME shouldBe 604800000L // 7 days in ms
+    BasisConstants.EMERGENCY_REDEMPTION_TIME_IN_BLOCKS shouldBe 2160 // 3 days in blocks (3 * 720)
     BasisConstants.REDEMPTION_FEE_PERCENTAGE shouldBe 2
   }
 }
