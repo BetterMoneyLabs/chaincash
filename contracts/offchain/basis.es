@@ -18,52 +18,54 @@
     // * onchain contract based redemption with prevention of double redemptions
 
     // How does that work:
-    //  * a tracker holds ever created A -> B debt (as positive ever increasing number).
-    //    A key->value dictionary is used to store the data as hash(AB) -> (amount, timestamp, sig_A), where AB is concatenation of public
-    //    keys A and B, "amount" is amount of debt of A before B, timestamp is operation timestamp (in milliseconds), sig_A is signature of A for
-    //    A for message (hash(AB), amount, timestamp).
-    //  * to make a (new payment) to B, A is taking current AB record, increasing debt, signing the updated record and
-    //    sending it to the tracker
-    //  * tracker is periodically committing to its state (dictionary) by posting its digest on chain
-    //  * at any moment it is possible to redeem A debt to B by calling redemption action of the reserve contract below
+    //  * a tracker holds cumulative A -> B debt (as positive ever increasing number).
+    //    A key->value dictionary is used to store the data as hash(A_pubkey || B_pubkey) -> totalDebt,
+    //    where totalDebt is the cumulative amount of debt A owes to B.
+    //  * to make a (new payment) to B, A is taking current AB record, increasing cumulative debt,
+    //    signing the updated record (message: hash(A||B) || totalDebt) and sending it to the tracker.
+    //  * tracker is periodically committing to its state (dictionary) by posting its digest on chain.
+    //  * at any moment it is possible to redeem A's debt to B by calling redemption action of the reserve contract below.
     //    The contract tracks cumulative amount of debt already redeemed for each (owner, receiver) pair in an AVL tree.
-    //    Tracker signature is needed to redeem normally.
-    //  * if tracker is going offline, possible to redeem without its signature, when at least 3 days passed since tracker creation
-    //    (NOTE: this affects ALL debts associated with the tracker simultaneously)
-    //  * always possible to top up the reserve, to redeem, reserve holder is making an offchain payment to self (A -> A)
-    //    and then redeem
+    //    Redemption requires BOTH reserve owner's signature AND tracker's signature on message: hash(ownerKey||receiverKey) || totalDebt.
+    //    The tracker signature guarantees that the offchain state is consistent and prevents double-spending.
+    //  * to redeem: B contacts tracker to obtain signature on the debt note, then presents reserve owner's signature
+    //    (from original IOU note) and tracker's signature to the on-chain contract along with AVL tree proof.
+    //  * always possible to top up the reserve. To redeem partially, reserve holder can make an offchain payment to self (A -> A)
+    //    updating the cumulative debt, then redeem the desired amount.
 
     // Security analysis and the role of the tracker:
-    //  * the usual problem is than A can pay to B and then create a note from A to self and redeem. Solved by tracker solely.
-    //  * double spending of a note is not possible by contract design
+    //  * the usual problem is that A can pay to B and then create a note from A to self and redeem. Solved by tracker solely.
+    //  * double spending of a note is not possible by contract design (AVL tree tracks cumulative redeemed amounts).
+    //  * tracker cannot steal funds as both owner and tracker signatures are required for redemption.
+    //  * tracker can re-order redemption transactions, potentially affecting outcome for undercollateralized notes.
 
     // Normal workflow:
-    // * A is willing to buy some services for B. He is asking B whether collateral (along with debt notes)
-    //     can be accepted (can be done non-interactively when B is publishing his acceptance predicated)
-    // * if A's debt note would be accepted, he is signing a debt note and sending it to a tracker. Tracker is providing
-    //   a signature on a bit modified message to be used in case of tracker going offline. A is sending debt note and
-    //   both signatures to B.
-    // * after some time (defined by offchain logic), B can redeem, fully or partially. For that, B is contacting tracker
-    //   to obtain a signature on debt note to present then A's and tracker's signatures along with the debt note to a contract
-    // * at any time A can make another payment to B, by signing a message with increased cumulative debt amount
-    // * if tracker is going offline, B can redeem using a special signature from tracker from above. Ideally, tracker
-    //   shouldnt' allow for another redemption before B's redemption transaction got confirmed on-chain, or some deadline,
-    //   whatever comes first
-    // * A can refund by redeeming like B. Actually, in pseudonymous environment it always impossible to say how many
-    //   alts A may have. So B should always track collateralization level. B can prepare redemption transaction in advance and
-    //   ask 3rd party service to submmit it when A is offline.
+    // * A is willing to buy some services from B. A asks B whether debt notes (IOU) are accepted as payment.
+    //   This can be done non-interactively if B publishes their acceptance predicate.
+    // * If A's debt note is acceptable, A creates an IOU note with cumulative debt amount and signs it
+    //   (signature on message: hash(A_pubkey || B_pubkey) || totalDebt). A sends the note to the tracker.
+    // * The tracker verifies the note against its state, updates its internal ledger, and provides a signature
+    //   on the same message. This tracker signature is required for on-chain redemption.
+    // * A sends both signatures (A's and tracker's) to B. B now holds a valid, redeemable IOU note.
+    // * At any time, B can redeem the debt by presenting both signatures to the reserve contract along with
+    //   an AVL tree proof showing the cumulative redeemed amount. The contract verifies both signatures and
+    //   ensures the redeemed amount doesn't exceed (totalDebt - alreadyRedeemed).
+    // * At any time, A can make another payment to B by signing a message with increased cumulative debt amount.
+    // * A can refund by redeeming like B (in pseudonymous environments, A may have multiple keys).
+    //   B should always track collateralization level and can prepare redemption transactions in advance.
 
     // Tracker's role here is to guarantee fairness of payments. Tracker can't steal A's onchain funds as A's signature is
-    // required. Tracker can re-order redemption trandactions though, thus affecting outcome for B when a note is
-    // undercollateralized (this can be improved). Ideally, tracker should  Tracker can be centralized entity or federation.
+    // required. Tracker cannot enable double-redemption as the contract tracks cumulative redeemed amounts in AVL tree.
+    // Tracker can re-order redemption transactions though, potentially affecting outcome for B when a note is
+    // undercollateralized. Tracker can be a centralized entity or a federation.
 
-    // Debt notes are not transferrable in current design. So B cant' really pay C with a debt note issued by A. B has
+    // Debt notes are not transferrable in current design. So B can't really pay C with a debt note issued by A. B has
     // to create a new debt note.
 
-    // With some trust involved in managing redemption process, some pros are coming :
-    // * no on-chain fees. Suitable for micropayments.
-    // * Unlike other offchain cash schemes (Lightning, Cashu/Fedimint etc), transaction can be done with no
-    //   collateralization. Or first there could be payment and then on-chain reserve being created
+    // With some trust involved in managing redemption process, some pros are coming:
+    // * no on-chain fees for offchain transactions. Suitable for micropayments.
+    // * Unlike other offchain cash schemes (Lightning, Cashu/Fedimint etc), transactions can be done with no
+    //   collateralization first. Or there could be payment on credit and then on-chain reserve being created
     //   to pay for services already provided. Could provide nice alternative to free trials etc.
 
     // Examples and demos:
