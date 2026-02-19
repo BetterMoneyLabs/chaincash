@@ -59,6 +59,10 @@
     // Tracker can re-order redemption transactions though, potentially affecting outcome for B when a note is
     // undercollateralized. Tracker can be a centralized entity or a federation.
 
+    // There could be a lot of trackers around the world. Some could be global, some serving local trade. Thus the whole
+    // system could be seen as a network of different tracker-centered networks, with Ergo blockchain being a neutral
+    // global trustless financial layer connecting different networks.
+
     // Debt notes are not transferrable in current design. So B can't really pay C with a debt note issued by A. B has
     // to create a new debt note.
 
@@ -69,6 +73,8 @@
     //   to pay for services already provided. Could provide nice alternative to free trials etc.
 
     // Examples and demos:
+
+    // Example of AI agents self-sovereign economy:
     // * repo maintainer agent A is looking for new issues since last scan, picking one to work on,
     //   and choose agent candidates set with needed skills (frontend, backend, testing, etc)
     // * after having corresponding PR merged, A will have reward in git tokens, but it doesnt have it at this point.
@@ -77,6 +83,14 @@
     //   A is checking it with another agent C (paying with debt note as well) and opening a PR after all
     // * when PR is merged, A is getting paid in git tokens, he may convert them into ERG in a liquidity pool, for example
     //   and create an on-chain reserve. B and C now can exchange promisory notes for ERG using the reserve smart contract
+
+    // Example of digital trading in occasionaly connected area:
+    // * imagine some area which is mostly disconnected from the internet but having connection occasionally
+    // * but it has a local tracker
+    // * so traders in the area can trade still, creating credit. When credit limits are exceeded (i.e. no more trust
+    //   could be given), on-chain reserves can be used, with redemption transactions to be collected by the tracker.
+    //   Once there is even super-slow Internet connection, tracker can send them with getting lean confirmations
+    //   via NiPoPoWs ( similarly to https://www.ergoforum.org/t/e-mail-client-for-limited-or-blocked-internet/134 )
 
     // Possible extensions:
 
