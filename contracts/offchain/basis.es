@@ -23,13 +23,17 @@
     //    where totalDebt is the cumulative amount of debt A owes to B.
     //  * to make a (new payment) to B, A is taking current AB record, increasing cumulative debt,
     //    signing the updated record (message: hash(A||B) || totalDebt) and sending it to the tracker.
-    //  * tracker is periodically committing to its state (dictionary) by posting its digest on chain.
+    //  * tracker is periodically committing to its state (dictionary) by posting its digest on chain
+    //    via an AVL tree in register R5. The tree stores hash(A||B) -> totalDebt mappings.
     //  * at any moment it is possible to redeem A's debt to B by calling redemption action of the reserve contract below.
     //    The contract tracks cumulative amount of debt already redeemed for each (owner, receiver) pair in an AVL tree.
     //    Redemption requires BOTH reserve owner's signature AND tracker's signature on message: hash(ownerKey||receiverKey) || totalDebt.
     //    The tracker signature guarantees that the offchain state is consistent and prevents double-spending.
+    //    Additionally, the contract verifies that totalDebt is committed in the tracker's AVL tree (context var #8 provides lookup proof).
     //  * to redeem: B contacts tracker to obtain signature on the debt note, then presents reserve owner's signature
-    //    (from original IOU note) and tracker's signature to the on-chain contract along with AVL tree proof.
+    //    (from original IOU note) and tracker's signature to the on-chain contract along with AVL tree proofs:
+    //    - proof for reserve tree lookup (context var #7, optional for first redemption)
+    //    - proof for tracker tree lookup (context var #8, required)
     //  * always possible to top up the reserve. To redeem partially, reserve holder can make an offchain payment to self (A -> A)
     //    updating the cumulative debt, then redeem the desired amount.
 
@@ -96,7 +100,8 @@
 
     // Data:
     //  - R4 - signing key (as a group element)
-    //  - R5 - tree of debt redeemed
+    //  - R5 - AVL tree tracking cumulative redeemed debt per (owner, receiver) pair
+    //         stores: hash(ownerKey || receiverKey) -> cumulativeRedeemedAmount
     //  - R6 - NFT id of tracker server (bytes) // todo: support multiple payment servers by using a tree
     //
     // Actions:
@@ -104,7 +109,13 @@
     //  - top up      (#1)
     //
     //  Tracker box registers:
-    //  - R4 - tracker's signing key
+    //  - R4 - tracker's signing key (GroupElement)
+    //  - R5 - AVL tree commitment to offchain credit data
+    //         stores: hash(A_pubkey || B_pubkey) -> totalDebt
+    //         This on-chain commitment allows the reserve contract to verify that the tracker
+    //         is attesting to a debt amount that is actually recorded in its state.
+    //         During redemption, context var #8 provides the AVL proof for looking up
+    //         hash(ownerKey || receiverKey) in this tree to verify totalDebt.
 
     // action and reserve output index. By passing them instead of hard-coding, we allow for multiple notes to be
     // redeemed at once, which can be used for atomic mutual debt clearing etc
@@ -125,19 +136,22 @@
     if (action == 0) {
       // redemption path
       // context extension variables used:
-      // #1 - receiver pubkey (as a group element)
-      // #2 - reserve owner's signature for the debt record
-      // #3 - current total debt amount
-      // #5 - proof for insertion into reserve's AVL+ tree
-      // #6 - tracker's signature
-      // #7 - [OPTIONAL] proof for AVL+ tree lookup for lender-borrower pair
+      // #1 - receiver pubkey (as a GroupElement)
+      // #2 - reserve owner's signature bytes for the debt record (Schnorr signature on key || totalDebt)
+      // #3 - current total debt amount (Long)
+      // #5 - proof for insertion into reserve's AVL tree (Coll[Byte])
+      // #6 - tracker's signature bytes (Schnorr signature on key || totalDebt or key || totalDebt || 0L for emergency)
+      // #7 - [OPTIONAL] proof for AVL tree lookup in reserve's tree for hash(ownerKey||receiverKey) -> redeemedDebt
+      //      Not needed for first redemption (when redeemedDebt = 0)
+      // #8 - proof for AVL tree lookup in tracker's tree for hash(ownerKey||receiverKey) -> totalDebt (required)
 
       // Base point for elliptic curve operations
       val g: GroupElement = groupGenerator
 
-      // Tracker box holds the debt information as key-value pairs: AB -> amount
+      // Tracker box holds the debt information as key-value pairs: hash(A||B) -> totalDebt
       val tracker = CONTEXT.dataInputs(0) // Data input: tracker box containing debt records
       val trackerNftId = tracker.tokens(0)._1 // NFT token ID identifying the tracker
+      val trackerTree = tracker.R5[AvlTree].get // AVL tree commitment to offchain credit data
       val trackerPubKey = tracker.R4[GroupElement].get // Tracker's public key for signature verification
       val expectedTrackerId = SELF.R6[Coll[Byte]].get // Expected tracker ID stored in reserve contract
 
@@ -151,13 +165,23 @@
       val ownerKeyBytes = ownerKey.getEncoded // Reserve owner's public key (from R4 register) bytes
 
       // Create key for debt record: hash(ownerKey || receiverKey)
-      // the key is used in the reserve's tree stored in R5 register
+      // This key is used in both:
+      // - tracker's AVL tree (R5) for totalDebt lookup
+      // - reserve's AVL tree (R5) for cumulative redeemed amount lookup
       val key = blake2b256(ownerKeyBytes ++ receiverBytes)
+
+      // Total debt amount from context variables
+      val totalDebt = getVar[Long](3).get
+
+      // Verify totalDebt is committed in tracker's AVL tree using context variable #8
+      // This ensures the tracker is attesting to a debt amount that exists in its on-chain commitment
+      val trackerLookupProof = getVar[Coll[Byte]](8).get
+      val trackerDebtBytes = trackerTree.get(key, trackerLookupProof).get
+      val trackerTotalDebt = byteArrayToLong(trackerDebtBytes)
+      val trackerDebtCorrect = trackerTotalDebt == totalDebt
 
       // Reserve owner's signature for the debt record
       val reserveSigBytes = getVar[Coll[Byte]](2).get
-
-      val totalDebt = getVar[Long](3).get
 
       val lookupProofOpt = getVar[Coll[Byte]](7)
       val redeemedDebt = if(lookupProofOpt.isDefined){
@@ -228,6 +252,7 @@
       // Combine all validation conditions
       sigmaProp(selfPreserved &&
                 trackerIdCorrect &&
+                trackerDebtCorrect &&
                 properRedemptionTree &&
                 properReserveSignature &&
                 properlyRedeemed &&

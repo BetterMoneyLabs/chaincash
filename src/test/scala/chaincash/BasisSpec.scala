@@ -178,11 +178,14 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       val reservePlasmaParameters = PlasmaParameters(32, None)
       val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, reservePlasmaParameters)
       val inputTreeErgoValue = plasmaMap.ergoValue
-      
+
       // Create proof for inserting new redeemed debt
       val insertRes2 = plasmaMap.insert(key -> Longs.toByteArray(newRedeemedDebt))
       val insertProof = insertRes2.proof
       val outputTreeErgoValue = plasmaMap.ergoValue
+
+      // Create tracker tree with debt record and lookup proof
+      val TrackerTreeAndProof(trackerTree, trackerLookupProof) = mkTrackerTreeAndProof(key, totalDebt)
 
       // Create basis input with tree containing existing redeemed debt
       val basisInput =
@@ -201,18 +204,19 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
             new ContextVar(2, ErgoValue.of(reserveSigBytes)),
             new ContextVar(3, ErgoValue.of(totalDebt)), // total debt amount
             new ContextVar(5, ErgoValue.of(insertProof.bytes)), // proof for insertion
-            new ContextVar(6, ErgoValue.of(trackerSigBytes))
+            new ContextVar(6, ErgoValue.of(trackerSigBytes)),
+            new ContextVar(8, ErgoValue.of(trackerLookupProof)) // tracker tree lookup proof
           )
 
 
-      // Tracker data input
+      // Tracker data input with debt record in AVL tree
       val trackerDataInput =
         ctx
           .newTxBuilder()
           .outBoxBuilder
           .value(minValue)
           .tokens(new ErgoToken(trackerNFTBytes, 1))
-          .registers(ErgoValue.of(trackerPk), ErgoValue.of(emptyTree))
+          .registers(ErgoValue.of(trackerPk), trackerTree)
           .contract(ctx.compileContract(ConstantsBuilder.empty(), "{sigmaProp(true)}")) // Simple true contract
           .build()
           .convertToInputWith(fakeTxId2, fakeIndex)
@@ -342,6 +346,9 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       val inputTreeErgoValue = plasmaMap.ergoValue
       val outputTreeErgoValue = plasmaMap.ergoValue
 
+      // Create tracker tree with debt record and lookup proof
+      val TrackerTreeAndProof(trackerTree, trackerLookupProof) = mkTrackerTreeAndProof(key, totalDebt)
+
       // Basis reserve input
       val basisInput =
         ctx
@@ -360,7 +367,8 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
             new ContextVar(3, ErgoValue.of(totalDebt)), // total debt amount
             new ContextVar(5, ErgoValue.of(insertProof.bytes)), // proof for insertion
             new ContextVar(6, ErgoValue.of(invalidTrackerSigBytes)),
-            new ContextVar(7, ErgoValue.of(lookupProof.bytes)) // proof for lookup
+            new ContextVar(7, ErgoValue.of(lookupProof.bytes)), // proof for lookup
+            new ContextVar(8, ErgoValue.of(trackerLookupProof)) // tracker tree lookup proof
           )
 
       // Tracker data input - created with old creation height (3+ days old)
@@ -371,7 +379,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .outBoxBuilder
           .value(minValue)
           .tokens(new ErgoToken(trackerNFTBytes, 1))
-          .registers(ErgoValue.of(trackerPk), ErgoValue.of(emptyTree))
+          .registers(ErgoValue.of(trackerPk), trackerTree)
           .contract(ctx.compileContract(ConstantsBuilder.empty(), "{sigmaProp(true)}"))
           .creationHeight(ctx.getHeight - 3 * 720 - 1) // At least 3 days old
           .build()
@@ -1232,7 +1240,17 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
   def mkLookupProof(key: Array[Byte], redeemedDebt: Long): Array[Byte] = {
     val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, chainCashPlasmaParameters)
     val insertRes = plasmaMap.insert((key, Longs.toByteArray(redeemedDebt)))
-    insertRes.proof.bytes
+    plasmaMap.lookUp(key).proof.bytes
+  }
+
+  // Tracker tree setup: create tree with debt record and lookup proof
+  case class TrackerTreeAndProof(tree: ErgoValue[AvlTree], lookupProofBytes: Array[Byte])
+
+  def mkTrackerTreeAndProof(key: Array[Byte], totalDebt: Long): TrackerTreeAndProof = {
+    val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, chainCashPlasmaParameters)
+    val insertRes = plasmaMap.insert((key, Longs.toByteArray(totalDebt)))
+
+    TrackerTreeAndProof(plasmaMap.ergoValue, plasmaMap.lookUp(key).proof.bytes)
   }
 
   def mkBasisInput(
@@ -1243,7 +1261,8 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
     totalDebt: Long,
     insertProofBytes: Array[Byte],
     trackerSigBytes: Array[Byte],
-    lookupProofBytes: Option[Array[Byte]] = None
+    lookupProofBytes: Option[Array[Byte]] = None,
+    trackerLookupProofBytes: Option[Array[Byte]] = None
   )(implicit ctx: BlockchainContext): InputBox = {
     val baseVars = Array(
       new ContextVar(0, ErgoValue.of(0: Byte)),
@@ -1253,9 +1272,13 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       new ContextVar(5, ErgoValue.of(insertProofBytes)),
       new ContextVar(6, ErgoValue.of(trackerSigBytes))
     )
-    val allVars = lookupProofBytes match {
+    val withLookup = lookupProofBytes match {
       case Some(lookupProof) => baseVars :+ new ContextVar(7, ErgoValue.of(lookupProof))
       case None => baseVars
+    }
+    val allVars = trackerLookupProofBytes match {
+      case Some(trackerLookupProof) => withLookup :+ new ContextVar(8, ErgoValue.of(trackerLookupProof))
+      case None => withLookup
     }
     ctx.newTxBuilder().outBoxBuilder
       .value(value)
@@ -1267,13 +1290,17 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       .withContextVars(allVars: _*)
   }
 
-  // Note: tracker data input uses emptyTree for R5 as basis.es only reads R4 (trackerPk).
+  // Note: tracker data input includes R4 (trackerPk) and R5 (AVL tree commitment to credit data).
+  // The contract reads tracker.R5[AvlTree] for potential validation of tracker state.
   // For emergency redemption tests, set creationHeight to ctx.getHeight - 3 * 720 - 1 or more
-  def mkTrackerDataInput(creationHeightOffset: Option[Int] = None)(implicit ctx: BlockchainContext): InputBox = {
+  def mkTrackerDataInput(
+    trackerTree: ErgoValue[AvlTree] = ErgoValue.of(emptyTree),
+    creationHeightOffset: Option[Int] = None
+  )(implicit ctx: BlockchainContext): InputBox = {
     val builder = ctx.newTxBuilder().outBoxBuilder
       .value(minValue)
       .tokens(new ErgoToken(trackerNFTBytes, 1))
-      .registers(ErgoValue.of(trackerPk), ErgoValue.of(emptyTree))
+      .registers(ErgoValue.of(trackerPk), trackerTree)
       .contract(ctx.compileContract(ConstantsBuilder.empty(), "{sigmaProp(true)}"))
     val builderWithHeight = creationHeightOffset match {
       case Some(offset) => builder.creationHeight(ctx.getHeight - offset)
@@ -1356,11 +1383,15 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       val reserveSigBytes = mkSigBytes(SigUtils.sign(message, ownerSecret))
       val trackerSigBytes = mkSigBytes(SigUtils.sign(message, trackerSecret))
       val TreeAndProof(initialTree, nextTree, proofBytes) = mkTreeAndProof(key, newRedeemedDebt)
+      // Create tracker tree with debt record and lookup proof
+      val TrackerTreeAndProof(trackerTree, trackerLookupProof) = mkTrackerTreeAndProof(key, totalDebt)
       // No lookup proof needed for first redemption (redeemedDebt = 0)
 
+      // Create tracker tree with debt record and lookup proof
+
       val basisInput = mkBasisInput(minValue + totalDebt + feeValue, initialTree,
-        receiverPk, reserveSigBytes, totalDebt, proofBytes, trackerSigBytes, None)
-      val trackerDataInput = mkTrackerDataInput()
+        receiverPk, reserveSigBytes, totalDebt, proofBytes, trackerSigBytes, None, Some(trackerLookupProof))
+      val trackerDataInput = mkTrackerDataInput(trackerTree)
       val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
 
       // FAIL CASE: Output with DIFFERENT contract - violates selfPreserved.propositionBytes
@@ -1392,11 +1423,15 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       val reserveSigBytes = mkSigBytes(SigUtils.sign(message, ownerSecret))
       val trackerSigBytes = mkSigBytes(SigUtils.sign(message, trackerSecret))
       val TreeAndProof(initialTree, nextTree, proofBytes) = mkTreeAndProof(key, newRedeemedDebt)
+      // Create tracker tree with debt record and lookup proof
+      val TrackerTreeAndProof(trackerTree, trackerLookupProof) = mkTrackerTreeAndProof(key, totalDebt)
       // No lookup proof needed for first redemption (redeemedDebt = 0)
 
+      // Create tracker tree with debt record and lookup proof
+
       val basisInput = mkBasisInput(minValue + totalDebt + feeValue, initialTree,
-        receiverPk, reserveSigBytes, totalDebt, proofBytes, trackerSigBytes, None)
-      val trackerDataInput = mkTrackerDataInput()
+        receiverPk, reserveSigBytes, totalDebt, proofBytes, trackerSigBytes, None, Some(trackerLookupProof))
+      val trackerDataInput = mkTrackerDataInput(trackerTree)
       val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
 
       // FAIL CASE: basis output missing token (moved to redemption) - violates selfPreserved.tokens
@@ -1430,13 +1465,17 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       val reserveSigBytes = mkSigBytes(SigUtils.sign(message, ownerSecret))
       val trackerSigBytes = mkSigBytes(SigUtils.sign(message, trackerSecret))
       val TreeAndProof(initialTree, nextTree, proofBytes) = mkTreeAndProof(key, newRedeemedDebt)
+      // Create tracker tree with debt record and lookup proof
+      val TrackerTreeAndProof(trackerTree, trackerLookupProof) = mkTrackerTreeAndProof(key, totalDebt)
       // No lookup proof needed for first redemption (redeemedDebt = 0)
 
       val differentOwnerPk = Constants.g.exp(SigUtils.randBigInt.bigInteger)
 
+      // Create tracker tree with debt record and lookup proof
+
       val basisInput = mkBasisInput(minValue + totalDebt + feeValue, initialTree,
-        receiverPk, reserveSigBytes, totalDebt, proofBytes, trackerSigBytes, None)
-      val trackerDataInput = mkTrackerDataInput()
+        receiverPk, reserveSigBytes, totalDebt, proofBytes, trackerSigBytes, None, Some(trackerLookupProof))
+      val trackerDataInput = mkTrackerDataInput(trackerTree)
       val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
 
       // FAIL CASE: Output with DIFFERENT owner key in R4 - violates selfPreserved.R4
@@ -1468,13 +1507,17 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       val reserveSigBytes = mkSigBytes(SigUtils.sign(message, ownerSecret))
       val trackerSigBytes = mkSigBytes(SigUtils.sign(message, trackerSecret))
       val TreeAndProof(initialTree, nextTree, proofBytes) = mkTreeAndProof(key, newRedeemedDebt)
+      // Create tracker tree with debt record and lookup proof
+      val TrackerTreeAndProof(trackerTree, trackerLookupProof) = mkTrackerTreeAndProof(key, totalDebt)
       // No lookup proof needed for first redemption (redeemedDebt = 0)
 
       val differentTrackerNFTBytes = Base16.decode("4c45f29a5165b030fdb5eaf5d81f8108f9d8f507b31487dd51f4ae08fe07cf4b").get
 
+      // Create tracker tree with debt record and lookup proof
+
       val basisInput = mkBasisInput(minValue + totalDebt + feeValue, initialTree,
-        receiverPk, reserveSigBytes, totalDebt, proofBytes, trackerSigBytes, None)
-      val trackerDataInput = mkTrackerDataInput()
+        receiverPk, reserveSigBytes, totalDebt, proofBytes, trackerSigBytes, None, Some(trackerLookupProof))
+      val trackerDataInput = mkTrackerDataInput(trackerTree)
       val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
 
       // FAIL CASE: Output with DIFFERENT tracker NFT ID in R6 - violates selfPreserved.R6
@@ -1524,7 +1567,9 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       val treeAfterInsert = freshPlasmaMap.ergoValue
 
       val lookupProofBytes = None  // No lookup proof needed for first redemption (redeemedDebt = 0)
-      val trackerDataInput = mkTrackerDataInput()
+      // Create tracker tree with debt record and lookup proof
+      val TrackerTreeAndProof(trackerTree, trackerLookupProof) = mkTrackerTreeAndProof(key, totalDebt)
+      val trackerDataInput = mkTrackerDataInput(trackerTree)
       val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
 
       // FAIL CASE: Input has existing key, but proof is for empty tree
@@ -1541,8 +1586,8 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           new ContextVar(2, ErgoValue.of(reserveSigBytes)),
           new ContextVar(3, ErgoValue.of(totalDebt)),
           new ContextVar(5, ErgoValue.of(proofFromEmptyTree)),
-          new ContextVar(6, ErgoValue.of(trackerSigBytes))
-          // No context var 7 (lookup proof) for first redemption
+          new ContextVar(6, ErgoValue.of(trackerSigBytes)),
+          new ContextVar(8, ErgoValue.of(trackerLookupProof))
         )
       val badBasisOutput = createOut(Constants.basisContract, minValue + feeValue,
         Array(ErgoValue.of(ownerPk), treeAfterInsert, ErgoValue.of(trackerNFTBytes)),
@@ -1564,8 +1609,8 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           new ContextVar(2, ErgoValue.of(reserveSigBytes)),
           new ContextVar(3, ErgoValue.of(totalDebt)),
           new ContextVar(5, ErgoValue.of(proofFromEmptyTree)),
-          new ContextVar(6, ErgoValue.of(trackerSigBytes))
-          // No context var 7 (lookup proof) for first redemption
+          new ContextVar(6, ErgoValue.of(trackerSigBytes)),
+          new ContextVar(8, ErgoValue.of(trackerLookupProof))
         )
       val goodBasisOutput = createOut(Constants.basisContract, minValue + feeValue,
         Array(ErgoValue.of(ownerPk), treeAfterInsert, ErgoValue.of(trackerNFTBytes)),
@@ -1637,11 +1682,15 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       val reserveSigBytes = mkSigBytes(SigUtils.sign(message, ownerSecret))
       val trackerSigBytes = mkSigBytes(SigUtils.sign(message, trackerSecret)) // VALID tracker sig
       val TreeAndProof(initialTree, nextTree, proofBytes) = mkTreeAndProof(key, newRedeemedDebt)
+      // Create tracker tree with debt record and lookup proof
+      val TrackerTreeAndProof(trackerTree, trackerLookupProof) = mkTrackerTreeAndProof(key, totalDebt)
       // No lookup proof needed for first redemption (redeemedDebt = 0)
 
+      // Create tracker tree with debt record and lookup proof
+
       val basisInput = mkBasisInput(minValue + totalDebt + feeValue, initialTree,
-        receiverPk, reserveSigBytes, totalDebt, proofBytes, trackerSigBytes, None)
-      val trackerDataInput = mkTrackerDataInput()
+        receiverPk, reserveSigBytes, totalDebt, proofBytes, trackerSigBytes, None, Some(trackerLookupProof))
+      val trackerDataInput = mkTrackerDataInput(trackerTree)
       val basisOutput = createOut(Constants.basisContract, minValue + feeValue,
         Array(ErgoValue.of(ownerPk), nextTree, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
@@ -1672,11 +1721,15 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       val reserveSigBytes = mkSigBytes(SigUtils.sign(message, ownerSecret))
       val invalidTrackerSigBytes = corruptSig(SigUtils.sign(message, trackerSecret)) // corrupted sig
       val TreeAndProof(initialTree, nextTree, proofBytes) = mkTreeAndProof(key, newRedeemedDebt)
+      // Create tracker tree with debt record and lookup proof
+      val TrackerTreeAndProof(trackerTree, trackerLookupProof) = mkTrackerTreeAndProof(key, totalDebt)
       // No lookup proof needed for first redemption (redeemedDebt = 0)
+
+      // Create tracker tree with debt record and lookup proof
 
       val basisInput = mkBasisInput(minValue + totalDebt + feeValue, initialTree,
         receiverPk, reserveSigBytes, totalDebt, proofBytes, invalidTrackerSigBytes, None)
-      val trackerDataInput = mkTrackerDataInput()
+      val trackerDataInput = mkTrackerDataInput(trackerTree)
       val basisOutput = createOut(Constants.basisContract, minValue + feeValue,
         Array(ErgoValue.of(ownerPk), nextTree, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
@@ -1702,11 +1755,15 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       val reserveSigBytes = mkSigBytes(SigUtils.sign(message, ownerSecret))
       val invalidTrackerSigBytes = corruptSig(SigUtils.sign(message, trackerSecret)) // corrupted sig
       val TreeAndProof(initialTree, nextTree, proofBytes) = mkTreeAndProof(key, newRedeemedDebt)
+      // Create tracker tree with debt record and lookup proof
+      val TrackerTreeAndProof(trackerTree, trackerLookupProof) = mkTrackerTreeAndProof(key, totalDebt)
       // No lookup proof needed for first redemption (redeemedDebt = 0)
+
+      // Create tracker tree with debt record and lookup proof
 
       val basisInput = mkBasisInput(minValue + totalDebt + feeValue, initialTree,
         receiverPk, reserveSigBytes, totalDebt, proofBytes, invalidTrackerSigBytes, None)
-      val trackerDataInput = mkTrackerDataInput()
+      val trackerDataInput = mkTrackerDataInput(trackerTree)
       val basisOutput = createOut(Constants.basisContract, minValue + feeValue,
         Array(ErgoValue.of(ownerPk), nextTree, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
