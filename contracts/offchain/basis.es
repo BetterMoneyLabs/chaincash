@@ -36,12 +36,33 @@
     //    - proof for tracker tree lookup (context var #8, required)
     //  * always possible to top up the reserve. To redeem partially, reserve holder can make an offchain payment to self (A -> A)
     //    updating the cumulative debt, then redeem the desired amount.
+    //
+    // Debt Transfer (Novation):
+    //  * The scheme supports transferring debt obligations between creditors with debtor consent.
+    //  * Example: A owes debt to B. B wants to buy from C. If A agrees, A's debt to B can be decreased
+    //    and A's debt to C can be increased by the same amount.
+    //  * Process:
+    //    1. B initiates transfer: requests to transfer amount X from debt(A->B) to debt(A->C)
+    //    2. A signs the transfer: message includes hash(A||B), hash(A||C), and transfer amount X
+    //    3. Tracker verifies: debt(A->B) >= X, then updates both records atomically
+    //    4. Tracker commits: posts updated AVL tree with decreased debt(A->B) and increased debt(A->C)
+    //  * This allows debt to circulate in the network: A's credit with B can be used to pay C,
+    //    effectively making debt notes transferrable with debtor consent.
+    //  * Benefits:
+    //    - Enables triangular trade: A->B->C becomes A->C (B is paid by debt transfer)
+    //    - Reduces need for on-chain redemption: debt can be re-assigned offchain
+    //    - Maintains security: debtor must consent, tracker must verify and commit
 
     // Security analysis and the role of the tracker:
     //  * the usual problem is that A can pay to B and then create a note from A to self and redeem. Solved by tracker solely.
     //  * double spending of a note is not possible by contract design (AVL tree tracks cumulative redeemed amounts).
     //  * tracker cannot steal funds as both owner and tracker signatures are required for redemption.
     //  * tracker can re-order redemption transactions, potentially affecting outcome for undercollateralized notes.
+    //  * debt transfer security:
+    //    - debtor (A) must sign: prevents unauthorized transfer of debt obligation
+    //    - tracker verifies source debt exists: prevents creating debt(A->C) without sufficient debt(A->B)
+    //    - atomic update: both decrease(A->B) and increase(A->C) happen together or not at all
+    //    - tracker cannot forge transfer: requires A's signature on transfer message
 
     // Normal workflow:
     // * A is willing to buy some services from B. A asks B whether debt notes (IOU) are accepted as payment.
@@ -57,6 +78,18 @@
     // * At any time, A can make another payment to B by signing a message with increased cumulative debt amount.
     // * A can refund by redeeming like B (in pseudonymous environments, A may have multiple keys).
     //   B should always track collateralization level and can prepare redemption transactions in advance.
+    //
+    // Debt Transfer Workflow (Triangular Trade):
+    // * Scenario: A owes 10 ERG to B. B wants to buy 5 ERG worth of services from C.
+    // * Step 1: B proposes to C that B will pay via debt transfer from A. C agrees.
+    // * Step 2: B requests transfer from tracker: decrease debt(A->B) by 5 ERG, increase debt(A->C) by 5 ERG.
+    // * Step 3: Tracker notifies A of the transfer request. A verifies the purchase (B->C) and signs approval.
+    // * Step 4: A's signature message: hash(A||B) || hash(A||C) || 5000000000L (transfer amount)
+    // * Step 5: Tracker verifies: debt(A->B) >= 5 ERG, A's signature is valid.
+    // * Step 6: Tracker atomically updates: debt(A->B) -= 5 ERG, debt(A->C) += 5 ERG.
+    // * Step 7: Tracker posts updated AVL tree commitment on-chain.
+    // * Result: B is paid (debt reduced), C is creditor (new debt created), A owes C instead of B.
+    // * C can now redeem from A's reserve or further transfer the debt to D (with A's consent).
 
     // Tracker's role here is to guarantee fairness of payments. Tracker can't steal A's onchain funds as A's signature is
     // required. Tracker cannot enable double-redemption as the contract tracks cumulative redeemed amounts in AVL tree.
@@ -87,6 +120,18 @@
     //   A is checking it with another agent C (paying with debt note as well) and opening a PR after all
     // * when PR is merged, A is getting paid in git tokens, he may convert them into ERG in a liquidity pool, for example
     //   and create an on-chain reserve. B and C now can exchange promisory notes for ERG using the reserve smart contract
+    //
+    // Example with Debt Transfer (Triangular Trade):
+    // * Agent A (repo maintainer) owes 10 ERG to Agent B (frontend dev) for completed work.
+    // * Agent A needs testing work from Agent C (tester) but hasn't created reserve yet.
+    // * Agent B needs testing work from Agent C (5 ERG worth).
+    // * Instead of B paying C separately, they use debt transfer:
+    //   - B requests: transfer 5 ERG from debt(A->B) to debt(A->C)
+    //   - A verifies B's work was satisfactory and approves the transfer
+    //   - Tracker updates: debt(A->B) = 5 ERG, debt(A->C) = 5 ERG
+    // * Result: B effectively paid C using A's debt obligation. A now owes C directly.
+    // * When A creates reserve, both B and C can redeem their respective portions.
+    // * This creates a chain of trust: A's creditworthiness backs payments to B and C.
 
     // Example of digital trading in occasionaly connected area:
     // * imagine some area which is mostly disconnected from the internet but having connection occasionally
