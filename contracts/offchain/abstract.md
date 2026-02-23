@@ -26,6 +26,6 @@ reserves using this committed state. There could be multiple trackers around the
 to federated control, to rollups and sidechains. 
 
 We provide implementation of reserve contract as well as offchain clients (tracker server and example clients). We show 
-example of group trading over mesh network with occasional Internet connection. Another example shows AI agent 
+an example of group trading over mesh network with occasional Internet connection. Another example shows AI agent 
 economies where autonomous agents create credit relationships for services.
 

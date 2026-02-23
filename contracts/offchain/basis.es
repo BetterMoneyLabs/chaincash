@@ -100,9 +100,6 @@
     // system could be seen as a network of different tracker-centered networks, with Ergo blockchain being a neutral
     // global trustless financial layer connecting different networks.
 
-    // Debt notes are not transferrable in current design. So B can't really pay C with a debt note issued by A. B has
-    // to create a new debt note.
-
     // With some trust involved in managing redemption process, some pros are coming:
     // * no on-chain fees for offchain transactions. Suitable for micropayments.
     // * Unlike other offchain cash schemes (Lightning, Cashu/Fedimint etc), transactions can be done with no
