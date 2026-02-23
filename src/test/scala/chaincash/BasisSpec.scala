@@ -1778,4 +1778,107 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
     }
   }
 
+  // ========== EMERGENCY EXIT TESTS ==========
+  // Emergency redemption allows redemption after 3 days (3 * 720 blocks) with special message format
+  // The tracker signature is still required, but the message format includes || 0L suffix
+  // This provides an escape hatch if tracker becomes unavailable (can coordinate off-chain for signature)
+
+  property("Emergency exit: should succeed with old tracker and valid emergency signature") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
+      val totalDebt = 500000000L
+      val redeemedDebt = 0L
+      val redeemAmount = totalDebt
+      val newRedeemedDebt = redeemedDebt + redeemAmount
+      val key = mkKey(ownerPk, receiverPk)
+      // Emergency redemption message: key || totalDebt || 0L
+      val message = mkEmergencyMessage(key, totalDebt)
+      val reserveSigBytes = mkSigBytes(SigUtils.sign(message, ownerSecret))
+      val trackerSigBytes = mkSigBytes(SigUtils.sign(message, trackerSecret)) // VALID tracker sig for emergency message
+      val TreeAndProof(initialTree, nextTree, proofBytes) = mkTreeAndProof(key, newRedeemedDebt)
+      // Create tracker tree with debt record and lookup proof
+      val TrackerTreeAndProof(trackerTree, trackerLookupProof) = mkTrackerTreeAndProof(key, totalDebt)
+
+      val basisInput = mkBasisInput(minValue + totalDebt + feeValue, initialTree,
+        receiverPk, reserveSigBytes, totalDebt, proofBytes, trackerSigBytes, None, Some(trackerLookupProof))
+      // Tracker is more than 3 days old (3 * 720 = 2160 blocks)
+      val trackerDataInput = mkTrackerDataInput(trackerTree, Some(3 * 720 + 1))
+      val basisOutput = createOut(Constants.basisContract, minValue + feeValue,
+        Array(ErgoValue.of(ownerPk), nextTree, ErgoValue.of(trackerNFTBytes)),
+        Array(new ErgoToken(basisTokenId, 1)))
+      val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
+
+      // Emergency redemption should succeed: tracker is old enough and has valid signature
+      noException should be thrownBy {
+        assertTxSucceeds(Array(basisInput), Array(trackerDataInput),
+          Array(basisOutput, redemptionOutput), Array(receiverSecret.toString()))
+      }
+    }
+  }
+
+  property("Emergency exit: should fail with old tracker but normal message format") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
+      val totalDebt = 500000000L
+      val redeemedDebt = 0L
+      val redeemAmount = totalDebt
+      val newRedeemedDebt = redeemedDebt + redeemAmount
+      val key = mkKey(ownerPk, receiverPk)
+      // Wrong message: using normal redemption format instead of emergency format (tracker expects || 0L)
+      val message = mkMessage(key, totalDebt) // Missing || 0L suffix
+      val reserveSigBytes = mkSigBytes(SigUtils.sign(message, ownerSecret))
+      val trackerSigBytes = mkSigBytes(SigUtils.sign(message, trackerSecret)) // Valid for normal message, but tracker expects emergency
+      val TreeAndProof(initialTree, nextTree, proofBytes) = mkTreeAndProof(key, newRedeemedDebt)
+      // Create tracker tree with debt record and lookup proof
+      val TrackerTreeAndProof(trackerTree, trackerLookupProof) = mkTrackerTreeAndProof(key, totalDebt)
+
+      val basisInput = mkBasisInput(minValue + totalDebt + feeValue, initialTree,
+        receiverPk, reserveSigBytes, totalDebt, proofBytes, trackerSigBytes, None, Some(trackerLookupProof))
+      // Tracker is more than 3 days old
+      val trackerDataInput = mkTrackerDataInput(trackerTree, Some(3 * 720 + 1))
+      val basisOutput = createOut(Constants.basisContract, minValue + feeValue,
+        Array(ErgoValue.of(ownerPk), nextTree, ErgoValue.of(trackerNFTBytes)),
+        Array(new ErgoToken(basisTokenId, 1)))
+      val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
+
+      // Emergency redemption should fail: message format doesn't match what tracker expects
+      a[Throwable] should be thrownBy {
+        createTx(Array(basisInput), Array(trackerDataInput),
+          Array(basisOutput, redemptionOutput), fee = None, changeAddress,
+          Array(receiverSecret.toString()), broadcast = false)
+      }
+    }
+  }
+
+  property("Emergency exit: should fail with old tracker and invalid tracker signature") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
+      val totalDebt = 500000000L
+      val redeemedDebt = 0L
+      val redeemAmount = totalDebt
+      val newRedeemedDebt = redeemedDebt + redeemAmount
+      val key = mkKey(ownerPk, receiverPk)
+      // Emergency redemption message: key || totalDebt || 0L
+      val message = mkEmergencyMessage(key, totalDebt)
+      val reserveSigBytes = mkSigBytes(SigUtils.sign(message, ownerSecret))
+      val invalidTrackerSigBytes = corruptSig(SigUtils.sign(message, trackerSecret)) // corrupted sig
+      val TreeAndProof(initialTree, nextTree, proofBytes) = mkTreeAndProof(key, newRedeemedDebt)
+      // Create tracker tree with debt record and lookup proof
+      val TrackerTreeAndProof(trackerTree, trackerLookupProof) = mkTrackerTreeAndProof(key, totalDebt)
+
+      val basisInput = mkBasisInput(minValue + totalDebt + feeValue, initialTree,
+        receiverPk, reserveSigBytes, totalDebt, proofBytes, invalidTrackerSigBytes, None, Some(trackerLookupProof))
+      // Tracker is more than 3 days old (but tracker signature is still required)
+      val trackerDataInput = mkTrackerDataInput(trackerTree, Some(3 * 720 + 1))
+      val basisOutput = createOut(Constants.basisContract, minValue + feeValue,
+        Array(ErgoValue.of(ownerPk), nextTree, ErgoValue.of(trackerNFTBytes)),
+        Array(new ErgoToken(basisTokenId, 1)))
+      val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
+
+      // Emergency redemption should fail: tracker signature is still required even for old tracker
+      a[Throwable] should be thrownBy {
+        createTx(Array(basisInput), Array(trackerDataInput),
+          Array(basisOutput, redemptionOutput), fee = None, changeAddress,
+          Array(receiverSecret.toString()), broadcast = false)
+      }
+    }
+  }
+
 }
