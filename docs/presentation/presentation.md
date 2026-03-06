@@ -110,12 +110,12 @@ Disconnected Village
 │ Repo Agent  │──────────────►│ Dev Agent   │
 │ (needs code)│  "10 ERG debt"│ (writes PR) │
 └─────────────┘               └─────────────┘
-       ▲                              │
-       │                              ▼
-       │                         ┌─────────────┐
-       └─────────────────────────│ Test Agent  │
-            IOU "5 ERG debt"     │ (reviews)   │
-                                 └─────────────┘
+                               │
+                               ▼
+                          ┌─────────────┐
+                          │ Test Agent  │
+                          │ (reviews)   │
+                          └─────────────┘
 ```
 
 
@@ -144,74 +144,25 @@ No on-chain redemption needed!
 
 ## Why Ergo?
 
-- **UTXO model**: Perfect for tokenized collateral
+- **UTXO model**: perfect for off-chain interactions
 - **Smart contracts**: Expressive redemption logic
-- **Low fees**: Viable for small settlements
-- **PoW security**: No trusted validators
-
-### Emergency Exit
-- Tracker offline > 3 days? → **Emergency redemption**
-- Protects against tracker failure/censorship
+- **Trust-minimized De-Fi Stack** to continue on-chain
+- **PoW security**
 
 ---
 
-### Minimal Trust Collateral
 
-```
-┌─────────────────────────────────────┐
-│         Ergo Blockchain             │
-│  ┌───────────────────────────────┐  │
-│  │  Reserve Contract (Smart)     │  │
-│  │  • ERG locked securely        │  │
-│  │  • Redemption rules enforced  │  │
-│  │  • No trusted third party     │  │
-│  └───────────────────────────────┘  │
-└─────────────────────────────────────┘
-          ▲              ▲
-          │              │
-    Optional Collateral  │
-    (when trust low)     │
-                         │
-              Tracker cannot steal funds
-              (needs owner signature)
-```
+## Monetary Expansion
 
----
+### Reserve Collateral Options
 
-## Monetary Expansion Beyond ERG
 
-### Tokenized Assets & Cross-Chain
+* ERG (native)     
+* Bitcoin (via bridges/wrapping)          
+* Tokenized gold, silver, commodities      
+* Stablecoins                              
+* Basket tokens, and so on                 
 
-```
-┌─────────────────────────────────────────────┐
-│         Reserve Collateral Options          │
-├─────────────────────────────────────────────┤
-│  • ERG (native)                             │
-│  • Tokenized gold, silver, commodities      │
-│  • Bitcoin (via bridges/wrapping)           │
-│  • Stablecoins                              │
-│  • LP tokens from DEXs                      │
-│  • Real estate tokens                       │
-└─────────────────────────────────────────────┘
-```
-
-### How It Works
-- **Any Ergo token** can back IOU notes
-- **Cross-chain assets** (BTC, ETH) via bridges
-- **Diversified reserves**: Mix of assets reduces risk
-
----
-
-## Example: Local Currency Expansion
-
-```
-Gold mining co-op issues IOUs
-→ Backed by tokenized gold reserves
-→ IOUs circulate locally on trust
-→ Redeemable for gold-backed ERG tokens
-```
-
-**Monetary expansion**: Credit created against real assets
 
 ---
 
@@ -220,23 +171,9 @@ Gold mining co-op issues IOUs
 ### Boosting DeFi & ERG Demand
 
 **Direct Benefits**
-- **ERG as primary collateral** — reserves locked in contracts
-- **Increased on-chain activity** — settlements, redemptions
-- **Fee burn/rewards** — network fees paid in ERG
+- **ERG as min-trust collateral** — reserves locked in contracts
+- **Increased on-chain activity**
 - **TVL growth** — more value secured on Ergo
-
----
-
-## Impact on Ergo Ecosystem
-
-### Ecosystem Synergies
-
-- **DEX integration** — IOU/ERG trading pairs
-- **Stablecoin demand** — SigUSD and other Ergo assets
-- **Cross-chain bridges** — BTC, ETH flow through Ergo
-- **Developer activity** — new contracts, tools, services
-
-**Network Effects**
 ```
 More users → More reserves → More ERG demand → Higher security
      ↓                                              ↑
@@ -252,8 +189,8 @@ More users → More reserves → More ERG demand → Higher security
 Village in Ghana (occasional Internet)
 • Local tracker on Raspberry Pi
 • Farmers trade on credit daily
-• Sync to Ergo weekly via satellite
-• Redeem against ERG reserves when needed
+• Sync to Ergo when connection appears
+• Using ERG / BTC / stablecoin reserves when there is no enough trust
 ```
 
 ---
@@ -263,7 +200,7 @@ Village in Ghana (occasional Internet)
 Autonomous agents on the internet
 • Agent A hires B for work (IOU note)
 • B subcontracts to C (debt transfer)
-• Payment in git tokens → convert to ERG
+• A get rewarded in contribution tokens → converts to ERG via LP
 • Create reserve, agents redeem
 ```
 
@@ -272,9 +209,9 @@ Autonomous agents on the internet
 ### 3. Micropayments for Content
 ```
 Pay-per-article without subscriptions
-• Reader accepts publisher's IOU
+• Publisher accepts reader's IOU
 • Small amounts, no on-chain fees
-• Aggregate and redeem later
+• Redeem aggregated debt later
 ```
 
 ---
@@ -282,23 +219,24 @@ Pay-per-article without subscriptions
 ## Why This Matters
 
 ### For Humans
-- **Financial sovereignty**: Be your own bank
+- **Free banking for everyone**
 - **Works offline**: Trade without Internet
 - **No forced collateralization**: Trust is enough
 
 ---
 
 ### For AI Agents
-- **Autonomous economics**: Agents pay agents
-- **No KYC/centralized services**: Pure P2P
-- **Programmable money**: Smart contracts enforce rules
+- **Autonomous economics**: agents pay agents
+- **Agentic economics**: via self-sovereign credit creation, agents can become in the center of value production
+- **No human-controlled third-parties**: pure agentic P2P
 
 ---
 
 ### For the World
-- **Alternative to political money**: Self-sovereign issuance
+- **Alternative to political money**: self-sovereign grassroots issuance
 - **Local credit, global settlement**: Best of both worlds
-- **Elastic money supply**: Expands with trust, contracts when needed
+- **Elastic money supply**: Expands with trust when possible
+- **Individual risk**: the system does not force to accept debt, it is individual choice of every user
 
 ---
 
@@ -326,14 +264,9 @@ Pay-per-article without subscriptions
 - **Custom deployments** — white-label for communities
 
 ### For Developers
-- **Build integrations** — wallets, exchanges, tools
 - **Consulting & support** — help communities deploy
+- **Protocol fee** - default option for tracker 
 - **Extend the protocol** — grants, bounties, donations
-
-### Sustainable & Decentralized
-- No rent extraction by platform owners
-- Value flows to network participants
-- Community-governed fee markets
 
 ---
 
