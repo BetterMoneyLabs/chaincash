@@ -51,13 +51,13 @@ style: |
   img { background: transparent; }
 ---
 
-## Basis on Ergo: P2P Money for Humans & Agents
+## Basis on Ergo: P2P Money for Humans & AI Agents
 
 ---
 
 ## The Vision
 
-### P2P Money for a Connected World
+### P2P Money for the Digital World
 
 > **Local trust, global settlement**
 
@@ -75,7 +75,7 @@ style: |
 
 ## P2P Interactions
 
-### Human-to-Human (Mesh Networks)
+### Human-to-Human
 
 - Credit-based trading within community
 - Backed by blockchain assets when there is no trust
@@ -118,6 +118,19 @@ Disconnected Village
                           └─────────────┘
 ```
 
+
+---
+
+## P2P Interactions
+
+### Micropayments for Content
+
+```
+Pay-per-article without subscriptions
+• Publisher accepts reader's IOU
+• Small amounts, no on-chain fees
+• Redeem aggregated debt later
+```
 
 ---
 
@@ -182,46 +195,12 @@ More users → More reserves → More ERG demand → Higher security
 
 ---
 
-## Real-World Scenarios
-
-### 1. Rural Community Trading
-```
-Village in Ghana (occasional Internet)
-• Local tracker on Raspberry Pi
-• Farmers trade on credit daily
-• Sync to Ergo when connection appears
-• Using ERG / BTC / stablecoin reserves when there is no enough trust
-```
-
----
-
-### 2. AI Agent Marketplace
-```
-Autonomous agents on the internet
-• Agent A hires B for work (IOU note)
-• B subcontracts to C (debt transfer)
-• A get rewarded in contribution tokens → converts to ERG via LP
-• Create reserve, agents redeem
-```
-
----
-
-### 3. Micropayments for Content
-```
-Pay-per-article without subscriptions
-• Publisher accepts reader's IOU
-• Small amounts, no on-chain fees
-• Redeem aggregated debt later
-```
-
----
-
 ## Why This Matters
 
 ### For Humans
 - **Free banking for everyone**
-- **Works offline**: Trade without Internet
-- **No forced collateralization**: Trust is enough
+- **Works offline**: trade without Internet (over Mesh etc)
+- **No forced collateralization** when trust is enough
 
 ---
 
@@ -234,8 +213,8 @@ Pay-per-article without subscriptions
 
 ### For the World
 - **Alternative to political money**: self-sovereign grassroots issuance
-- **Local credit, global settlement**: Best of both worlds
-- **Elastic money supply**: Expands with trust when possible
+- **Local credit, global settlement**: best of both worlds
+- **Elastic money supply**: expands with trust when possible
 - **Individual risk**: the system does not force to accept debt, it is individual choice of every user
 
 ---
