@@ -2,15 +2,14 @@
 
 ## Overview
 
-This specification describes how to implement an AI agents self-sovereign economy on top of the Basis framework, where autonomous agents create credit relationships, exchange services, and settle debts using IOU notes backed by on-chain reserves.
+This specification describes how to implement an AI agents self-sovereign economy on top of the Basis framework, where autonomous agents create credit relationships, exchange services, and settle debts using IOU notes backed by on-chain reserves. Humans participate as liquidity providers (individually) and govern open-source project rewards through git token distribution (collectively).
 
 ## Actors
 
 ### Humans: Users and Liquidity Providers
-- **Role**: provide ERG to liquidity pool for agent reserve creation (individually), reward repo maintainer agent
- with git tokens according performance (collectively)
-- **Incentive**: reward open-source project development to see it progressed
-- **Function**: enable agents to convert git token rewards into ERG for reserves
+- **Role**: Provide ERG to liquidity pool for agent reserve creation (individually), reward repo maintainer agents with git tokens according to performance (collectively)
+- **Incentive**: Reward open-source project development to see it progressed; earn trading fees from agent token swaps
+- **Function**: Enable agents to convert git token rewards into ERG for reserves via AMM liquidity pools
 
 ### Agent A: Repo Maintainer Agent
 - **Role**: Scans repositories for issues, coordinates PRs, manages contributor payments
@@ -129,28 +128,32 @@ transferMessage = hash(A||B) || hash(A||C) || transferAmount
 ┌─────────────────────────────────────────────────────────────┐
 │ PR Merged → Agent A Receives Git Tokens                     │
 │ 1. Repository merges PR                                     │
-│ 2. A receives reward in git tokens (e.g., project tokens)   │
+│ 2. Humans (collectively) reward A with git tokens           │
+│    based on performance evaluation                          │
 │ 3. A swaps git tokens → ERG via liquidity pool              │
-│    - Humans provide ERG/git tokens LP                       │
+│    - Humans (individually) provide ERG/git tokens LP        │
 │    - A pays trading fee to LP (e.g., 0.3%)                  │
 │ 4. A creates on-chain reserve contract                      │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Liquidity Pool Interaction:**
+**Git Token Reward Mechanism:**
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ Human LP: Provide Liquidity                                 │
-│ 1. Human deposits ERG + git tokens to AMM pool              │
-│ 2. Human receives LP tokens (pool share representation)     │
-│ 3. Human earns fees from all swaps in the pool              │
+│ Humans: Collective Reward Distribution                      │
+│ 1. Humans evaluate Agent A's performance                    │
+│    - PR quality and quantity                                │
+│    - Community impact                                       │
+│    - Project milestones achieved                            │
+│ 2. Humans vote/allocate git tokens to Agent A               │
+│ 3. Git tokens transferred to Agent A's wallet               │
 │                                                             │
 │ Agent A: Swap Git Tokens → ERG                              │
 │ 1. A sends git tokens to AMM pool                           │
 │ 2. Pool calculates ERG output (price + fee)                 │
 │ 3. A receives ERG, pool git tokens updated                  │
-│ 4. Fee distributed to LP token holders                      │
+│ 4. Fee distributed to LP token holders (Human LPs)          │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -315,6 +318,15 @@ Value: Long (cumulative redeemed amount in nanoERG)
 | A creates insufficient reserve | Partial redemption only | B, C monitor reserve level |
 | B submits poor work | A pays for nothing | Verification by C, escrow mechanisms |
 
+### Human Trust Model
+
+| Scenario | Risk | Mitigation |
+|----------|------|------------|
+| Humans don't reward Agent A | A cannot create reserve, B/C unpaid | Incremental rewards, reputation tracking |
+| Humans reward poor performance | Misaligned incentives, wasted funds | Performance metrics, community review |
+| LP provider withdraws liquidity | A cannot swap tokens → ERG | Multiple LPs, minimum liquidity requirements |
+| LP manipulation (price) | Agents receive less ERG for rewards | Slippage protection, multi-pool routing |
+
 ### Emergency Redemption
 
 If tracker becomes unavailable:
@@ -372,6 +384,12 @@ See `contracts/offchain/basis.es` for full implementation.
 - `SigUtils`: Schnorr signature utilities
 - `TrackerClient`: Communicate with tracker service
 
+### 5. Human LP Utilities
+
+- `LiquidityPoolClient`: Add/remove liquidity, swap tokens
+- `RewardClient`: Participate in git token reward governance
+- `PerformanceOracle`: Submit and verify agent performance metrics
+
 ## Example Scenario (End-to-End)
 
 ### Setup
@@ -392,10 +410,9 @@ Tracker:
   - NFT ID: 0x3c45f29a...
   - PubKey: 0x04t1u2v3...
 
-Human LP: Liquidity Provider
-  - Secret: 0xjkl012...
-  - PubKey: 0x04h9i0j1...
-  - LP Deposit: 100 ERG + 10,000 git tokens
+Humans:
+  - LP Provider: 0xjkl012... / 0x04h9i0j1... (100 ERG + 10,000 git tokens)
+  - Community: Collective git token reward governance
 ```
 
 ### Step 1: A Creates IOU for B (5 ERG)
@@ -448,15 +465,28 @@ val lpDepositTx = AMMPool.addLiquidity(
 // Pool share: ~100% (initial liquidity provider)
 ```
 
+### Step 3c: Humans Reward Agent A with Git Tokens (After PR Merge)
+```scala
+// PR merged - Humans collectively evaluate Agent A's performance
+val performanceScore = 0.95  // Based on PR quality, community impact
+
+// Humans allocate git tokens reward (e.g., via DAO vote)
+val gitTokenReward = 1000000000L  // 1,000 git tokens transferred to A
+
+// Git tokens transferred to Agent A's wallet
+val rewardTx = HumansCommunity.distributeReward(
+  recipient = agentAPubKey,
+  amount = gitTokenReward,
+  performanceScore = performanceScore
+)
+```
+
 ### Step 4: A Creates Reserve (10 ERG)
 ```scala
-// After PR merge, A receives git tokens reward
-val gitTokenReward = 1000000000L  // 1,000 git tokens
-
 // A swaps git tokens → ERG via liquidity pool
 val swapTx = AMMPool.swap(
   user = agentASecret,
-  tokenIn = 1000000000L,          // 1,000 git tokens
+  tokenIn = 1000000000L,          // 1,000 git tokens (from Human reward)
   minOut = 9500000000L,           // 9.5 ERG (slippage protection)
   fee = 30000000L                 // 0.03 ERG fee to LP
 )
@@ -518,15 +548,22 @@ val redeemTx_C = BasisSpec.redeemDebt(...)
 - Fee tier optimization for different pool volatilities
 - Impermanent loss protection mechanisms
 
-### 4. Reputation System
+### 4. Human Reward Governance
+- DAO-based git token distribution mechanisms
+- Performance metric frameworks (code quality, community impact)
+- Quadratic funding for public goods
+- Reputation-weighted voting for reward allocation
+
+### 5. Reputation System
 - On-chain reputation tokens for agents
 - Slashing conditions for malicious behavior
+- Cross-project reputation portability
 
-### 5. Federated Trackers
+### 6. Federated Trackers
 - Multiple trackers for redundancy
 - Cross-tracker debt portability
 
-### 6. Privacy Extensions
+### 7. Privacy Extensions
 - Confidential transactions (Sigma protocols)
 - Zero-knowledge redemption proofs
 
