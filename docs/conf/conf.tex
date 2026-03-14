@@ -92,26 +92,26 @@ a local exchange trading system (LETS), and also how to do mutual credit clearin
 
 \section{Introduction}
 
-Currently, most of monetary value is created by private banks~(often, offshore banks as in so-called eurodollar
+Currently, most of monetary value is created by private banks~(often, offshore banks as in so-called eurodollar system
 system~\cite{machlup1970euro}), following central banks requirements. As an alternative, starting with
 Bitcoin~\cite{nakamoto2008peer} launch in 2009, a lot of cryptocurrencies and applications on top of public
-blockchains are experimenting with algorithmic money issuance. As another option, we also have alternative (usually, local),
+blockchains experiment with algorithmic money issuance. As another option, we also have alternative (usually, local),
 monetary systems, such as LETS~(local exchange trading systems~\cite{williams1996new}), timebanks, local government
 currencies~(such as famous Woergl demurrage-based local currency back in 1930s~\cite{unterguggenbercer1934end}), and so on.
 
 Control in traditional fiat monetary systems is possessed by big players~(with rich getting richer effect) creating
-money in non-transparent ways~(especially when done in offshore circuits), at the same time,
-fiat monetary systems (in opposite to commodity money used before fiat, as well as alternative monetary systems) have
+money in non-transparent ways~(especially when done in offshore circuits). At the same time,
+fiat monetary systems (in contrast with commodity money used before fiat, as well as alternative monetary systems) have
 best supply elasticity. Proof-of-work cryptocurrencies~(and, sometimes, other tokens on top of public blockchains) have strict and
-publicly known emission schedule set in an algorithm for computers, which is making them perfect digital commodity assets,
-on the other hand, supply is disconnected from economic activity and so not elastic. Local currencies usually considered
+publicly known emission schedule set in an algorithm for computers, which is making them perfect digital commodity assets.
+On the other hand, supply is disconnected from economic activity and so not elastic. Local currencies are usually considered
 more fair in segniorage distribution than fiat currencies, they are often successfully boosting local economies, but,
-in opposite to fiat and crypto-currencies, they are not global and rarely surviving in the long term due to loss of active supporters.
+in contrast with fiat and crypto-currencies, they are not global and rarely surviving in the long term due to loss of active supporters.
 They are also usually hard to get into for external actors.
 
 In this work, we propose a new global peer-to-peer network based monetary system, with decentralized issuance, individual acceptance rules and elastic supply, called \cc{}.
 A digital banknote in \cc{} can be created by any party and collectively backed by the means of collateral and trust. Collateral for a \cc{} note comes from reserves network peers may have, and on spending a note, a peer is attaching its
-reserve to collective backing. At the same time, a newly issued note could be accepted by a peer without any backing provided, for example, if such a note is issued by a friend or a trusted charity. Every peer in the system is having own individual rules
+reserve to collective backing. At the same time, a newly issued note could be accepted by a peer without any backing provided, for example, if such a note is issued by a friend or a trusted charity. Every peer in the system has own individual rules
 for accepting notes~(widely accepted standards may exist at the same time), which provides basis for elasticity of supply. We are providing details in the next section.
 
 The paper is organized as follows. In Section~\ref{sec-design} we describe design of the system. Section~\ref{sec-impl} provides
@@ -121,11 +121,11 @@ of advantages and drawbacks of the proposal.
 \section{Design}
 \label{sec-design}
 
-We consider money here via its medium-of-exchange property~\cite{kiyotaki1989money}. For existing currencies, there are usually many options to represent value to exchange, such as coins, paper or plastic banknotes, digital records in different ledgers, etc. For \cc{}, we define money as a set of digital notes, each has arbitrary nominal. Some existing widely recognizable unit-of-account is used to represent value, for example, a milligram of gold.
+We consider money here via its medium-of-exchange property~\cite{kiyotaki1989money}. For existing currencies, there are usually many options to represent value to exchange, such as coins, paper or plastic banknotes, digital records in different ledgers, etc. For \cc{}, we define money as a set of digital notes. Each of them has an arbitrary nominal value. Some existing widely recognizable unit-of-account is used to represent value, for example, a milligram of gold.
 
-We consider that an economy is consisting of known agents $a_1, ..., a_n$. Then we can define medium-of-exchange property of money via a set of agents accepting monetary objects~(i.e. notes). Usually, set of agents accepting some kind of money~(e.g. local or foreign currency) is the same for every monetary object~(e.g. a note), so an agent is accepting any note as a means of payment, or rejecting it. In contrast, for \cc{} money, similarly to spender-signed currency in~\cite{saito2003peer}, the set is individual for a note, so when agent $a_i$ sees a note $n$, it applies its personal predicate $P_i(n)$ to decide whether to accept or reject the note.
+We consider that an economic system consists of known agents $a_1, ..., a_n$. Then we can define medium-of-exchange property of money via a set of agents accepting monetary objects~(i.e. notes). Usually, set of agents accepting some kind of money~(e.g. local or foreign currency) is the same for every monetary object~(e.g. a note), so an agent is accepting any note as a means of payment, or rejecting it. In contrast, for \cc{} money, similarly to spender-signed currency in~\cite{saito2003peer}, the set is individual for a note, so when agent $a_i$ sees a note $n$, it applies its personal predicate $P_i(n)$ to decide whether to accept or reject the note.
 
-How \cc{} notes are different from each other then? Every note is collectively backed by all the previous spenders of the note. And every agent may create reserves to be used as collateral. When an agent spends a note, whether received previously from another agent or just created by the agent itself, it is attaching his signature to it. A note could be redeemed at any time against any of reserves of agents previously signing the note. However, any agent after the first one in signature chain is getting redemption receipt which is indicating debt of previous signers before him, and then he may redeem the receipt against a reserve of any previous signer, with a new redeemable receipt being generated, until the first signer is reached. Also, redemption fee should be paid from the note value, the fee is incentivizing both reserves provision and also using the notes instead of redeeming them. The protocol does not impose collateralization requirements, it is allowed for an agent to issue and spend notes with an empty reserve even. It is up to agent's counter-parties then whether to accept and so back after spending an issued note with collateral or agent's trust or not.
+How do \cc{} notes differ from each other, then? Every note is collectively backed by all the previous spenders of the note. And every agent may create reserves to be used as collateral. When an agent spends a note, whether received previously from another agent or just created by the agent itself, it is attaching its signature to it. A note could be redeemed at any time against any of reserves of agents previously signing the note. However, any agent after the first one in signature chain is getting redemption receipt which is indicating debt of previous signers before him, and then he may redeem the receipt against a reserve of any previous signer, with a new redeemable receipt being generated, until the first signer is reached. Also, redemption fee should be paid from the note value, the fee is incentivizing both reserves provision and also using the notes instead of redeeming them. The protocol does not impose collateralization requirements, it is allowed for an agent to issue and spend notes with an empty reserve even. It is up to agent's counter-parties then whether to accept and so back after spending an issued note with collateral or agent's trust or not.
 
 As an example, consider a small gold mining cooperative in Ghana issuing a note backed by (tokenized) gold. The note is then accepted by the national government as a means of tax payment. Then the government is using the note~(which is now backed by gold and also trust in Ghana government, so convertible to Ghanaian Cedi as well) to buy oil from a Saudi oil company. Then the oil company, having its own oil reserve also, is using the note to buy equipment from China. Now a Chinese company has a note which is backed by gold, oil, and Cedis. It could be hard for Chinese company to redeem from a small cooperative in Ghana, so it can redeem from Ghana government, and the government may re-redeem its receipt from the cooperative.
 
@@ -157,8 +157,8 @@ For blockchain-based \cc{} implementation, we consider implementation of the fol
   \item{} contracts for notes, reserves, and redemption receipts. Here, for now we consider on-chain contracts as the most
   straightforward option. Then we may consider more scalable options, such as having reserves (and maybe receipts) only
   on chain, and have notes making progress on a side-chain or off-chain (on top of some Layer 2 solution)
-  \item{} client software~(which we refer to as \cc{} Server), which is interacting with the blockchain (in future, possibly, also a p2p network
-  where notes are making progress off-chain). This software is implementing $a_i$ agent's functionality from the Section~\ref{sec-design},
+  \item{} client software~(which we refer to as \cc{} Server), which interacts with the blockchain (in future, possibly, also a p2p network
+  where notes are making progress off-chain). This software implements $a_i$ agent's functionality from the Section~\ref{sec-design},
   including note quality estimation predicate $P_i(n)$. For that, the client may potentially track all the reserves and notes on the blockchain.
   Client's $P_i(n)$ may be configured via whitelists, blacklists, collateralization requirements provided in a configuration file.
   \cc{} Server can be seen as a self-sovereign digital bank in peer-to-peer free banking system, issuing own private money using common unit-of-account.
@@ -227,7 +227,7 @@ than other options of helping communities in need.
 In addition to basic on-chain contracts, there could be other options described via CCIPs
 (ChainCash Improvement Proposals), and optionally supported in software.
 
-The most appealing option, likely, is having notes created and making progress off-chain, with on-chain reserves.
+The most appealing option, likely, has notes created and making progress off-chain, with on-chain reserves.
 It is not clear at the moment how to build such a system in pure peer-to-peer setting. What is doable, though, is
 notes tracking, with a signature needed for note transfer and redemption, done by a central server or a federation.
 
