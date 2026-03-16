@@ -284,7 +284,7 @@
       val treeValue = longToByteArray(newRedeemed)
       val redeemedKeyVal = (key, treeValue)  // key -> redeemed debt value
       val insertProof = getVar[Coll[Byte]](5).get // Merkle proof for tree insertion
-      val nextTree: AvlTree = SELF.R5[AvlTree].get.insert(Coll(redeemedKeyVal), insertProof).get // todo: insertOrUpdate?
+      val nextTree: AvlTree = SELF.R5[AvlTree].get.insert(Coll(redeemedKeyVal), insertProof).get // todo: insertOrUpdate after appkit update
       // Verify tree was properly updated in output
       val properRedemptionTree = nextTree == selfOut.R5[AvlTree].get
 
