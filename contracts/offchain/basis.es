@@ -226,7 +226,7 @@
       val reserveSigBytes = getVar[Coll[Byte]](2).get
 
       val lookupProofOpt = getVar[Coll[Byte]](7)
-      val redeemedDebt = if(lookupProofOpt.isDefined){
+      val redeemedDebt = if (lookupProofOpt.isDefined) {
         val redeemedDebtBytes = SELF.R5[AvlTree].get.get(key, lookupProofOpt.get).get
         byteArrayToLong(redeemedDebtBytes)
       } else {
