@@ -181,10 +181,15 @@ object ParticipantKeys {
   )
 
   /**
-   * Bob's Ergo address and secret (for testing/demo purposes only)
+   * Bob's Ergo address and secret.
    *
-   * Note: The secret is NOT used for signing (Bob is the payee/receiver).
-   * It's kept for reference only. Public key is derived from the address.
+   * Bob is the payee/receiver in the Basis protocol. His signature is required
+   * for redemption transactions due to the contract's receiverCondition check:
+   * `val receiverCondition = proveDlog(receiver)`
+   *
+   * Note: Bob's secret is used by the Ergo node for transaction signing,
+   * not directly in this codebase. The node automatically signs inputs
+   * corresponding to addresses in the wallet when signing a transaction.
    */
   val bobAddress: String = getAddress("bob")
   val bobSecret: BigInt = getSecret("bob")

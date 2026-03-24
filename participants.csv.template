@@ -6,7 +6,20 @@
 # 2. Replace the placeholder secrets with your actual values
 # 3. The participants.local.csv file is git-ignored and will not be committed
 #
+# To generate a new secret key pair:
+#   - Use ergo-wallet or any secp256k1 key generator
+#   - Secret must be a 256-bit hex string (64 hex characters)
+#   - Derive the address from the secret and update both fields
+#
+# Participants:
+#   - tracker: Manages offchain debt tracking, signs redemption transactions
+#   - alice: Reserve owner (Issuer), signs redemption transactions  
+#   - bob: Payee/Receiver, signs transactions via Ergo node (receiverCondition)
+#
 # Example:
-# tracker,9f7ZXamnfaDZL7EWLKLuBZgWMuHCusQYK6yow2d7p2eES9oRRRe,your_tracker_secret_hex
-# alice,9hNQcqi72NB5u5Tw6tbfCGbEKByguR7njvcyZXnXPLvV3Do1DiJ,your_alice_secret_hex
-# bob,9hnupHc2udAoa7SV2UrWAba3N7pu9tR4RX662wv2iFa9gMn1E73,your_bob_secret_hex
+# tracker,<your_tracker_address>,<your_tracker_secret_hex>
+# alice,<your_alice_address>,<your_alice_secret_hex>
+# bob,<your_bob_address>,<your_bob_secret_hex>
+#
+# Note: All three secrets are required. Bob's secret is used by the Ergo node
+# for signing transactions (the contract's proveDlog(receiver) requires it).
