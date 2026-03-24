@@ -2,8 +2,6 @@ package chaincash.contracts
 
 import chaincash.offchain.SigUtils
 import com.google.common.primitives.Longs
-import org.ergoplatform.ErgoAddressEncoder
-import org.ergoplatform.appkit.NetworkType
 import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Blake2b256
 import sigmastate.basics.CryptoConstants
@@ -11,24 +9,47 @@ import sigmastate.eval._
 import sigmastate.serialization.GroupElementSerializer
 import special.sigma.GroupElement
 
-import scala.io.StdIn
-
 /**
- * Utility for creating Basis IOU notes
- * 
- * An IOU note represents a debt from party A (payer) to party B (payee)
- * Note format: (B_pubkey, totalDebt, sig_A)
- * where sig_A signs: hash(A_pubkey || B_pubkey) || totalDebt
+ * Utility for creating Basis IOU notes with tracker signature.
+ *
+ * Uses Alice's address and secret (verified to match), Bob's secret for demo.
+ * The tracker signature is included for normal redemption (without waiting for emergency period).
+ *
+ * Usage:
+ *   sbt "runMain chaincash.contracts.BasisNoteCreator [amount_nanoERG]"
  */
 object BasisNoteCreator extends App {
 
-  val networkType = NetworkType.MAINNET
-  val ergoAddressEncoder = new ErgoAddressEncoder(networkType.networkPrefix)
-  val g = CryptoConstants.dlogGroup.generator
+  val g: GroupElement = CryptoConstants.dlogGroup.generator
+
+  // Alice's keys - public and secret from ParticipantKeys (verified to match)
+  val alicePublicKey: GroupElement = ParticipantKeys.alicePublicKey
+  val aliceSecret: BigInt = ParticipantKeys.aliceSecret
+
+  // Bob's secret key (payee)
+  val bobSecret: BigInt = ParticipantKeys.bobSecret
+  val bobPublicKey: GroupElement = ParticipantKeys.bobPublicKey
+
+  // Tracker's keys (verified to match tracker address)
+  val trackerPublicKey: GroupElement = ParticipantKeys.trackerPublicKey
+  val trackerSecret: BigInt = ParticipantKeys.trackerSecret
+
+  case class IOUNote(
+    payerKey: GroupElement,
+    payeeKey: GroupElement,
+    totalDebt: Long,
+    signatureA: GroupElement,
+    signatureZ: BigInt,
+    message: Array[Byte]
+  )
+
+  case class TrackerSignature(
+    signatureA: GroupElement,
+    signatureZ: BigInt
+  )
 
   def createNoteMessage(payerKey: GroupElement, payeeKey: GroupElement, totalDebt: Long): Array[Byte] = {
-    val key = Blake2b256(payerKey.getEncoded.toArray ++ payeeKey.getEncoded.toArray)
-    key ++ Longs.toByteArray(totalDebt)
+    Blake2b256(payerKey.getEncoded.toArray ++ payeeKey.getEncoded.toArray) ++ Longs.toByteArray(totalDebt)
   }
 
   def createNote(payerSecret: BigInt, payeeKey: GroupElement, totalDebt: Long): IOUNote = {
@@ -38,10 +59,9 @@ object BasisNoteCreator extends App {
     IOUNote(payerKey, payeeKey, totalDebt, a, z, message)
   }
 
-  def createNoteFromHex(payerSecretHex: String, payeeKeyHex: String, totalDebt: Long): IOUNote = {
-    val payerSecret = BigInt(payerSecretHex, 16)
-    val payeeKey = GroupElementSerializer.fromBytes(Base16.decode(payeeKeyHex).get)
-    createNote(payerSecret, payeeKey, totalDebt)
+  def createTrackerSignature(message: Array[Byte]): TrackerSignature = {
+    val (a, z) = SigUtils.sign(message, trackerSecret)
+    TrackerSignature(a, z)
   }
 
   def verifyNote(note: IOUNote): Boolean = {
@@ -49,83 +69,67 @@ object BasisNoteCreator extends App {
     SigUtils.verify(message, note.payerKey, note.signatureA, note.signatureZ)
   }
 
-  def formatNoteAsJson(note: IOUNote): String = {
+  def verifyTrackerSignature(message: Array[Byte], trackerSig: TrackerSignature): Boolean = {
+    SigUtils.verify(message, trackerPublicKey, trackerSig.signatureA, trackerSig.signatureZ)
+  }
+
+  def formatNoteAsJson(note: IOUNote, trackerSig: TrackerSignature): String = {
     val payerKeyHex = Base16.encode(note.payerKey.getEncoded.toArray)
     val payeeKeyHex = Base16.encode(note.payeeKey.getEncoded.toArray)
     val sigAHex = Base16.encode(GroupElementSerializer.toBytes(note.signatureA))
+    val trackerSigAHex = Base16.encode(GroupElementSerializer.toBytes(trackerSig.signatureA))
     s"""{
        |  "payerKey": "$payerKeyHex",
        |  "payeeKey": "$payeeKeyHex",
        |  "totalDebt": ${note.totalDebt},
        |  "totalDebtERG": ${note.totalDebt.toDouble / 1000000000},
-       |  "signature": {"a": "$sigAHex", "z": "${note.signatureZ.toString(16)}"},
+       |  "payerSignature": {"a": "$sigAHex", "z": "${note.signatureZ.toString(16)}"},
+       |  "trackerSignature": {"a": "$trackerSigAHex", "z": "${trackerSig.signatureZ.toString(16)}"},
        |  "message": "${Base16.encode(note.message)}",
        |  "noteKey": "${Base16.encode(Blake2b256((payerKeyHex ++ payeeKeyHex).getBytes))}"
        |}""".stripMargin
   }
 
-  def formatNoteHuman(note: IOUNote): String = {
+  def formatNoteHuman(note: IOUNote, trackerSig: TrackerSignature): String = {
     val payerShort = Base16.encode(note.payerKey.getEncoded.toArray).take(16) + "..."
     val payeeShort = Base16.encode(note.payeeKey.getEncoded.toArray).take(16) + "..."
+    val trackerSigValid = verifyTrackerSignature(note.message, trackerSig)
     s"""IOU Note:
-       |  Payer:  $payerShort
-       |  Payee:  $payeeShort  
-       |  Amount: ${note.totalDebt} nanoERG (${note.totalDebt.toDouble / 1000000000} ERG)
-       |  Valid:  ${verifyNote(note)}
+       |  Payer:           $payerShort
+       |  Payee:           $payeeShort
+       |  Amount:          ${note.totalDebt} nanoERG (${note.totalDebt.toDouble / 1000000000} ERG)
+       |  Payer Sig Valid: ${verifyNote(note)}
+       |  Tracker Sig Valid: $trackerSigValid
        |""".stripMargin
   }
 
-  def printUsage(): Unit = {
-    println("=== Basis Note Creator ===")
-    println("Creates IOU notes for Basis offchain payments.")
-    println()
-    println("Usage: BasisNoteCreator [payerSecret] [payeeKey] [amount_nanoERG]")
-    println("  Run without args for interactive mode")
-    println()
-  }
+  val amount = if (args.length >= 1) args(0).toLong else 50000000L // default 0.05 ERG
+  val note = createNote(aliceSecret, bobPublicKey, amount)
+  val trackerSig = createTrackerSignature(note.message)
 
-  if (args.isEmpty) {
-    printUsage()
-    println("=== Interactive Mode ===\n")
-    
-    print("Payer secret (hex): ")
-    val payerSecret = try { BigInt(StdIn.readLine(), 16) } catch { case _: Exception => BigInt(StdIn.readLine()) }
-    
-    print("Payee public key (hex): ")
-    val payeeKey = GroupElementSerializer.fromBytes(Base16.decode(StdIn.readLine()).get)
-    
-    print("Amount nanoERG (default 1 ERG): ")
-    val amount = StdIn.readLine() match { case s if s.isEmpty => 1000000000L case s => s.toLong }
-    
-    val note = createNote(payerSecret, payeeKey, amount)
-    println("\n" + formatNoteHuman(note))
-    println("=== JSON ===\n" + formatNoteAsJson(note))
-    println("\nNext: Send to tracker via POST noteUpdate")
-  } else if (args.length >= 3) {
-    val note = createNoteFromHex(args(0), args(1), args(2).toLong)
-    println(formatNoteHuman(note))
-    println("\n=== JSON ===\n" + formatNoteAsJson(note))
-  } else {
-    println("Error: Need 3 args: payerSecret payeeKey amount_nanoERG")
-    sys.exit(1)
-  }
-}
+  // Human-readable to stderr, JSON to stdout
+  Console.err.println("=== Basis Note Creator ===")
+  Console.err.println("Creates IOU note from Alice to Bob with tracker signature")
+  Console.err.println()
+  Console.err.println("=== Keys ===")
+  Console.err.println(s"Alice Address: ${ParticipantKeys.aliceAddress}")
+  Console.err.println(s"Alice Public:  ${ParticipantKeys.alicePublicKeyHex}")
+  Console.err.println(s"Alice Secret:  ${ParticipantKeys.aliceSecret.toString(16)}")
+  Console.err.println(s"Bob Secret:    ${ParticipantKeys.bobSecret.toString(16)}")
+  Console.err.println(s"Bob Public:    ${ParticipantKeys.bobPublicKeyHex}")
+  Console.err.println(s"Tracker Address: ${ParticipantKeys.trackerAddress}")
+  Console.err.println(s"Tracker Public:  ${ParticipantKeys.trackerPublicKeyHex}")
+  Console.err.println(s"Tracker Secret:  ${ParticipantKeys.trackerSecret.toString(16)}")
+  Console.err.println()
+  Console.err.println(formatNoteHuman(note, trackerSig))
+  Console.err.println("=== JSON (stdout) ===")
 
-case class IOUNote(
-  payerKey: GroupElement,
-  payeeKey: GroupElement,
-  totalDebt: Long,
-  signatureA: GroupElement,
-  signatureZ: BigInt,
-  message: Array[Byte]
-) {
-  def noteKey: Array[Byte] = Blake2b256(payerKey.getEncoded.toArray ++ payeeKey.getEncoded.toArray)
-  def noteKeyHex: String = Base16.encode(noteKey)
-  def debtInERG: Double = totalDebt.toDouble / 1000000000
-}
+  println(formatNoteAsJson(note, trackerSig))
 
-object IOUNote {
-  def createNoteKey(payerKey: GroupElement, payeeKey: GroupElement): Array[Byte] =
-    Blake2b256(payerKey.getEncoded.toArray ++ payeeKey.getEncoded.toArray)
-  def calculateNewDebt(previousDebt: Long, paymentAmount: Long): Long = previousDebt + paymentAmount
+  Console.err.println()
+  Console.err.println("=== Usage ===")
+  Console.err.println("Save note:  sbt \"runMain ...BasisNoteCreator\" > note.json")
+  Console.err.println("Redeem:     sbt \"runMain ...BasisNoteRedeemer --note-json note.json --reserve-box <id>\"")
+  Console.err.println()
+  Console.err.println("Note: This note includes tracker signature for normal redemption.")
 }
