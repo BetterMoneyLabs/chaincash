@@ -21,6 +21,7 @@ import work.lithos.plasma.collections.PlasmaMap
 import sigmastate.AvlTreeFlags
 
 import scala.util.{Try, Success, Failure}
+import java.net.{URL, HttpURLConnection}
 
 /**
  * Utility for redeeming Basis IOU notes with tracker signature.
@@ -155,45 +156,25 @@ object BasisNoteRedeemer extends App {
   }
 
   def encodeByteValue(b: Byte): String = {
-    Base16.encode(Array(0x00.toByte, b))
+    Base16.encode(ValueSerializer.serialize(b))
   }
 
   def encodeGroupElementValue(ge: GroupElement): String = {
-    val bytes = Array(0x07.toByte) ++ ge.getEncoded.toArray
-    Base16.encode(bytes)
+    Base16.encode(ValueSerializer.serialize(ge))
   }
 
   def encodeCollByteValue(bytes: Array[Byte]): String = {
-    val lengthBytes = Array((bytes.length & 0xff).toByte, ((bytes.length >> 8) & 0xff).toByte)
-    Base16.encode(Array(0x0e.toByte) ++ lengthBytes ++ bytes)
+    Base16.encode(ValueSerializer.serialize(bytes))
   }
 
   def encodeLongValue(l: Long): String = {
-    val longBytes = java.nio.ByteBuffer.allocate(8).order(java.nio.ByteOrder.LITTLE_ENDIAN).putLong(l).array()
-    Base16.encode(Array(0x05.toByte) ++ longBytes)
-  }
-
-  /**
-   * Converts signature z to exactly 32 bytes.
-   * Fails if z cannot be represented in 32 bytes.
-   */
-  private def zTo32Bytes(z: BigInt): Array[Byte] = {
-    val bytes = z.toByteArray
-    if (bytes.length == 32) {
-      bytes
-    } else if (bytes.length == 33 && bytes(0) == 0) {
-      bytes.tail  // Remove leading zero sign byte
-    } else {
-      throw new IllegalArgumentException(
-        s"Signature z must be exactly 32 bytes, got ${bytes.length}. " +
-        s"This indicates a bug in SigUtils.sign"
-      )
-    }
+    Base16.encode(ValueSerializer.serialize(l))
   }
 
   def buildTransaction(
     note: IOUNote,
     reserveBoxId: String,
+    trackerBoxId: String,
     reserveOwnerSecret: BigInt,
     trackerSecret: BigInt,
     trackerProof: String,
@@ -232,7 +213,7 @@ object BasisNoteRedeemer extends App {
 
     s"""{
        |  "inputs": [{"boxId": "$reserveBoxId"}],
-       |  "dataInputs": [{"boxId": "$reserveBoxId"}],
+       |  "dataInputs": [{"boxId": "$trackerBoxId"}],
        |  "outputs": [{
        |    "address": "$receiverAddress",
        |    "value": ${redeemedAmount + 1000000L},
@@ -246,6 +227,7 @@ object BasisNoteRedeemer extends App {
   def redeem(
     noteJson: NoteJson,
     reserveBoxId: String,
+    trackerBoxId: String,
     outputFile: Option[String],
     reserveOwnerSecret: BigInt,
     trackerSecret: BigInt
@@ -288,7 +270,7 @@ object BasisNoteRedeemer extends App {
     println(s"Tracker AVL proof: ${avlProof.take(64)}...")
     println()
 
-    val txJson = buildTransaction(note, reserveBoxId, reserveOwnerSecret, trackerSecret, avlProof, noteJson.totalDebt, receiverAddr)
+    val txJson = buildTransaction(note, reserveBoxId, trackerBoxId, reserveOwnerSecret, trackerSecret, avlProof, noteJson.totalDebt, receiverAddr)
 
     outputFile match {
       case Some(file) =>
@@ -321,25 +303,31 @@ object BasisNoteRedeemer extends App {
     println()
     println("Required:")
     println("  --note-json <file>       IOU note JSON with tracker signature from BasisNoteCreator")
-    println("  --reserve-box <id>       Reserve box ID to redeem from")
+    println("  --reserve-box <id>       Reserve box ID to redeem from (or 'auto' to fetch from scan API)")
     println()
     println("Optional:")
+    println("  --tracker-box <id>       Tracker box ID (or 'auto' to fetch from scan API, default)")
     println("  --output <file>          Save transaction to file (default: stdout)")
     println("  --reserve-owner-secret   Reserve owner's secret key (default: from ParticipantKeys)")
     println("  --tracker-secret         Tracker's secret key (default: from ParticipantKeys)")
     println("  --help, -h               Show this help")
     println()
     println("Examples:")
-    println("  sbt \"runMain chaincash.contracts.BasisNoteCreator\" > note.json")
-    println("  sbt \"runMain chaincash.contracts.BasisNoteRedeemer --note-json note.json --reserve-box abc123...\"")
+    println("  # With explicit box IDs:")
+    println("  sbt \"runMain chaincash.contracts.BasisNoteRedeemer --note-json note.json --reserve-box abc123... --tracker-box xyz789...\"")
+    println()
+    println("  # Auto-fetch box IDs from node scan API:")
+    println("  sbt \"runMain chaincash.contracts.BasisNoteRedeemer --note-json note.json --reserve-box auto --tracker-box auto\"")
     println()
     println("Note: The note must include trackerSignature for normal redemption.")
     println("      Reserve owner and tracker secrets are needed to sign the redemption.")
+    println("      For auto-fetch, set ERGO_NODE_URL and ERGO_API_KEY environment variables.")
   }
 
   case class Args(
     noteJsonFile: Option[String] = None,
     reserveBoxId: Option[String] = None,
+    trackerBoxId: Option[String] = None,
     outputFile: Option[String] = None,
     reserveOwnerSecret: Option[String] = None,
     trackerSecret: Option[String] = None,
@@ -361,6 +349,11 @@ object BasisNoteRedeemer extends App {
             result = result.copy(reserveBoxId = Some(args(i + 1)))
             i += 1
           } else return Left("Missing value for --reserve-box")
+        case "--tracker-box" =>
+          if (i + 1 < args.length) {
+            result = result.copy(trackerBoxId = Some(args(i + 1)))
+            i += 1
+          } else return Left("Missing value for --tracker-box")
         case "--output" =>
           if (i + 1 < args.length) {
             result = result.copy(outputFile = Some(args(i + 1)))
@@ -386,6 +379,66 @@ object BasisNoteRedeemer extends App {
     Right(result)
   }
 
+  // Node API configuration
+  val nodeUrl = sys.env.getOrElse("ERGO_NODE_URL", "http://127.0.0.1:9053")
+  val apiKey = sys.env.getOrElse("ERGO_API_KEY", "hello")
+
+  def fetchUnspentBoxes(scanId: Int): Option[String] = {
+    val urlStr = s"$nodeUrl/scan/$scanId/boxes/unspent"
+    val url = new URL(urlStr)
+    val conn = url.openConnection().asInstanceOf[HttpURLConnection]
+    try {
+      conn.setRequestMethod("GET")
+      conn.setRequestProperty("api_key", apiKey)
+      val responseCode = conn.getResponseCode
+      if (responseCode == 200) {
+        val source = scala.io.Source.fromInputStream(conn.getInputStream)
+        try {
+          val jsonStr = source.mkString
+          parse(jsonStr) match {
+            case Right(json) =>
+              json.hcursor.downField("items").downArray.downField("boxId").as[String].toOption
+            case Left(_) => None
+          }
+        } finally {
+          source.close()
+        }
+      } else None
+    } finally {
+      conn.disconnect()
+    }
+  }
+
+  def fetchReserveAndTrackerBoxes(reserveBoxId: Option[String], trackerBoxId: Option[String]): Either[String, (String, String)] = {
+    // Fetch reserve box (scanId=35)
+    val actualReserveBoxId = reserveBoxId match {
+      case Some("auto") | None =>
+        Console.err.println("Fetching reserve box (scanId=35)...")
+        fetchUnspentBoxes(35) match {
+          case Some(id) =>
+            Console.err.println(s"  Found reserve box: $id")
+            id
+          case None => return Left("Reserve box not found. Make sure the reserve is created and scanned with scanId=35")
+        }
+      case Some(id) => id
+    }
+
+    // Fetch tracker box (scanId=36)
+    val actualTrackerBoxId = trackerBoxId match {
+      case Some("auto") | None =>
+        Console.err.println("Fetching tracker box (scanId=36)...")
+        fetchUnspentBoxes(36) match {
+          case Some(id) =>
+            Console.err.println(s"  Found tracker box: $id")
+            id
+          case None => return Left("Tracker box not found. Make sure the tracker is created and scanned with scanId=36")
+        }
+      case Some(id) => id
+    }
+
+    Right((actualReserveBoxId, actualTrackerBoxId))
+  }
+
   // Main
   if (args.isEmpty) {
     printUsage()
@@ -405,29 +458,32 @@ object BasisNoteRedeemer extends App {
         println("Error: --note-json is required")
         printUsage()
         sys.exit(1)
-      } else if (cli.reserveBoxId.isEmpty) {
-        println("Error: --reserve-box is required")
-        printUsage()
-        sys.exit(1)
       } else {
-        // Get secrets from command line or use defaults from ParticipantKeys
-        val reserveOwnerSecret = cli.reserveOwnerSecret match {
-          case Some(s) => BigInt(s)
-          case None => ParticipantKeys.aliceSecret // default: Alice is reserve owner
-        }
-        val trackerSecret = cli.trackerSecret match {
-          case Some(s) => BigInt(s)
-          case None => ParticipantKeys.trackerSecret // default: use tracker secret from ParticipantKeys
-        }
-
-        Try {
-          val noteJson = parseNoteJson(cli.noteJsonFile.get)
-          redeem(noteJson, cli.reserveBoxId.get, cli.outputFile, reserveOwnerSecret, trackerSecret)
-        } match {
-          case Success(_) =>
-          case Failure(e) =>
-            println(s"ERROR: ${e.getMessage}")
+        // Fetch box IDs (supports 'auto' for scan API fetching)
+        fetchReserveAndTrackerBoxes(cli.reserveBoxId, cli.trackerBoxId) match {
+          case Left(err) =>
+            println(s"Error: $err")
             sys.exit(1)
+          case Right((reserveBoxId, trackerBoxId)) =>
+            // Get secrets from command line or use defaults from ParticipantKeys
+            val reserveOwnerSecret = cli.reserveOwnerSecret match {
+              case Some(s) => BigInt(s)
+              case None => ParticipantKeys.aliceSecret // default: Alice is reserve owner
+            }
+            val trackerSecret = cli.trackerSecret match {
+              case Some(s) => BigInt(s)
+              case None => ParticipantKeys.trackerSecret // default: use tracker secret from ParticipantKeys
+            }
+
+            Try {
+              val noteJson = parseNoteJson(cli.noteJsonFile.get)
+              redeem(noteJson, reserveBoxId, trackerBoxId, cli.outputFile, reserveOwnerSecret, trackerSecret)
+            } match {
+              case Success(_) =>
+              case Failure(e) =>
+                println(s"ERROR: ${e.getMessage}")
+                sys.exit(1)
+            }
         }
       }
   }
