@@ -1,0 +1,12 @@
+# Participant secrets for Basis protocol
+# Format: name,address,secret_hex
+# 
+# INSTRUCTIONS:
+# 1. Copy this file to secrets/participants.local.csv
+# 2. Replace the placeholder secrets with your actual values
+# 3. The participants.local.csv file is git-ignored and will not be committed
+#
+# Example:
+# tracker,9f7ZXamnfaDZL7EWLKLuBZgWMuHCusQYK6yow2d7p2eES9oRRRe,your_tracker_secret_hex
+# alice,9hNQcqi72NB5u5Tw6tbfCGbEKByguR7njvcyZXnXPLvV3Do1DiJ,your_alice_secret_hex
+# bob,9hnupHc2udAoa7SV2UrWAba3N7pu9tR4RX662wv2iFa9gMn1E73,your_bob_secret_hex
