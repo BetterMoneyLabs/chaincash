@@ -18,26 +18,17 @@ import work.lithos.plasma.collections.PlasmaMap
 object BasisDeployer extends App {
 
   /**
-   * Creates a GroupElementConstant from a hex-encoded public key
-   * @param hexPublicKey Hex string representing the public key (compressed or uncompressed)
-   * @return GroupElementConstant for use in Ergo contracts
-   */
-  def createOwnerKeyFromHex(hexPublicKey: String): GroupElementConstant = {
-    val publicKeyBytes = Base16.decode(hexPublicKey).get
-    val groupElement = GroupElementSerializer.fromBytes(publicKeyBytes)
-    GroupElementConstant(groupElement)
-  }
-
-  /**
-   * Example owner key using the specified public key
+   * Alice's public key derived from her Ergo address
+   * In production, this would come from the wallet, not a hardcoded secret
    */
   val exampleOwnerKey: GroupElementConstant = {
-    createOwnerKeyFromHex("025ffe0e1a282fc0249320946af4209eb2dd7f250c16946fdd615533092e054bca") // Alice
+    val alicePubKey = ParticipantKeys.alicePublicKey
+    GroupElementConstant(alicePubKey)
   }
 
   // Example values - these should be replaced with actual values
-  val exampleTrackerNftId = "dbfbbaf91a98c22204de3745e1986463620dcf3525ad566c6924cf9e976f86f8"
-  val exampleReserveTokenId = "c7510cba80a9b7113e53968f7ff42ad250be2808fef1d36b71a89b0d644178c2"
+  val exampleTrackerNftId = "8b1ab583bb085ecbd8fa9bc2fd59784afcdfce5496eb146bb3dd04664b56822a"
+  val exampleReserveTokenId = "006e552382033bc8a362435bab079705cde40bec63cd5f96450e6bd70dc81409"
 
   // Network configuration
   val networkType = NetworkType.MAINNET
@@ -46,8 +37,6 @@ object BasisDeployer extends App {
 
   // Basis contract configuration
   val basisContractScript = Constants.readContract("offchain/basis.es", Map.empty)
-
-  println("basis script: " + basisContractScript)
 
   val basisErgoTree = Constants.compile(basisContractScript)
   val basisAddress = Constants.getAddressFromErgoTree(basisErgoTree)
@@ -70,7 +59,7 @@ object BasisDeployer extends App {
     ownerPublicKey: GroupElementConstant,
     trackerNftId: String,
     reserveTokenId: String,
-    initialCollateral: Long = 1000000000L // 1 ERG
+    initialCollateral: Long = 100000000L // 0.1 ERG
   ): String = {
 
     // Encode registers
@@ -125,16 +114,21 @@ object BasisDeployer extends App {
   def printDeploymentInfo(): Unit = {
     println("=== Basis Reserve Contract Deployment Information ===")
     println()
-    
+
     println(s"Contract Address: ${basisAddress.toString}")
     println(s"Network: ${networkType.name}")
     println(s"Network Prefix: $networkPrefix")
     println()
-    
+
+    println("=== Alice's Key Information ===")
+    println(s"Alice Address: ${ParticipantKeys.aliceAddress}")
+    println(s"Alice Public Key (hex): ${ParticipantKeys.alicePublicKeyHex}")
+    println()
+
     println("Contract Script:")
     println(basisContractScript)
     println()
-    
+
     println("Deployment Instructions:")
     println("1. Issue a singleton NFT token for the reserve")
     println("2. Issue an NFT token for the tracker")
@@ -170,31 +164,10 @@ object BasisConstants {
   // Action codes for Basis contract
   val REDEEM_ACTION: Byte = 0
   val TOP_UP_ACTION: Byte = 1
-  
-  // Minimum top-up amount (1 ERG)
-  val MIN_TOP_UP_AMOUNT: Long = 1000000000L
-  
+
+  // Minimum top-up amount (0.1 ERG)
+  val MIN_TOP_UP_AMOUNT: Long = 100000000L
+
   // Emergency redemption time (3 days in blocks, assuming ~2.5 min per block)
   val EMERGENCY_REDEMPTION_TIME_IN_BLOCKS: Int = 3 * 720
-  
-  // Fee percentage for redemption (2%)
-  val REDEMPTION_FEE_PERCENTAGE: Int = 2
-  
-  /**
-   * Calculates redemption fee
-   * @param amount Amount to redeem
-   * @return Fee amount
-   */
-  def calculateRedemptionFee(amount: Long): Long = {
-    (amount * REDEMPTION_FEE_PERCENTAGE) / 100
-  }
-  
-  /**
-   * Calculates net redemption amount after fees
-   * @param amount Amount to redeem
-   * @return Net amount after fees
-   */
-  def calculateNetRedemption(amount: Long): Long = {
-    amount - calculateRedemptionFee(amount)
-  }
 }
