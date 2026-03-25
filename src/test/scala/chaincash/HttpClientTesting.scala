@@ -19,6 +19,11 @@ trait HttpClientTesting {
     FileUtil.read(new File(s"$responsesDir/explorer_responses/$name"))
   }
 
+  /** Load scan response for a given scanId */
+  def loadScanResponse(scanId: Int): String = {
+    loadNodeResponse(s"response_Scan$scanId.json")
+  }
+
   case class MockData(nodeResponses: Seq[String] = Nil, explorerResponses: Seq[String] = Nil) {
     def appendNodeResponses(moreResponses: Seq[String]): MockData = {
       this.copy(nodeResponses = this.nodeResponses ++ moreResponses)
@@ -34,6 +39,17 @@ trait HttpClientTesting {
 
   def createMockedErgoClient(data: MockData): FileMockedErgoClient = {
     val nodeResponses = IndexedSeq(loadNodeResponse("response_NodeInfo.json"), loadNodeResponse("response_LastHeaders.json")) ++ data.nodeResponses
+    val explorerResponses: IndexedSeq[String] = data.explorerResponses.toIndexedSeq
+    new FileMockedErgoClient(nodeResponses.convertTo[JList[JString]], explorerResponses.convertTo[JList[JString]])
+  }
+
+  /** Create mocked client with scan responses appended for scan endpoint queries */
+  def createMockedErgoClientWithScans(data: MockData, scanIds: Int*): FileMockedErgoClient = {
+    val scanResponses = scanIds.map(loadScanResponse)
+    val nodeResponses = IndexedSeq(
+      loadNodeResponse("response_NodeInfo.json"),
+      loadNodeResponse("response_LastHeaders.json")
+    ) ++ scanResponses ++ data.nodeResponses
     val explorerResponses: IndexedSeq[String] = data.explorerResponses.toIndexedSeq
     new FileMockedErgoClient(nodeResponses.convertTo[JList[JString]], explorerResponses.convertTo[JList[JString]])
   }

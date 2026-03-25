@@ -59,7 +59,7 @@ style: |
 
 ### P2P Money for the Digital World
 
-> **Local trust, global settlement**
+> **Local Trust, Global Settlement**
 
 ### Goals
 - Humans trading in **local communities** (possibly over mesh)
@@ -67,7 +67,7 @@ style: |
 - **Optional collateral** via blockchain when trust is insufficient
 
 ### Today's State
-- Lightning/Cashu require **100% collateral** → no credit
+- Lightning/Cashu require **100% collateral**, so no credit expansion
 - Blockchain fees too high for **micropayments**
 - No solutions for **occasionally-connected** areas
 
@@ -158,8 +158,7 @@ No on-chain redemption needed!
 ## Why Ergo?
 
 - **UTXO model**: perfect for off-chain interactions
-- **Smart contracts**: Expressive redemption logic
-- **Trust-minimized De-Fi Stack** to continue on-chain
+- **Smart contracts** and **Trust-minimized De-Fi Stack** to continue on-chain
 - **PoW security**
 
 ---
@@ -255,7 +254,6 @@ More users → More reserves → More ERG demand → Higher security
 - Reserve contract on Ergo
 - Tracker prototype
 - P2P payment flows tested
-- Emergency redemption tested
 
 ---
 
