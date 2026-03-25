@@ -42,6 +42,10 @@ object BasisNoteRedeemer extends App {
 
   val REDEEM_ACTION: Byte = 0
 
+  // Token IDs (must match deployed contract)
+  val basisReserveNftId = "4b2d8b7beb3eaac8234d9e61792d270898a43934d6a27275e4f3a044609c9f2a"
+  val trackerNftId = "8b1ab583bb085ecbd8fa9bc2fd59784afcdfce5496eb146bb3dd04664b56822a"
+
   // Plasma tree configuration (must match basis.es contract)
   val chainCashPlasmaParameters = PlasmaParameters(32, None)
   val InsertUpdate = AvlTreeFlags(insertAllowed = true, updateAllowed = true, removeAllowed = false)
@@ -179,11 +183,9 @@ object BasisNoteRedeemer extends App {
     trackerSecret: BigInt,
     trackerProof: String,
     redeemedAmount: Long,
-    receiverAddress: String,
-    feeAmount: Long = 1000000L
+    feeAmount: Long = 0L
   ): String = {
     // Create redemption message: key || totalDebt
-    // key = blake2b256(ownerKeyBytes ++ receiverBytes)
     val ownerKeyBytes = note.payerKey.getEncoded.toArray
     val receiverBytes = note.payeeKey.getEncoded.toArray
     val key = Blake2b256(ownerKeyBytes ++ receiverBytes)
@@ -200,7 +202,7 @@ object BasisNoteRedeemer extends App {
     val trackerSigEncoded = Base16.encode(trackerSigBytes)
 
     // Build context extension with proper SValue encoding
-    val contextVars = Seq(
+    val contextVars = Map(
       "0" -> Base16.encode(ValueSerializer.serialize(REDEEM_ACTION)),
       "1" -> encodeGroupElementValue(note.payeeKey),
       "2" -> encodeCollByteValue(Base16.decode(reserveSigEncoded).get),
@@ -209,19 +211,51 @@ object BasisNoteRedeemer extends App {
       "8" -> encodeCollByteValue(Base16.decode(trackerProof).get)
     )
 
-    val contextJson = contextVars.map { case (k, v) => s""""$k": "$v"""" }.mkString(",")
+    val reserveValue = 50000000L
+    val receiverValue = 50000000L
+    val creationHeight = 1748179
 
-    s"""{
-       |  "inputs": [{"boxId": "$reserveBoxId"}],
-       |  "dataInputs": [{"boxId": "$trackerBoxId"}],
-       |  "outputs": [{
-       |    "address": "$receiverAddress",
-       |    "value": ${redeemedAmount + 1000000L},
-       |    "registers": {}
+    // Get receiver's ergoTree from payeeKey (P2PK: 0008cd + pubkey)
+    val receiverErgoTree = s"0008cd${Base16.encode(note.payeeKey.getEncoded.toArray)}"
+
+    // Get basis ergoTree as hex string
+    val basisErgoTreeHex = Base16.encode(Constants.basisErgoTree.bytes)
+
+    val txJson = s"""{
+       |  "inputs": [{
+       |    "boxId": "$reserveBoxId",
+       |    "extension": ${mapToJson(contextVars)}
        |  }],
-       |  "fee": $feeAmount,
-       |  "contextExtension": {$contextJson}
+       |  "dataInputs": [{"boxId": "$trackerBoxId"}],
+       |  "outputs": [
+       |    {
+       |      "ergoTree": "$basisErgoTreeHex",
+       |      "creationHeight": $creationHeight,
+       |      "value": $reserveValue,
+       |      "assets": [{"tokenId": "$basisReserveNftId", "amount": 1}],
+       |      "additionalRegisters": {
+       |        "R4": "${encodeGroupElementValue(note.payerKey)}",
+       |        "R5": "${encodeCollByteValue(Base16.decode(trackerProof).get)}",
+       |        "R6": "0e20$trackerNftId"
+       |      }
+       |    },
+       |    {
+       |      "ergoTree": "$receiverErgoTree",
+       |      "creationHeight": $creationHeight,
+       |      "value": $receiverValue,
+       |      "assets": [],
+       |      "additionalRegisters": {}
+       |    }
+       |  ],
+       |  "fee": $feeAmount
        |}""".stripMargin
+
+    // Wrap in TransactionSigningRequest format (OpenAPI spec)
+    s"""{"tx": $txJson}"""
+  }
+
+  def mapToJson(m: Map[String, String]): String = {
+    m.map { case (k, v) => s""""$k": "$v"""" }.mkString("{", ",", "}")
   }
 
   def redeem(
@@ -261,16 +295,12 @@ object BasisNoteRedeemer extends App {
     println("Generating real AVL proof for tracker tree.")
     println()
 
-    val payeeKeyBytes = Base16.decode(noteJson.payeeKey).get
-    val payeeKey = GroupElementSerializer.fromBytes(payeeKeyBytes)
-    val receiverAddr = P2PKAddress(ProveDlog(payeeKey))(ergoAddressEncoder).toString
-
     // Generate real AVL proof from tracker tree with debt record
     val avlProof = generateTrackerAvlProof(noteJson.payerKey, noteJson.payeeKey, noteJson.totalDebt)
     println(s"Tracker AVL proof: ${avlProof.take(64)}...")
     println()
 
-    val txJson = buildTransaction(note, reserveBoxId, trackerBoxId, reserveOwnerSecret, trackerSecret, avlProof, noteJson.totalDebt, receiverAddr)
+    val txJson = buildTransaction(note, reserveBoxId, trackerBoxId, reserveOwnerSecret, trackerSecret, avlProof, noteJson.totalDebt)
 
     outputFile match {
       case Some(file) =>
