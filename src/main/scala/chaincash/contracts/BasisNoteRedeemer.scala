@@ -6,6 +6,7 @@ import io.circe.{Decoder, Json}
 import io.circe.generic.auto._
 import io.circe.parser._
 import io.circe.syntax._
+import org.bouncycastle.util.BigIntegers
 import org.ergoplatform.{ErgoAddressEncoder, P2PKAddress}
 import org.ergoplatform.appkit.NetworkType
 import scorex.crypto.encode.Base16
@@ -41,7 +42,7 @@ object BasisNoteRedeemer extends App {
   val REDEEM_ACTION: Byte = 0
 
   // Token IDs (must match deployed contract)
-  val basisReserveNftId = "4b2d8b7beb3eaac8234d9e61792d270898a43934d6a27275e4f3a044609c9f2a"
+  val basisReserveNftId = "21426942b8d30a7a293f04f44caa2febc536c33121f03f5259ad7be59015b972"
   val trackerNftId = "8b1ab583bb085ecbd8fa9bc2fd59784afcdfce5496eb146bb3dd04664b56822a"
 
   // Plasma tree configuration (must match basis.es contract and TrackerBoxSetup)
@@ -284,12 +285,16 @@ object BasisNoteRedeemer extends App {
 
     // Generate reserve owner's signature on redemption message
     val (reserveSigA, reserveSigZ) = SigUtils.sign(redemptionMessage, reserveOwnerSecret)
-    val reserveSigBytes = GroupElementSerializer.toBytes(reserveSigA) ++ reserveSigZ.toByteArray
+    // Use BouncyCastle to get exactly 32 bytes for z (no sign byte issues)
+    val reserveSigZBytes = BigIntegers.asUnsignedByteArray(32, reserveSigZ.bigInteger)
+    val reserveSigBytes = GroupElementSerializer.toBytes(reserveSigA) ++ reserveSigZBytes
     val reserveSigEncoded = Base16.encode(reserveSigBytes)
 
     // Generate tracker's signature on redemption message
     val (trackerSigA, trackerSigZ) = SigUtils.sign(redemptionMessage, trackerSecret)
-    val trackerSigBytes = GroupElementSerializer.toBytes(trackerSigA) ++ trackerSigZ.toByteArray
+    // Use BouncyCastle to get exactly 32 bytes for z (no sign byte issues)
+    val trackerSigZBytes = BigIntegers.asUnsignedByteArray(32, trackerSigZ.bigInteger)
+    val trackerSigBytes = GroupElementSerializer.toBytes(trackerSigA) ++ trackerSigZBytes
     val trackerSigEncoded = Base16.encode(trackerSigBytes)
 
     // Generate BOTH AVL proofs required by the contract:
