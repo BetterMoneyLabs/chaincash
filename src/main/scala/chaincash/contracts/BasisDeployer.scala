@@ -28,7 +28,7 @@ object BasisDeployer extends App {
 
   // Example values - these should be replaced with actual values
   val exampleTrackerNftId = "8b1ab583bb085ecbd8fa9bc2fd59784afcdfce5496eb146bb3dd04664b56822a"
-  val exampleReserveTokenId = "006e552382033bc8a362435bab079705cde40bec63cd5f96450e6bd70dc81409"
+  val exampleReserveTokenId = "21426942b8d30a7a293f04f44caa2febc536c33121f03f5259ad7be59015b972"
 
   // Network configuration
   val networkType = NetworkType.MAINNET
@@ -41,9 +41,9 @@ object BasisDeployer extends App {
   val basisErgoTree = Constants.compile(basisContractScript)
   val basisAddress = Constants.getAddressFromErgoTree(basisErgoTree)
 
-  val chainCashPlasmaParameters = PlasmaParameters(32, None)
-  val InsertUpdate = AvlTreeFlags(insertAllowed = true, updateAllowed = true, removeAllowed = false)
-  def emptyPlasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](InsertUpdate, chainCashPlasmaParameters)
+  // Use Constants.chainCashPlasmaParameters for consistency with BasisNoteRedeemer and TrackerBoxSetup
+  val InsertOnly = AvlTreeFlags(insertAllowed = true, updateAllowed = false, removeAllowed = false)
+  def emptyPlasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](InsertOnly, Constants.chainCashPlasmaParameters)
   val emptyTreeErgoValue: ErgoValue[AvlTree] = emptyPlasmaMap.ergoValue
   val emptyTree: AvlTree = emptyTreeErgoValue.getValue
 

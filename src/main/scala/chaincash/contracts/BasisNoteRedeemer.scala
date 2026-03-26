@@ -15,11 +15,9 @@ import sigmastate.basics.DLogProtocol.ProveDlog
 import sigmastate.eval._
 import sigmastate.serialization.{GroupElementSerializer, ValueSerializer}
 import sigmastate.Values.AvlTreeConstant
-import special.sigma.GroupElement
-import work.lithos.plasma.PlasmaParameters
-import work.lithos.plasma.collections.PlasmaMap
+import special.sigma.{AvlTree, GroupElement}
 import sigmastate.AvlTreeFlags
-
+import work.lithos.plasma.collections.PlasmaMap
 import scala.util.{Try, Success, Failure}
 import java.net.{URL, HttpURLConnection}
 
@@ -46,9 +44,38 @@ object BasisNoteRedeemer extends App {
   val basisReserveNftId = "4b2d8b7beb3eaac8234d9e61792d270898a43934d6a27275e4f3a044609c9f2a"
   val trackerNftId = "8b1ab583bb085ecbd8fa9bc2fd59784afcdfce5496eb146bb3dd04664b56822a"
 
-  // Plasma tree configuration (must match basis.es contract)
-  val chainCashPlasmaParameters = PlasmaParameters(32, None)
+  // Plasma tree configuration (must match basis.es contract and TrackerBoxSetup)
+  // Uses Constants.chainCashPlasmaParameters for consistency
   val InsertUpdate = AvlTreeFlags(insertAllowed = true, updateAllowed = true, removeAllowed = false)
+
+  /**
+   * Get current blockchain height from node API.
+   */
+  def getCurrentHeight(): Int = {
+    val urlStr = s"$nodeUrl/info"
+    val url = new URL(urlStr)
+    val conn = url.openConnection().asInstanceOf[HttpURLConnection]
+    try {
+      conn.setRequestMethod("GET")
+      conn.setRequestProperty("api_key", apiKey)
+      val responseCode = conn.getResponseCode
+      if (responseCode == 200) {
+        val source = scala.io.Source.fromInputStream(conn.getInputStream)
+        try {
+          val jsonStr = source.mkString
+          parse(jsonStr) match {
+            case Right(json) =>
+              json.hcursor.downField("fullHeight").as[Int].toOption.getOrElse(1750221)
+            case Left(_) => 1750221
+          }
+        } finally {
+          source.close()
+        }
+      } else 1750221
+    } finally {
+      conn.disconnect()
+    }
+  }
 
   case class SignatureJson(
     a: String,
@@ -137,26 +164,58 @@ object BasisNoteRedeemer extends App {
   /**
    * Generates a real AVL proof for tracker tree lookup.
    * For first redemption (empty tree), creates a tree with the debt record and generates proof.
+   *
+   * Note: Uses InsertOnly flags and Constants.chainCashPlasmaParameters to match
+   * the tracker box creation (TrackerBoxSetup).
    */
   def generateTrackerAvlProof(payerKey: String, payeeKey: String, totalDebt: Long): String = {
-    // Create empty PlasmaMap
-    val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](InsertUpdate, chainCashPlasmaParameters)
-    
+    // Create PlasmaMap with InsertOnly flags and correct parameters (must match tracker box)
+    val InsertOnly = AvlTreeFlags(insertAllowed = true, updateAllowed = false, removeAllowed = false)
+    val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](InsertOnly, Constants.chainCashPlasmaParameters)
+
     // Create the key: hash(payerKey || payeeKey)
     val key = Blake2b256(
       Base16.decode(payerKey).get ++
       Base16.decode(payeeKey).get
     )
-    
+
     // Insert the debt record into the tree (updates map in place)
     plasmaMap.insert((key, Longs.toByteArray(totalDebt)))
     plasmaMap.prover.generateProof()
-    
+
     // Generate proof for the key lookup
     val lookupProof = plasmaMap.lookUp(key).proof.bytes
-    
+
     // Encode proof as hex string
     Base16.encode(lookupProof)
+  }
+
+  /**
+   * Generates a real AVL proof for inserting redeemed amount into reserve tree.
+   * For first redemption, creates a tree from scratch and generates insert proof.
+   *
+   * Note: Uses InsertOnly flags and Constants.chainCashPlasmaParameters to match
+   * the reserve box creation (BasisDeployer).
+   */
+  def generateReserveInsertProof(payerKey: String, payeeKey: String, redeemedAmount: Long): (Array[Byte], AvlTree) = {
+    // Create PlasmaMap with InsertOnly flags and correct parameters (must match reserve box)
+    val InsertOnly = AvlTreeFlags(insertAllowed = true, updateAllowed = false, removeAllowed = false)
+    val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](InsertOnly, Constants.chainCashPlasmaParameters)
+
+    // Create the key: hash(payerKey || payeeKey)
+    val key = Blake2b256(
+      Base16.decode(payerKey).get ++
+      Base16.decode(payeeKey).get
+    )
+
+    // Insert the redeemed amount into the tree
+    val insertResult = plasmaMap.insert((key, Longs.toByteArray(redeemedAmount)))
+
+    // Get the insert proof and updated tree
+    val insertProof = insertResult.proof.bytes
+    val updatedTree = plasmaMap.ergoValue.getValue()
+
+    (insertProof, updatedTree)
   }
 
   def encodeByteValue(b: Byte): String = {
@@ -173,6 +232,38 @@ object BasisNoteRedeemer extends App {
 
   def encodeLongValue(l: Long): String = {
     Base16.encode(ValueSerializer.serialize(l))
+  }
+
+  /**
+   * Fetch reserve box and extract its AVL tree (R5 register).
+   */
+  def fetchReserveTree(reserveBoxId: String): Option[AvlTree] = {
+    val urlStr = s"$nodeUrl/utxo/byId/$reserveBoxId"
+    val url = new URL(urlStr)
+    val conn = url.openConnection().asInstanceOf[HttpURLConnection]
+    try {
+      conn.setRequestMethod("GET")
+      val responseCode = conn.getResponseCode
+      if (responseCode == 200) {
+        val source = scala.io.Source.fromInputStream(conn.getInputStream)
+        try {
+          val jsonStr = source.mkString
+          parse(jsonStr) match {
+            case Right(json) =>
+              json.hcursor.downField("additionalRegisters").downField("R5").as[String].toOption.flatMap { r5Hex =>
+                val bytes = Base16.decode(r5Hex).get
+                val avlTreeConstant = ValueSerializer.deserialize(bytes).asInstanceOf[AvlTreeConstant]
+                Some(avlTreeConstant.value)
+              }
+            case Left(_) => None
+          }
+        } finally {
+          source.close()
+        }
+      } else None
+    } finally {
+      conn.disconnect()
+    }
   }
 
   def buildTransaction(
@@ -201,19 +292,31 @@ object BasisNoteRedeemer extends App {
     val trackerSigBytes = GroupElementSerializer.toBytes(trackerSigA) ++ trackerSigZ.toByteArray
     val trackerSigEncoded = Base16.encode(trackerSigBytes)
 
-    // Build context extension with proper SValue encoding
+    // Generate BOTH AVL proofs required by the contract:
+    // 1. Reserve insert proof (context var 5) - for inserting redeemed amount into reserve tree
+    // 2. Tracker lookup proof (context var 8) - for looking up debt in tracker tree (already provided)
+    val payerKeyHex = Base16.encode(note.payerKey.getEncoded.toArray)
+    val payeeKeyHex = Base16.encode(note.payeeKey.getEncoded.toArray)
+    val (reserveInsertProof, updatedReserveTree) = generateReserveInsertProof(
+      payerKeyHex, payeeKeyHex, redeemedAmount
+    )
+    val reserveInsertProofEncoded = encodeCollByteValue(reserveInsertProof)
+    val updatedReserveTreeEncoded = Base16.encode(ValueSerializer.serialize(AvlTreeConstant(updatedReserveTree)))
+
+    // Build context extension with BOTH AVL proofs
     val contextVars = Map(
       "0" -> Base16.encode(ValueSerializer.serialize(REDEEM_ACTION)),
       "1" -> encodeGroupElementValue(note.payeeKey),
       "2" -> encodeCollByteValue(Base16.decode(reserveSigEncoded).get),
       "3" -> encodeLongValue(note.totalDebt),
+      "5" -> reserveInsertProofEncoded,  // NEW: Reserve insert proof
       "6" -> encodeCollByteValue(Base16.decode(trackerSigEncoded).get),
       "8" -> encodeCollByteValue(Base16.decode(trackerProof).get)
     )
 
     val reserveValue = 50000000L
     val receiverValue = 50000000L
-    val creationHeight = 1748179
+    val creationHeight = getCurrentHeight()
 
     // Get receiver's ergoTree from payeeKey (P2PK: 0008cd + pubkey)
     val receiverErgoTree = s"0008cd${Base16.encode(note.payeeKey.getEncoded.toArray)}"
@@ -235,7 +338,7 @@ object BasisNoteRedeemer extends App {
        |      "assets": [{"tokenId": "$basisReserveNftId", "amount": 1}],
        |      "additionalRegisters": {
        |        "R4": "${encodeGroupElementValue(note.payerKey)}",
-       |        "R5": "${encodeCollByteValue(Base16.decode(trackerProof).get)}",
+       |        "R5": "$updatedReserveTreeEncoded",
        |        "R6": "0e20$trackerNftId"
        |      }
        |    },
@@ -440,15 +543,15 @@ object BasisNoteRedeemer extends App {
   }
 
   def fetchReserveAndTrackerBoxes(reserveBoxId: Option[String], trackerBoxId: Option[String]): Either[String, (String, String)] = {
-    // Fetch reserve box (scanId=35)
+    // Fetch reserve box (scanId=38)
     val actualReserveBoxId = reserveBoxId match {
       case Some("auto") | None =>
-        Console.err.println("Fetching reserve box (scanId=35)...")
-        fetchUnspentBoxes(35) match {
+        Console.err.println("Fetching reserve box (scanId=38)...")
+        fetchUnspentBoxes(38) match {
           case Some(id) =>
             Console.err.println(s"  Found reserve box: $id")
             id
-          case None => return Left("Reserve box not found. Make sure the reserve is created and scanned with scanId=35")
+          case None => return Left("Reserve box not found. Make sure the reserve is created and scanned with scanId=38")
         }
       case Some(id) => id
     }
