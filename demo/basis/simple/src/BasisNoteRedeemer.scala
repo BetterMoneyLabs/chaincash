@@ -275,7 +275,8 @@ object BasisNoteRedeemer extends App {
     trackerSecret: BigInt,
     trackerProof: String,
     redeemedAmount: Long,
-    feeAmount: Long = 0L
+    feeAmount: Long = 1000000L,
+    feeBoxIds: Option[Seq[String]] = None  // List of box IDs to cover fee
   ): String = {
     // Create redemption message: key || totalDebt
     val ownerKeyBytes = note.payerKey.getEncoded.toArray
@@ -329,11 +330,42 @@ object BasisNoteRedeemer extends App {
     // Get basis ergoTree as hex string
     val basisErgoTreeHex = Base16.encode(Constants.basisErgoTree.bytes)
 
+    // Fee recipient (from user request)
+    val feeRecipientErgoTree = "1005040004000e36100204a00b08cd0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ea02d192a39a8cc7a701730073011001020402d19683030193a38cc7b2a57300000193c2b2a57301007473027303830108cdeeac93b1a57304"
+
+    // Build fee inputs if provided
+    val feeInputsJson = feeBoxIds match {
+      case Some(boxIds) =>
+        // Fee inputs need empty extension to be valid for signing
+        boxIds.map(boxId => s""",{"boxId": "$boxId", "extension": {}}""").mkString
+      case None => ""
+    }
+
+    // Calculate fee output: total input value - outputs
+    // Reserve box: 100000000, Fee boxes: 4 * 250000 = 1000000
+    // Total input: 101000000
+    // Outputs: 50000000 + 50000000 = 100000000
+    // Fee (to recipient): 101000000 - 100000000 = 1000000
+    val totalInputValue = reserveValue * 2 + feeAmount  // 100000000 + 1000000
+    val totalOutputValue = reserveValue + receiverValue  // 50000000 + 50000000
+    val feeOutputValue = totalInputValue - totalOutputValue  // 1000000 nanoERG (goes to fee recipient)
+
+    val feeOutputJson = if (feeOutputValue > 0) {
+      s""",
+    {
+      "ergoTree": "$feeRecipientErgoTree",
+      "creationHeight": $creationHeight,
+      "value": $feeOutputValue,
+      "assets": [],
+      "additionalRegisters": {}
+    }"""
+    } else ""
+
     val txJson = s"""{
        |  "inputs": [{
        |    "boxId": "$reserveBoxId",
        |    "extension": ${mapToJson(contextVars)}
-       |  }],
+       |  }$feeInputsJson],
        |  "dataInputs": [{"boxId": "$trackerBoxId"}],
        |  "outputs": [
        |    {
@@ -353,9 +385,8 @@ object BasisNoteRedeemer extends App {
        |      "value": $receiverValue,
        |      "assets": [],
        |      "additionalRegisters": {}
-       |    }
-       |  ],
-       |  "fee": $feeAmount
+       |    }$feeOutputJson
+       |  ]
        |}""".stripMargin
 
     // Wrap in TransactionSigningRequest format (OpenAPI spec)
@@ -372,7 +403,8 @@ object BasisNoteRedeemer extends App {
     trackerBoxId: String,
     outputFile: Option[String],
     reserveOwnerSecret: BigInt,
-    trackerSecret: BigInt
+    trackerSecret: BigInt,
+    feeBoxIds: Option[Seq[String]] = None
   ): Unit = {
     println("=== Basis Note Redeemer (Normal Redemption) ===")
     println()
@@ -408,7 +440,7 @@ object BasisNoteRedeemer extends App {
     println(s"Tracker AVL proof: ${avlProof.take(64)}...")
     println()
 
-    val txJson = buildTransaction(note, reserveBoxId, trackerBoxId, reserveOwnerSecret, trackerSecret, avlProof, noteJson.totalDebt)
+    val txJson = buildTransaction(note, reserveBoxId, trackerBoxId, reserveOwnerSecret, trackerSecret, avlProof, noteJson.totalDebt, feeAmount = 1000000L, feeBoxIds = feeBoxIds)
 
     outputFile match {
       case Some(file) =>
@@ -448,6 +480,7 @@ object BasisNoteRedeemer extends App {
     println("  --output <file>          Save transaction to file (default: stdout)")
     println("  --reserve-owner-secret   Reserve owner's secret key (default: from ParticipantKeys)")
     println("  --tracker-secret         Tracker's secret key (default: from ParticipantKeys)")
+    println("  --fee-box <ids>          Comma-separated list of box IDs to cover fee (4x 250000 nanoERG)")
     println("  --help, -h               Show this help")
     println()
     println("Examples:")
@@ -469,6 +502,7 @@ object BasisNoteRedeemer extends App {
     outputFile: Option[String] = None,
     reserveOwnerSecret: Option[String] = None,
     trackerSecret: Option[String] = None,
+    feeBoxIds: Option[String] = None,  // Comma-separated list of box IDs for fee
     help: Boolean = false
   )
 
@@ -507,6 +541,11 @@ object BasisNoteRedeemer extends App {
             result = result.copy(trackerSecret = Some(args(i + 1)))
             i += 1
           } else return Left("Missing value for --tracker-secret")
+        case "--fee-box" =>
+          if (i + 1 < args.length) {
+            result = result.copy(feeBoxIds = Some(args(i + 1)))
+            i += 1
+          } else return Left("Missing value for --fee-box")
         case "--help" | "-h" =>
           result = result.copy(help = true)
         case arg =>
@@ -613,9 +652,15 @@ object BasisNoteRedeemer extends App {
               case None => ParticipantKeys.trackerSecret // default: use tracker secret from ParticipantKeys
             }
 
+            // Parse fee box IDs if provided
+            val feeBoxIdsOpt = cli.feeBoxIds match {
+              case Some(csv) => Some(csv.split(",").map(_.trim).toSeq)
+              case None => None
+            }
+
             Try {
               val noteJson = parseNoteJson(cli.noteJsonFile.get)
-              redeem(noteJson, reserveBoxId, trackerBoxId, cli.outputFile, reserveOwnerSecret, trackerSecret)
+              redeem(noteJson, reserveBoxId, trackerBoxId, cli.outputFile, reserveOwnerSecret, trackerSecret, feeBoxIdsOpt)
             } match {
               case Success(_) =>
               case Failure(e) =>

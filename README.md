@@ -37,15 +37,31 @@ without prior interaction.
 
 ## Whitepaper And Other Materials
 
-High-level description of ChainCash protocol and its implementation can be found 
-in the [whitepaper](https://github.com/ChainCashLabs/chaincash/blob/master/docs/conf/conf.pdf). 
+High-level description of ChainCash protocol and its implementation can be found
+in the [whitepaper](https://github.com/ChainCashLabs/chaincash/blob/master/docs/conf/conf.pdf).
 
-More introductory materials: 
+More introductory materials:
 
 * [Video presentation from 1st Stability Workshop](https://youtu.be/gTwKxizAXZQ)
 * [The World Needs For More Collateral](https://www.ergoforum.org/t/the-world-needs-for-more-collateral/4451) - forum thread
 * [Video presentation from Ergo Summit](https://www.youtube.com/watch?v=NxIlIpO6ZVI)
 * [Video: ChainCash, part two](https://www.youtube.com/watch?v=fk8ZFvNFDYc)
+
+## Basis Demo
+
+A simple demonstration of the Basis reserve protocol is available in `demo/basis/simple/`:
+
+```bash
+cd demo/basis/simple
+
+# Generate redemption transaction
+sbt "runMain chaincash.contracts.BasisNoteRedeemer --note-json note.json --reserve-box auto --tracker-box auto --fee-box <box1>,<box2>,<box3>,<box4> --output sign_request.json"
+
+# Sign with Ergo node
+curl -X POST "http://localhost:9053/wallet/transaction/sign" -H "api_key: hello" -d @sign_request.json
+```
+
+See `demo/basis/simple/README.md` for detailed instructions.
 
 ## ChainCash Server
 

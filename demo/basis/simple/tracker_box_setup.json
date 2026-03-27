@@ -1,0 +1,16 @@
+[
+  {
+    "address": "9f7ZXamnfaDZL7EWLKLuBZgWMuHCusQYK6yow2d7p2eES9oRRRe",
+    "value": 10000000,
+    "assets": [
+      {
+        "tokenId": "8b1ab583bb085ecbd8fa9bc2fd59784afcdfce5496eb146bb3dd04664b56822a",
+        "amount": 1
+      }
+    ],
+    "registers": {
+      "R4": "07024e564477ff457c601c01ad1cc31903f8b27b7d5e515bd03138891d8152d787b2",
+      "R5": "642c1d1fb21a9df51972a5439ca7ce8d5601f99c871f15cbf2c4ff6ae53d57a96f01012000"
+    }
+  }
+]
