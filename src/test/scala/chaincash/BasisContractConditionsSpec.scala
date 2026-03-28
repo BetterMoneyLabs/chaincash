@@ -160,6 +160,17 @@ class BasisContractConditionsSpec extends PropSpec with Matchers with ScalaCheck
   // For tests requiring receiver signature, we need receiver's secret (not available in sign_request.json)
   // We use a mock secret for testing, but note that real transactions need actual receiver signature
 
+  // Generate fresh tracker signature for the properlyRedeemed test
+  // The signature in sign_request.json was created with a different tracker key
+  // We need to generate one that matches our mock tracker box
+  val trackerSecret = SigUtils.randBigInt
+  val trackerPkFromSecret = Constants.g.exp(trackerSecret.bigInteger)
+  
+  // Create redemption message: key || totalDebt
+  val redemptionMessage = debtKey ++ Longs.toByteArray(totalDebt)
+  val (trackerSigA, trackerSigZ) = SigUtils.sign(redemptionMessage, trackerSecret)
+  val freshTrackerSigBytes = sigmastate.serialization.GroupElementSerializer.toBytes(trackerSigA) ++ trackerSigZ.toByteArray
+
   // Change address for transaction building (use a mock key we have the secret for)
   val mockReceiverSecret = SigUtils.randBigInt
   val mockReceiverPk = Constants.g.exp(mockReceiverSecret.bigInteger)
@@ -600,12 +611,42 @@ class BasisContractConditionsSpec extends PropSpec with Matchers with ScalaCheck
   }
 
   property("CONDITION 6: properlyRedeemed - should pass with valid redemption and tracker signature") {
-    // Note: This test uses actual signatures from sign_request.json.
-    // The tracker signature verification may fail due to a mismatch between
-    // how BasisNoteCreator generates signatures and how basis.es verifies them.
-    // The contract includes trackerPubKey in the signature hash, but BasisNoteCreator
-    // signs without it. This is a known issue that needs to be fixed in BasisNoteCreator.
-    pending
+    // This test verifies the properlyRedeemed condition with valid tracker signature
+    // The tracker signature authorizes the redemption amount reduction
+    // We generate a fresh tracker signature that matches our mock tracker key
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
+      // Create tracker data input with the matching tracker public key
+      val trackerDataInput = mkTrackerDataInput(trackerTreeWithKey, trackerPkFromSecret)
+
+      val basisInput = ctx.newTxBuilder().outBoxBuilder
+        .value(inputValue)
+        .tokens(new ErgoToken(basisTokenId, 1))
+        .registers(ErgoValue.of(ownerPk), emptyReserveTree, ErgoValue.of(trackerNFTBytes))
+        .contract(ctx.compileContract(ConstantsBuilder.empty(), conditionScript("properlyRedeemed")))
+        .build()
+        .convertToInputWith(reserveBoxId, fakeIndex)
+        .withContextVars(
+          new ContextVar(0, ErgoValue.of(0x00.toByte)), // action=0
+          new ContextVar(1, ErgoValue.of(receiverPk)),
+          new ContextVar(2, ErgoValue.of(reserveSigBytes)),
+          new ContextVar(3, ErgoValue.of(totalDebt)),
+          new ContextVar(5, ErgoValue.of(reserveInsertProofBytes)),
+          new ContextVar(6, ErgoValue.of(freshTrackerSigBytes)), // Use fresh tracker signature
+          new ContextVar(8, ErgoValue.of(trackerLookupProofBytes))
+        )
+
+      val basisOutput = createOut(
+        conditionScript("properlyRedeemed"), outputValue,
+        Array(ErgoValue.of(ownerPk), emptyReserveTree, ErgoValue.of(trackerNFTBytes)),
+        Array(new ErgoToken(basisTokenId, 1))
+      )
+      val redemptionOutput = createOut("{sigmaProp(true)}", redeemAmount, Array(), Array())
+
+      noException should be thrownBy {
+        createTx(Array(basisInput), Array(trackerDataInput), Array(basisOutput, redemptionOutput),
+          fee = None, changeAddress, Array(mockReceiverSecret.toString()), broadcast = false)
+      }
+    }
   }
 
   property("CONDITION 7: receiverCondition - should pass with receiver signature") {
