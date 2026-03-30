@@ -138,12 +138,13 @@
     //   Once there is even super-slow Internet connection, tracker can send them with getting lean confirmations
     //   via NiPoPoWs ( similarly to https://www.ergoforum.org/t/e-mail-client-for-limited-or-blocked-internet/134 )
 
-    // Possible extensions:
-
     // Data:
     //  - R4 - signing key (as a group element)
-    //  - R5 - AVL tree tracking cumulative redeemed debt per (owner, receiver) pair
-    //         stores: hash(ownerKey || receiverKey) -> cumulativeRedeemedAmount
+    //  - R5 - AVL tree tracking redeemed debt and timestamp per (owner, receiver) pair
+    //         stores: hash(ownerKey || receiverKey) -> (timestamp, cumulativeRedeemedAmount)
+    //         where timestamp is the latest payment timestamp (Long, 8 bytes big-endian)
+    //         and cumulativeRedeemedAmount is the total amount redeemed (Long, 8 bytes big-endian)
+    //         Value format: timestamp (8 bytes) ++ redeemedAmount (8 bytes) = 16 bytes total
     //  - R6 - NFT id of tracker server (bytes) // todo: support multiple payment servers by using a tree
     //
     // Actions:
@@ -158,6 +159,17 @@
     //         is attesting to a debt amount that is actually recorded in its state.
     //         During redemption, context var #8 provides the AVL proof for looking up
     //         hash(ownerKey || receiverKey) in this tree to verify totalDebt.
+
+    // Context extension variables for redemption:
+    // #1 - receiver pubkey (as a GroupElement)
+    // #2 - reserve owner's signature bytes (Schnorr signature on key || totalDebt || timestamp)
+    // #3 - current total debt amount (Long)
+    // #4 - timestamp of the payment (Long, milliseconds since Unix epoch)
+    // #5 - proof for insertion into reserve's AVL tree (Coll[Byte])
+    // #6 - tracker's signature bytes (Schnorr signature on key || totalDebt || timestamp)
+    // #7 - [OPTIONAL] proof for AVL tree lookup in reserve's tree for hash(ownerKey||receiverKey) -> (timestamp, redeemedDebt)
+    //      Not needed for first redemption (when redeemedDebt = 0)
+    // #8 - proof for AVL tree lookup in tracker's tree for hash(ownerKey||receiverKey) -> totalDebt (required)
 
     // action and reserve output index. By passing them instead of hard-coding, we allow for multiple notes to be
     // redeemed at once, which can be used for atomic mutual debt clearing etc
@@ -179,11 +191,12 @@
       // redemption path
       // context extension variables used:
       // #1 - receiver pubkey (as a GroupElement)
-      // #2 - reserve owner's signature bytes for the debt record (Schnorr signature on key || totalDebt)
+      // #2 - reserve owner's signature bytes for the debt record (Schnorr signature on key || totalDebt || timestamp)
       // #3 - current total debt amount (Long)
+      // #4 - timestamp of the payment (Long, milliseconds since Unix epoch)
       // #5 - proof for insertion into reserve's AVL tree (Coll[Byte])
-      // #6 - tracker's signature bytes (Schnorr signature on key || totalDebt or key || totalDebt || 0L for emergency)
-      // #7 - [OPTIONAL] proof for AVL tree lookup in reserve's tree for hash(ownerKey||receiverKey) -> redeemedDebt
+      // #6 - tracker's signature bytes (Schnorr signature on key || totalDebt || timestamp)
+      // #7 - [OPTIONAL] proof for AVL tree lookup in reserve's tree for hash(ownerKey||receiverKey) -> (timestamp, redeemedDebt)
       //      Not needed for first redemption (when redeemedDebt = 0)
       // #8 - proof for AVL tree lookup in tracker's tree for hash(ownerKey||receiverKey) -> totalDebt (required)
 
@@ -209,11 +222,12 @@
       // Create key for debt record: hash(ownerKey || receiverKey)
       // This key is used in both:
       // - tracker's AVL tree (R5) for totalDebt lookup
-      // - reserve's AVL tree (R5) for cumulative redeemed amount lookup
+      // - reserve's AVL tree (R5) for (timestamp, cumulative redeemed amount) lookup
       val key = blake2b256(ownerKeyBytes ++ receiverBytes)
 
-      // Total debt amount from context variables
+      // Total debt amount and timestamp from context variables
       val totalDebt = getVar[Long](3).get
+      val timestamp = getVar[Long](4).get
 
       // Verify totalDebt is committed in tracker's AVL tree using context variable #8
       // This ensures the tracker is attesting to a debt amount that exists in its on-chain commitment
@@ -225,13 +239,25 @@
       // Reserve owner's signature for the debt record
       val reserveSigBytes = getVar[Coll[Byte]](2).get
 
+      // Lookup previous redemption state (timestamp and redeemed amount)
+      // Value format: timestamp (8 bytes) ++ redeemedAmount (8 bytes) = 16 bytes
       val lookupProofOpt = getVar[Coll[Byte]](7)
-      val redeemedDebt = if (lookupProofOpt.isDefined) {
-        val redeemedDebtBytes = SELF.R5[AvlTree].get.get(key, lookupProofOpt.get).get
-        byteArrayToLong(redeemedDebtBytes)
+      val storedTimestamp = if (lookupProofOpt.isDefined) {
+        val valueBytes = SELF.R5[AvlTree].get.get(key, lookupProofOpt.get).get
+        byteArrayToLong(valueBytes.slice(0, 8))
       } else {
         0L
       }
+      val redeemedDebt = if (lookupProofOpt.isDefined) {
+        val valueBytes = SELF.R5[AvlTree].get.get(key, lookupProofOpt.get).get
+        byteArrayToLong(valueBytes.slice(8, 16))
+      } else {
+        0L
+      }
+
+      // Verify that the new timestamp is greater than the stored timestamp
+      // This prevents replay attacks with old notes
+      val timestampCorrect = timestamp > storedTimestamp
 
       // Check if enough time has passed for emergency redemption (without tracker signature)
       // NOTE: All debts associated with this tracker (both new and old) become eligible
@@ -239,11 +265,12 @@
       val trackerUpdateTime = tracker.creationInfo._1
       val enoughTimeSpent = (HEIGHT - trackerUpdateTime) > 3 * 720 // 3 days passed
 
-      // Message to verify signatures: key || total debt, in case of emergency exit key || total debt || 0
+      // Message to verify signatures: key || total debt || timestamp
+      // In case of emergency exit: key || total debt || timestamp || 0L
       val message = if (enoughTimeSpent) {
-         key ++ longToByteArray(totalDebt) ++ longToByteArray(0L)
+         key ++ longToByteArray(totalDebt) ++ longToByteArray(timestamp) ++ longToByteArray(0L)
       } else {
-         key ++ longToByteArray(totalDebt)
+         key ++ longToByteArray(totalDebt) ++ longToByteArray(timestamp)
       }
 
       // Tracker's signature authorizing the redemption
@@ -280,9 +307,11 @@
       // Verify reserve owner Schnorr signature: g^z = a * x^e
       val properReserveSignature = (g.exp(reserveZ) == reserveA.multiply(ownerKey.exp(reserveEInt)))
 
+      // Update the AVL tree with new timestamp and cumulative redeemed amount
+      // Value format: timestamp (8 bytes) ++ newRedeemedAmount (8 bytes) = 16 bytes
       val newRedeemed = redeemedDebt + redeemed
-      val treeValue = longToByteArray(newRedeemed)
-      val redeemedKeyVal = (key, treeValue)  // key -> redeemed debt value
+      val treeValue = longToByteArray(timestamp) ++ longToByteArray(newRedeemed)
+      val redeemedKeyVal = (key, treeValue)  // key -> (timestamp, redeemed debt value)
       val insertProof = getVar[Coll[Byte]](5).get // Merkle proof for tree insertion
       val nextTree: AvlTree = SELF.R5[AvlTree].get.insert(Coll(redeemedKeyVal), insertProof).get // todo: insertOrUpdate after appkit update
       // Verify tree was properly updated in output
@@ -295,6 +324,7 @@
       sigmaProp(selfPreserved &&
                 trackerIdCorrect &&
                 trackerDebtCorrect &&
+                timestampCorrect &&
                 properRedemptionTree &&
                 properReserveSignature &&
                 properlyRedeemed &&

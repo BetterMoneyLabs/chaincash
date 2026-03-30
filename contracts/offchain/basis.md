@@ -37,16 +37,18 @@ Anyone (presumably, owner in most cases) can top the reserve up.
   is starting censoring notes associated with a public key, by not including them into on-chain update, it is still
   possible to redeem them. There could be different improvements to the tracker design, see "Future Extensions" section.
 * IOU note from A to B is represented as (B_pubkey, amount, timestamp, sig_A) record, where amount is the **total** amount of
- A's debt before B, timestamp is timestamp of latest payment from A to B, and sig_A is a signature for (B_pubkey, amount, 
- nonce). Only one updateable note is stored by a tracker, and redeemable onchain. Thus a tracker is storing 
- (amount, timestamp) pairs for all A->B debt relationships. The tracker commits on-chain to the data by storing a digest 
- of a tree where hash(A ++ B) acts as a key, and (amount, timestamp) acts as a value. 
- 
-* If A has on-chain reserve, B may redeem offchain from A->B note, by providing proof of (amount, timestamp). Reserve
- contract UTXO is storing tree of hash(AB) -> timestamp pairs. It is impossible to withdraw a note with timestamp <= 
-redeemed again. After on-chain redemption, A and B should contact offchain to deduct before next payment from A to B done. 
-A note may be redeemed only one week after creation (timestamp of last block is one week ahead of timestamp in the note,
- at least), thus for services it makes sense to have a lot of rotating keys.
+ A's debt before B, timestamp is the timestamp of latest payment from A to B (in milliseconds since Unix epoch),
+ and sig_A is a signature for (B_pubkey, amount, timestamp). Only one updateable note is stored by a tracker,
+ and redeemable onchain. Thus a tracker is storing (amount, timestamp) pairs for all A->B debt relationships.
+ The tracker commits on-chain to the data by storing a digest of a tree where hash(A ++ B) acts as a key,
+ and (amount, timestamp) acts as a value.
+
+* If A has on-chain reserve, B may redeem offchain from A->B note, by providing proof of (amount, timestamp).
+ Reserve contract UTXO is storing tree of hash(ownerKey||receiverKey) -> (timestamp, cumulativeRedeemedAmount) pairs.
+ The value format is: timestamp (8 bytes big-endian) ++ cumulativeRedeemedAmount (8 bytes big-endian) = 16 bytes total.
+ During redemption, the contract verifies that the note's timestamp is **greater than** the stored timestamp,
+ which prevents replay attacks with old notes. After on-chain redemption, A and B should contact offchain tracker
+ to update their records before next payment from A to B is done.
 
 ## Basis Contract
 

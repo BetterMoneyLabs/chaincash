@@ -88,12 +88,28 @@ object BasisNoteRedeemer extends App {
     payeeKey: String,
     totalDebt: Long,
     totalDebtERG: Double,
+    timestamp: Option[Long],
     payerSignature: Option[SignatureJson],
     trackerSignature: Option[SignatureJson],
     signature: Option[SignatureJson], // legacy field for backward compatibility
     message: String,
+    messageFormat: Option[String],
     noteKey: String
   ) {
+    // Get timestamp from note or message (for backward compatibility)
+    def getTimestamp: Long = {
+      timestamp.getOrElse {
+        // Extract timestamp from message if not provided directly
+        // Message format: key (32 bytes) || totalDebt (8 bytes) || timestamp (8 bytes)
+        val messageBytes = Base16.decode(message).get
+        if (messageBytes.length >= 48) {
+          Longs.fromByteArray(messageBytes.slice(40, 48))
+        } else {
+          System.currentTimeMillis() // Fallback to current time
+        }
+      }
+    }
+
     // Get tracker signature (prioritize new field, fallback to legacy)
     def getTrackerSignature: SignatureJson = {
       trackerSignature.orElse(payerSignature).getOrElse {
@@ -113,6 +129,7 @@ object BasisNoteRedeemer extends App {
     payerKey: GroupElement,
     payeeKey: GroupElement,
     totalDebt: Long,
+    timestamp: Long,
     payerSignatureA: GroupElement,
     payerSignatureZ: BigInt,
     trackerSignatureA: GroupElement,
@@ -145,10 +162,12 @@ object BasisNoteRedeemer extends App {
   def noteFromJson(noteJson: NoteJson): IOUNote = {
     val payerSig = noteJson.getPayerSignature
     val trackerSig = noteJson.getTrackerSignature
+    val timestamp = noteJson.getTimestamp
     IOUNote(
       payerKey = GroupElementSerializer.fromBytes(Base16.decode(noteJson.payerKey).get),
       payeeKey = GroupElementSerializer.fromBytes(Base16.decode(noteJson.payeeKey).get),
       totalDebt = noteJson.totalDebt,
+      timestamp = timestamp,
       payerSignatureA = GroupElementSerializer.fromBytes(Base16.decode(payerSig.a).get),
       payerSignatureZ = BigInt(payerSig.z, 16),
       trackerSignatureA = GroupElementSerializer.fromBytes(Base16.decode(trackerSig.a).get),
@@ -197,8 +216,9 @@ object BasisNoteRedeemer extends App {
    *
    * Note: Uses InsertOnly flags and Constants.chainCashPlasmaParameters to match
    * the reserve box creation (BasisDeployer).
+   * Tree value format: timestamp (8 bytes) ++ redeemedAmount (8 bytes) = 16 bytes
    */
-  def generateReserveInsertProof(payerKey: String, payeeKey: String, redeemedAmount: Long): (Array[Byte], AvlTree) = {
+  def generateReserveInsertProof(payerKey: String, payeeKey: String, timestamp: Long, redeemedAmount: Long): (Array[Byte], AvlTree) = {
     // Create PlasmaMap with InsertOnly flags and correct parameters (must match reserve box)
     val InsertOnly = AvlTreeFlags(insertAllowed = true, updateAllowed = false, removeAllowed = false)
     val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](InsertOnly, Constants.chainCashPlasmaParameters)
@@ -209,8 +229,11 @@ object BasisNoteRedeemer extends App {
       Base16.decode(payeeKey).get
     )
 
-    // Insert the redeemed amount into the tree
-    val insertResult = plasmaMap.insert((key, Longs.toByteArray(redeemedAmount)))
+    // Tree value format: timestamp (8 bytes) ++ redeemedAmount (8 bytes) = 16 bytes
+    val treeValue = Longs.toByteArray(timestamp) ++ Longs.toByteArray(redeemedAmount)
+
+    // Insert the value into the tree
+    val insertResult = plasmaMap.insert((key, treeValue))
 
     // Get the insert proof and updated tree
     val insertProof = insertResult.proof.bytes
@@ -278,11 +301,11 @@ object BasisNoteRedeemer extends App {
     feeAmount: Long = 1000000L,
     feeBoxIds: Option[Seq[String]] = None  // List of box IDs to cover fee
   ): String = {
-    // Create redemption message: key || totalDebt
+    // Create redemption message: key || totalDebt || timestamp
     val ownerKeyBytes = note.payerKey.getEncoded.toArray
     val receiverBytes = note.payeeKey.getEncoded.toArray
     val key = Blake2b256(ownerKeyBytes ++ receiverBytes)
-    val redemptionMessage = key ++ Longs.toByteArray(note.totalDebt)
+    val redemptionMessage = key ++ Longs.toByteArray(note.totalDebt) ++ Longs.toByteArray(note.timestamp)
 
     // Generate reserve owner's signature on redemption message
     val (reserveSigA, reserveSigZ) = SigUtils.sign(redemptionMessage, reserveOwnerSecret)
@@ -304,18 +327,19 @@ object BasisNoteRedeemer extends App {
     val payerKeyHex = Base16.encode(note.payerKey.getEncoded.toArray)
     val payeeKeyHex = Base16.encode(note.payeeKey.getEncoded.toArray)
     val (reserveInsertProof, updatedReserveTree) = generateReserveInsertProof(
-      payerKeyHex, payeeKeyHex, redeemedAmount
+      payerKeyHex, payeeKeyHex, note.timestamp, redeemedAmount
     )
     val reserveInsertProofEncoded = encodeCollByteValue(reserveInsertProof)
     val updatedReserveTreeEncoded = Base16.encode(ValueSerializer.serialize(AvlTreeConstant(updatedReserveTree)))
 
-    // Build context extension with BOTH AVL proofs
+    // Build context extension with BOTH AVL proofs and timestamp
     val contextVars = Map(
       "0" -> Base16.encode(ValueSerializer.serialize(REDEEM_ACTION)),
       "1" -> encodeGroupElementValue(note.payeeKey),
       "2" -> encodeCollByteValue(Base16.decode(reserveSigEncoded).get),
       "3" -> encodeLongValue(note.totalDebt),
-      "5" -> reserveInsertProofEncoded,  // NEW: Reserve insert proof
+      "4" -> encodeLongValue(note.timestamp), // timestamp (NEW)
+      "5" -> reserveInsertProofEncoded,  // Reserve insert proof
       "6" -> encodeCollByteValue(Base16.decode(trackerSigEncoded).get),
       "8" -> encodeCollByteValue(Base16.decode(trackerProof).get)
     )
@@ -411,11 +435,13 @@ object BasisNoteRedeemer extends App {
 
     val note = noteFromJson(noteJson)
     val message = Base16.decode(noteJson.message).get
+    val timestampStr = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new java.util.Date(note.timestamp))
 
     println("--- Note Details ---")
-    println(s"Payer:   ${noteJson.payerKey.take(16)}...")
-    println(s"Payee:   ${noteJson.payeeKey.take(16)}...")
-    println(s"Amount:  ${noteJson.totalDebt} nanoERG (${noteJson.totalDebtERG} ERG)")
+    println(s"Payer:     ${noteJson.payerKey.take(16)}...")
+    println(s"Payee:     ${noteJson.payeeKey.take(16)}...")
+    println(s"Amount:    ${noteJson.totalDebt} nanoERG (${noteJson.totalDebtERG} ERG)")
+    println(s"Timestamp: $timestampStr")
     println()
 
     println("--- Verifying Note Signatures ---")

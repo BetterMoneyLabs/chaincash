@@ -38,6 +38,7 @@ object BasisNoteCreator extends App {
     payerKey: GroupElement,
     payeeKey: GroupElement,
     totalDebt: Long,
+    timestamp: Long,
     signatureA: GroupElement,
     signatureZ: BigInt,
     message: Array[Byte]
@@ -48,15 +49,15 @@ object BasisNoteCreator extends App {
     signatureZ: BigInt
   )
 
-  def createNoteMessage(payerKey: GroupElement, payeeKey: GroupElement, totalDebt: Long): Array[Byte] = {
-    Blake2b256(payerKey.getEncoded.toArray ++ payeeKey.getEncoded.toArray) ++ Longs.toByteArray(totalDebt)
+  def createNoteMessage(payerKey: GroupElement, payeeKey: GroupElement, totalDebt: Long, timestamp: Long): Array[Byte] = {
+    Blake2b256(payerKey.getEncoded.toArray ++ payeeKey.getEncoded.toArray) ++ Longs.toByteArray(totalDebt) ++ Longs.toByteArray(timestamp)
   }
 
-  def createNote(payerSecret: BigInt, payeeKey: GroupElement, totalDebt: Long): IOUNote = {
+  def createNote(payerSecret: BigInt, payeeKey: GroupElement, totalDebt: Long, timestamp: Long): IOUNote = {
     val payerKey = g.exp(payerSecret.bigInteger)
-    val message = createNoteMessage(payerKey, payeeKey, totalDebt)
+    val message = createNoteMessage(payerKey, payeeKey, totalDebt, timestamp)
     val (a, z) = SigUtils.sign(message, payerSecret)
-    IOUNote(payerKey, payeeKey, totalDebt, a, z, message)
+    IOUNote(payerKey, payeeKey, totalDebt, timestamp, a, z, message)
   }
 
   def createTrackerSignature(message: Array[Byte]): TrackerSignature = {
@@ -65,7 +66,7 @@ object BasisNoteCreator extends App {
   }
 
   def verifyNote(note: IOUNote): Boolean = {
-    val message = createNoteMessage(note.payerKey, note.payeeKey, note.totalDebt)
+    val message = createNoteMessage(note.payerKey, note.payeeKey, note.totalDebt, note.timestamp)
     SigUtils.verify(message, note.payerKey, note.signatureA, note.signatureZ)
   }
 
@@ -83,9 +84,11 @@ object BasisNoteCreator extends App {
        |  "payeeKey": "$payeeKeyHex",
        |  "totalDebt": ${note.totalDebt},
        |  "totalDebtERG": ${note.totalDebt.toDouble / 1000000000},
+       |  "timestamp": ${note.timestamp},
        |  "payerSignature": {"a": "$sigAHex", "z": "${note.signatureZ.toString(16)}"},
        |  "trackerSignature": {"a": "$trackerSigAHex", "z": "${trackerSig.signatureZ.toString(16)}"},
        |  "message": "${Base16.encode(note.message)}",
+       |  "messageFormat": "key (32 bytes) || totalDebt (8 bytes) || timestamp (8 bytes)",
        |  "noteKey": "${Base16.encode(Blake2b256((payerKeyHex ++ payeeKeyHex).getBytes))}"
        |}""".stripMargin
   }
@@ -94,17 +97,20 @@ object BasisNoteCreator extends App {
     val payerShort = Base16.encode(note.payerKey.getEncoded.toArray).take(16) + "..."
     val payeeShort = Base16.encode(note.payeeKey.getEncoded.toArray).take(16) + "..."
     val trackerSigValid = verifyTrackerSignature(note.message, trackerSig)
+    val timestampStr = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new java.util.Date(note.timestamp))
     s"""IOU Note:
        |  Payer:           $payerShort
        |  Payee:           $payeeShort
        |  Amount:          ${note.totalDebt} nanoERG (${note.totalDebt.toDouble / 1000000000} ERG)
+       |  Timestamp:       $timestampStr
        |  Payer Sig Valid: ${verifyNote(note)}
        |  Tracker Sig Valid: $trackerSigValid
        |""".stripMargin
   }
 
   val amount = if (args.length >= 1) args(0).toLong else 50000000L // default 0.05 ERG
-  val note = createNote(aliceSecret, bobPublicKey, amount)
+  val timestamp = System.currentTimeMillis() // Current timestamp in milliseconds
+  val note = createNote(aliceSecret, bobPublicKey, amount, timestamp)
   val trackerSig = createTrackerSignature(note.message)
 
   // Human-readable to stderr, JSON to stdout
