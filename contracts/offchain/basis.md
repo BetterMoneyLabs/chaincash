@@ -50,6 +50,14 @@ Anyone (presumably, owner in most cases) can top the reserve up.
  which prevents replay attacks with old notes. After on-chain redemption, A and B should contact offchain tracker
  to update their records before next payment from A to B is done.
 
+* Debt Transfer (Triangular Trade): The protocol supports transferring debt between creditors with debtor consent.
+ Example: A owes 10 ERG to B. B wants to buy from C for 5 ERG. Instead of on-chain redemption:
+  1. B requests A to sign new notes: A->B (5 ERG remaining), A->C (5 ERG transferred)
+  2. A signs both notes, tracker signs both notes
+  3. Old note A->B (10 ERG) is cancelled, new notes A->B (5 ERG) and A->C (5 ERG) are created
+  4. C can now redeem A->C note from A's reserve
+ This enables efficient multi-party settlements without on-chain transactions.
+
 ## Basis Contract
 
 A basic contract corresponding to the design outlined in the previous section, is available @ [basis.es](basis.es).

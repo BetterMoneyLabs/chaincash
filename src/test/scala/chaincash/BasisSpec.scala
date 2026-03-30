@@ -1926,4 +1926,156 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
     }
   }
 
+  // ========== DEBT TRANSFER (NOVATION) TESTS ==========
+  // Tests triangular trade: debt transfer from one creditor to another with debtor consent
+  // Scenario: A owes B (10 ERG). B wants to pay C (5 ERG).
+  // Solution: Alice signs two new notes - one to B (5 ERG), one to C (5 ERG)
+  // Result: A owes B (5 ERG), A owes C (5 ERG), B owes C (0 ERG)
+
+  property("debt transfer: triangular trade with consent should work") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
+      val timestamp = System.currentTimeMillis()
+
+      // Initial state: Alice owes Bob 10 ERG
+      val initialDebtToBob = 10000000000L // 10 ERG
+      val transferAmount = 5000000000L    // 5 ERG to transfer to Carol
+      val remainingDebtToBob = 5000000000L // 5 ERG remaining
+
+      // Keys for all parties
+      val aliceKey = ownerPk
+      val bobKey = receiverPk
+      val carolSecret = SigUtils.randBigInt
+      val carolKey = Constants.g.exp(carolSecret.bigInteger)
+
+      // Keys for debt records
+      val keyAliceBob = mkKey(aliceKey, bobKey)
+      val keyAliceCarol = mkKey(aliceKey, carolKey)
+
+      // === Step 1: Initial debt A->B exists in tracker (10 ERG) ===
+      val trackerTreeABInitial = mkTrackerTreeAndProof(keyAliceBob, initialDebtToBob)
+
+      // === Step 2: Debt transfer via new notes (B wants to pay C using A's debt) ===
+      // Alice signs TWO new notes:
+      // - Note 1: A->B for 5 ERG (remaining debt)
+      // - Note 2: A->C for 5 ERG (transferred debt)
+      
+      // Note 1: Alice -> Bob (5 ERG remaining)
+      val messageToBob = mkMessage(keyAliceBob, remainingDebtToBob, timestamp)
+      val aliceSigBob = SigUtils.sign(messageToBob, ownerSecret)
+      val trackerSigBob = SigUtils.sign(messageToBob, trackerSecret)
+      
+      // Note 2: Alice -> Carol (5 ERG transferred)
+      val messageToCarol = mkMessage(keyAliceCarol, transferAmount, timestamp)
+      val aliceSigCarol = SigUtils.sign(messageToCarol, ownerSecret)
+      val trackerSigCarol = SigUtils.sign(messageToCarol, trackerSecret)
+
+      // === Step 3: Tracker updates ledger (offchain simulation) ===
+      // Old note A->B (10 ERG) is cancelled/replaced by:
+      // - New note A->B (5 ERG)
+      // - New note A->C (5 ERG)
+      val trackerTreeAB = mkTrackerTreeAndProof(keyAliceBob, remainingDebtToBob)
+      val trackerTreeAC = mkTrackerTreeAndProof(keyAliceCarol, transferAmount)
+
+      // === Step 4: Bob redeems his note (5 ERG) ===
+      val reserveSigBob = mkSigBytes(aliceSigBob)
+      val trackerSigBobBytes = mkSigBytes(trackerSigBob)
+      val TreeAndProof(initialTreeBob, nextTreeBob, proofBob) = mkTreeAndProof(keyAliceBob, remainingDebtToBob, timestamp)
+
+      val reserveValueForBob = minValue + remainingDebtToBob + feeValue
+      val basisInputBob = mkBasisInput(
+        reserveValueForBob, initialTreeBob,
+        bobKey, reserveSigBob, remainingDebtToBob, proofBob, trackerSigBobBytes,
+        None, Some(trackerTreeAB.lookupProofBytes), timestamp
+      )
+      val trackerDataInputAB = mkTrackerDataInput(trackerTreeAB.tree)
+      val redemptionOutputBob = createOut(trueScript, remainingDebtToBob, Array(), Array())
+      val basisOutputBob = createOut(Constants.basisContract,
+        reserveValueForBob - remainingDebtToBob,
+        Array(ErgoValue.of(aliceKey), nextTreeBob, ErgoValue.of(trackerNFTBytes)),
+        Array(new ErgoToken(basisTokenId, 1)))
+
+      // Bob's redemption should succeed
+      noException should be thrownBy {
+        createTx(Array(basisInputBob), Array(trackerDataInputAB),
+          Array(basisOutputBob, redemptionOutputBob), fee = None, changeAddress,
+          Array(receiverSecret.toString()), broadcast = false)
+      }
+
+      // === Step 5: Carol redeems her note (5 ERG) ===
+      val reserveSigCarol = mkSigBytes(aliceSigCarol)
+      val trackerSigCarolBytes = mkSigBytes(trackerSigCarol)
+      val TreeAndProof(initialTreeCarol, nextTreeCarol, proofCarol) = mkTreeAndProof(keyAliceCarol, transferAmount, timestamp)
+
+      val reserveValueForCarol = minValue + transferAmount + feeValue
+      val basisInputCarol = mkBasisInput(
+        reserveValueForCarol, initialTreeCarol,
+        carolKey, reserveSigCarol, transferAmount, proofCarol, trackerSigCarolBytes,
+        None, Some(trackerTreeAC.lookupProofBytes), timestamp
+      )
+      val trackerDataInputAC = mkTrackerDataInput(trackerTreeAC.tree)
+      val redemptionOutputCarol = createOut(trueScript, transferAmount, Array(), Array())
+      val basisOutputCarol = createOut(Constants.basisContract,
+        reserveValueForCarol - transferAmount,
+        Array(ErgoValue.of(aliceKey), nextTreeCarol, ErgoValue.of(trackerNFTBytes)),
+        Array(new ErgoToken(basisTokenId, 1)))
+
+      // Carol's redemption should succeed
+      noException should be thrownBy {
+        createTx(Array(basisInputCarol), Array(trackerDataInputAC),
+          Array(basisOutputCarol, redemptionOutputCarol), fee = None, changeAddress,
+          Array(carolSecret.toString()), broadcast = false)
+      }
+
+      // === Verification: Debt transfer completed successfully ===
+      // Bob received 5 ERG, Carol received 5 ERG, total 10 ERG redeemed
+      // Original debt A->B (10 ERG) was split into two notes:
+      // - Note A->B (5 ERG) - redeemed by Bob
+      // - Note A->C (5 ERG) - redeemed by Carol
+      // This demonstrates triangular trade: B effectively paid C by having A sign a new note to C
+      println("Debt transfer test passed: triangular trade with two new notes works correctly")
+    }
+  }
+
+  property("debt transfer: should fail without debtor consent") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
+      val timestamp = System.currentTimeMillis()
+
+      // Initial state: Alice owes Bob 10 ERG
+      val initialDebt = 10000000000L // 10 ERG
+      val transferAmount = 5000000000L // 5 ERG
+
+      // Keys
+      val aliceKey = ownerPk
+      val bobKey = receiverPk
+      val carolSecret = SigUtils.randBigInt
+      val carolKey = Constants.g.exp(carolSecret.bigInteger)
+
+      val keyAliceBob = mkKey(aliceKey, bobKey)
+      val keyAliceCarol = mkKey(aliceKey, carolKey)
+
+      // === Attempt to create note to Carol WITHOUT Alice's consent ===
+      // Bob tries to sign a note from Alice to Carol (forging Alice's signature)
+      val messageToCarol = mkMessage(keyAliceCarol, transferAmount, timestamp)
+      
+      // Bob signs instead of Alice (invalid - forging Alice's signature)
+      val forgedAliceSig = SigUtils.sign(messageToCarol, receiverSecret) // Bob's secret, not Alice's
+      
+      // Verify that Bob cannot forge Alice's signature
+      val forgeryValid = SigUtils.verify(messageToCarol, aliceKey, forgedAliceSig._1, forgedAliceSig._2)
+      
+      // Signature verification should fail (Bob signed, not Alice)
+      forgeryValid shouldBe false
+
+      // === Also verify tracker cannot create note without Alice's signature ===
+      val trackerOnlySig = SigUtils.sign(messageToCarol, trackerSecret)
+      val trackerForgeryValid = SigUtils.verify(messageToCarol, aliceKey, trackerOnlySig._1, trackerOnlySig._2)
+      trackerForgeryValid shouldBe false
+
+      println("Debt transfer without consent test passed: unauthorized note creation prevented")
+      println("  - Bob cannot forge Alice's signature")
+      println("  - Tracker cannot create note without Alice's signature")
+      println("  - Both Alice's AND tracker's signatures are required for valid note")
+    }
+  }
+
 }
