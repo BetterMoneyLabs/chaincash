@@ -27,8 +27,41 @@ import java.net.{URL, HttpURLConnection}
  * Uses the tracker signature from the note for normal redemption (no emergency period needed).
  * Generates real AVL proofs for empty tree (first redemption) scenario.
  *
+ * ## How Redemption Works
+ *
+ * 1. Load the IOU note JSON (created by BasisNoteCreator)
+ * 2. Verify both payer's and tracker's signatures
+ * 3. Generate AVL proof for debt lookup in tracker's AVL tree
+ * 4. Build redemption transaction with:
+ *    - Reserve box input (holds collateral)
+ *    - Tracker box input (holds debt state digest)
+ *    - Context variables with signatures and proofs
+ * 5. Submit transaction to Ergo node
+ *
+ * ## Tracker's Role in Redemption
+ *
+ * The tracker signature enables "normal" redemption without waiting for emergency period:
+ * - Tracker signature certifies the note is witnessed in current state
+ * - AVL proof verifies the debt exists in tracker's tree
+ * - Reserve contract checks both signatures and AVL proof
+ *
+ * ## Emergency Redemption
+ *
+ * If tracker is offline, notes can be redeemed against last committed state
+ * after emergency period expires (no tracker signature needed).
+ *
+ * ## Required Inputs
+ *
+ * - **Note JSON**: Contains payer/payee keys, debt amount, signatures
+ * - **Reserve Box ID**: On-chain reserve holding collateral (or 'auto' to fetch)
+ * - **Tracker Box ID**: On-chain tracker box with AVL tree (or 'auto' to fetch)
+ * - **Reserve Owner Secret**: To sign redemption transaction
+ * - **Tracker Secret**: To generate tracker signature (default from ParticipantKeys)
+ *
  * Usage:
  *   sbt "runMain chaincash.contracts.BasisNoteRedeemer --note-json note.json --reserve-box <box_id>"
+ *
+ * See contracts/offchain/tracker.md and contracts/offchain/basis.md for more details.
  */
 object BasisNoteRedeemer extends App {
 
@@ -185,8 +218,33 @@ object BasisNoteRedeemer extends App {
    * Generates a real AVL proof for tracker tree lookup.
    * For first redemption (empty tree), creates a tree with the debt record and generates proof.
    *
+   * ## Tracker Tree Structure
+   *
+   * The tracker tree stores debt relationships:
+   * - Key: Blake2b256(payerPublicKey || payeePublicKey) (32 bytes)
+   * - Value: totalDebt as Long (8 bytes, big-endian)
+   *
+   * ## How It Works
+   *
+   * 1. Creates PlasmaMap with InsertOnly flags (matching tracker box parameters)
+   * 2. Computes debt key from payer and payee public keys
+   * 3. Inserts the debt record into the map
+   * 4. Generates lookup proof for the debt key
+   * 5. Returns proof bytes in hex format
+   *
+   * The proof is used in on-chain redemption to verify debt exists in tracker's
+   * committed AVL tree. The basis.es contract verifies:
+   * - Proof is valid against tracker tree digest
+   * - Debt key matches Blake2b256(payerKey || payeeKey)
+   * - Debt value matches note's totalDebt
+   *
    * Note: Uses InsertOnly flags and Constants.chainCashPlasmaParameters to match
    * the tracker box creation (TrackerBoxSetup).
+   *
+   * @param payerKey Hex-encoded public key of the debtor
+   * @param payeeKey Hex-encoded public key of the creditor
+   * @param totalDebt Total debt amount in nanoERG
+   * @return Hex-encoded AVL proof bytes
    */
   def generateTrackerAvlProof(payerKey: String, payeeKey: String, totalDebt: Long): String = {
     // Create PlasmaMap with InsertOnly flags and correct parameters (must match tracker box)

@@ -113,6 +113,31 @@ ChainCash implements a decentralized monetary system where different agents mana
 - State synchronization
 - Event processing and persistence
 
+### Basis Tracker Agent
+**File**: `contracts/offchain/tracker.md` (documentation), `demo/basis/simple/src/TrackerBoxSetup.scala` (setup)
+
+**Responsibilities**:
+- Tracks complete state of debt for all issuers (with or without on-chain reserves)
+- Witnesses IOU notes by signing them to certify inclusion in tracker's state
+- Monitors collateralization levels and prevents violations of existing debt holders
+- Publishes debt state and alerts via NOSTR protocol
+- Commits state digests to blockchain periodically for emergency redemption
+- Maintains AVL tree of debt relationships: `Blake2b256(payerKey || payeeKey) -> (totalDebt, timestamp)`
+
+**Key Operations**:
+- Note witnessing and signature generation
+- Debt state tracking and proof generation
+- Collateralization monitoring (80%/100% alerts)
+- On-chain state commitment
+- Emergency exit support (redemption against last committed state)
+
+**Security Properties**:
+- Tracker cannot steal funds (only certifies inclusion, issuer signature required for redemption)
+- Emergency exit available if tracker goes offline (last committed state redeemable)
+- Anti-censorship protection (previously witnessed notes can still be redeemed)
+
+**See Also**: `contracts/offchain/basis.md` for Basis protocol design, `contracts/offchain/tracker.md` for detailed tracker architecture
+
 ## Server Agent
 
 **File**: `src/main/scala/chaincash/offchain/server/model.scala`
@@ -131,7 +156,7 @@ ChainCash implements a decentralized monetary system where different agents mana
 
 ## Agent Interaction Patterns
 
-### Issuance Flow
+### Issuance Flow (On-Chain Notes)
 ```
 Reserve Agent → Note Agent
 1. User funds reserve with collateral
@@ -139,7 +164,16 @@ Reserve Agent → Note Agent
 3. Note Agent manages note lifecycle
 ```
 
-### Transfer Flow
+### Basis Issuance Flow (Off-Chain IOU Notes)
+```
+Issuer → Tracker → Creditor
+1. Issuer creates IOU note (debtor signs)
+2. Tracker witnesses note (tracker signs, includes in AVL tree)
+3. Creditor receives witnessed note
+4. Tracker commits state to blockchain
+```
+
+### Transfer Flow (On-Chain Notes)
 ```
 Note Agent → Note Agent
 1. Current owner signs note transfer
@@ -147,13 +181,41 @@ Note Agent → Note Agent
 3. Reserve Agent verifies transfer validity
 ```
 
-### Redemption Flow
+### Basis Transfer Flow (Debt Transfer / Triangular Trade)
+```
+Creditor B → Debtor A → New Creditor C
+1. B requests A to transfer debt: A->B (10 ERG) becomes A->B (5 ERG) + A->C (5 ERG)
+2. A signs new notes, Tracker witnesses both
+3. Old note A->B cancelled, new notes created
+4. C can redeem A->C note from A's reserve
+```
+
+### Redemption Flow (On-Chain Notes)
 ```
 Note Agent → Reserve Agent → Receipt Agent
 1. Note holder initiates redemption
 2. Reserve Agent processes redemption with fee
 3. Receipt Agent creates redemption receipt
 4. Receipt allows re-redemption against earlier reserves
+```
+
+### Basis Redemption Flow (With Tracker)
+```
+Creditor → Tracker → Reserve Agent
+1. Creditor presents IOU note with tracker signature
+2. Tracker provides AVL proof of debt in committed tree
+3. Reserve Agent verifies signatures and AVL proof
+4. Reserve pays creditor, updates reserve tree
+5. Tracker updates offchain state
+```
+
+### Emergency Redemption (Tracker Offline)
+```
+Creditor → Reserve Agent (after timeout)
+1. Tracker goes offline
+2. Emergency period expires (e.g., 1 week)
+3. Creditor redeems against last committed tracker state
+4. No tracker signature required
 ```
 
 ## System Architecture Principles

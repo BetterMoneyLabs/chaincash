@@ -13,19 +13,51 @@ import work.lithos.plasma.collections.PlasmaMap
 
 /**
  * Utility to create tracker box setup JSON for /wallet/payment/send API
- * 
- * This creates a tracker box with an initial AVL tree containing a single
- * Alice->Bob debt entry.
- * 
+ *
+ * ## What is a Tracker Box?
+ *
+ * A tracker box is an on-chain box that holds:
+ * - Tracker's public key (R4 register)
+ * - AVL tree digest of all debt relationships (R5 register)
+ * - Tracker NFT token (identifies this as the official tracker)
+ *
+ * The tracker box serves as a commitment to the offchain debt state.
+ * When the tracker goes offline, users can redeem against the last
+ * committed state in this box.
+ *
+ * ## Tracker Tree Structure
+ *
+ * The AVL tree in the tracker box stores debt relationships:
+ * - Key: Blake2b256(payerPublicKey || payeePublicKey) (32 bytes)
+ * - Value: totalDebt as Long (8 bytes, big-endian)
+ *
+ * This allows efficient lookup and proof generation for any debt pair.
+ *
+ * ## How This Utility Works
+ *
+ * 1. Creates an AVL tree with initial debt entries (for demo: Alice->Bob)
+ * 2. Generates JSON for creating tracker box via Ergo node API
+ * 3. Outputs can be submitted to /wallet/payment/send endpoint
+ *
+ * ## Usage Flow
+ *
+ * 1. Run this utility to generate tracker box JSON
+ * 2. Submit JSON to Ergo node to create tracker box
+ * 3. Tracker box is scanned with scanId=36
+ * 4. Tracker service uses this box for state commitments
+ *
  * Reference code for tracker tree calculation:
- * - BasisNoteRedeemer.generateTrackerAvlProof() - lines 141-159
- * - BasisSpec.mkTrackerTreeAndProof() - lines 1250-1255
- * 
+ * - BasisNoteRedeemer.generateTrackerAvlProof() - generates proofs for redemption
+ * - BasisSpec.mkTrackerTreeAndProof() - test code for tree creation
+ * - basis.es contract - on-chain verification of tracker proofs
+ *
  * Usage:
  *   sbt "runMain chaincash.contracts.TrackerBoxSetup"
- * 
+ *
  * The output JSON can be submitted to:
  *   POST /wallet/payment/send
+ *
+ * See contracts/offchain/tracker.md for detailed tracker architecture.
  */
 object TrackerBoxSetup extends App {
 
@@ -46,14 +78,31 @@ object TrackerBoxSetup extends App {
 
   /**
    * Creates the tracker AVL tree with a single Alice->Bob debt entry.
-   * 
-   * Reference: BasisNoteRedeemer.generateTrackerAvlProof() lines 141-159
-   * 
-   * The tree is created as follows:
+   *
+   * ## Tree Structure
+   *
+   * The tracker tree stores debt relationships as key-value pairs:
+   * - Key: Blake2b256(payerPublicKey || payeePublicKey) (32 bytes)
+   * - Value: totalDebt as Long (8 bytes, big-endian)
+   *
+   * ## Steps
+   *
    * 1. Create empty PlasmaMap with InsertOnly flags
    * 2. Compute debt key = Blake2b256(alicePubKey || bobPubKey)
    * 3. Insert (debtKey, totalDebt) into the map
    * 4. Get the ergoValue (AvlTree) which contains the digest
+   *
+   * The resulting tree can be used to:
+   * - Initialize a new tracker box
+   * - Generate proofs for redemption (see BasisNoteRedeemer.generateTrackerAvlProof)
+   * - Verify debt existence on-chain
+   *
+   * Reference: BasisNoteRedeemer.generateTrackerAvlProof() 
+   *
+   * @param alicePubKeyHex Alice's public key in hex (payer/debtor)
+   * @param bobPubKeyHex Bob's public key in hex (payee/creditor)
+   * @param totalDebt Total debt amount in nanoERG
+   * @return AvlTree containing the debt entry
    */
   def createTrackerTree(alicePubKeyHex: String, bobPubKeyHex: String, totalDebt: Long): AvlTree = {
     // Create empty PlasmaMap

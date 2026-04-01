@@ -15,8 +15,41 @@ import special.sigma.GroupElement
  * Uses Alice's address and secret (verified to match), Bob's secret for demo.
  * The tracker signature is included for normal redemption (without waiting for emergency period).
  *
+ * ## How It Works
+ *
+ * 1. Alice creates an IOU note representing debt from Alice to Bob
+ * 2. Alice signs the note with her secret key
+ * 3. Tracker signs the note to certify it's witnessed in the tracker's state
+ * 4. The signed note can be redeemed against Alice's reserve (if exists) or held as credit
+ *
+ * ## Note Structure
+ *
+ * An IOU note contains:
+ * - payerKey: Public key of the debtor (Alice)
+ * - payeeKey: Public key of the creditor (Bob)
+ * - totalDebt: Total amount owed in nanoERG
+ * - signature: Alice's signature on (payerKey || payeeKey || totalDebt)
+ * - trackerSignature: Tracker's signature certifying the note is witnessed
+ *
+ * ## Tracker's Role
+ *
+ * The tracker signature serves as a witness that:
+ * - The note is included in the tracker's debt state
+ * - The debt does not violate collateralization of previous notes
+ * - The tracker will commit this state to the blockchain
+ *
+ * The tracker cannot steal funds - it only certifies inclusion. Redemption still
+ * requires the payer's signature and valid AVL proof against tracker's committed state.
+ *
+ * ## Emergency Exit
+ *
+ * If the tracker goes offline, notes can still be redeemed against the last
+ * committed state on the blockchain (after emergency period expires).
+ *
  * Usage:
  *   sbt "runMain chaincash.contracts.BasisNoteCreator [amount_nanoERG]"
+ *
+ * See contracts/offchain/tracker.md and contracts/offchain/basis.md for more details.
  */
 object BasisNoteCreator extends App {
 
