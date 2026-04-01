@@ -73,6 +73,11 @@ object Constants {
   val basisErgoTree = compile(basisContract)
   val basisAddress = getAddressFromErgoTree(basisErgoTree)
 
+  // Basis-token contract (token-based reserve)
+  val basisTokenContract = readContract("offchain/basis-token.es", Map())
+  val basisTokenErgoTree = compile(basisTokenContract)
+  val basisTokenAddress = getAddressFromErgoTree(basisTokenErgoTree)
+
   // contracts below are experimental and not finished ChainCash-on-Layer2 contracts
 
   val redemptionContract = scala.io.Source.fromFile("contracts/layer2-old/redemption.es", "utf-8").getLines.mkString("\n")
@@ -86,9 +91,10 @@ object Constants {
 
 object Printer extends App {
   println("Basis p2s address: " + Constants.basisAddress)
+  println("Basis-token p2s address: " + Constants.basisTokenAddress)
   println("Redemption p2s address: " + Constants.redemptionAddress)
   println("Redemption producer p2s address: " + Constants.redemptionProducerAddress)
-  
+
   // Example deployment info
   println("\nTo deploy Basis reserve:")
   println("1. Run BasisDeployer.main() for deployment requests")
