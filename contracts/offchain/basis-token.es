@@ -247,34 +247,58 @@
       val timestampCorrect = timestamp > storedTimestamp
 
       // Check if enough time has passed for emergency redemption (without tracker signature)
-      // NOTE: All debts associated with this tracker (both new and old) become eligible
-      // for emergency redemption simultaneously after 3 days from tracker creation
+      // NOTE: After 3 days (2160 blocks), the tracker signature becomes optional.
+      // This provides an emergency exit if the tracker becomes unavailable.
+      // All debts associated with this tracker become eligible for emergency redemption
+      // simultaneously after 3 days from tracker creation.
       val trackerUpdateTime = tracker.creationInfo._1
       val enoughTimeSpent = (HEIGHT - trackerUpdateTime) > 3 * 720 // 3 days passed
 
-      // Message to verify signatures: key || total debt || timestamp
-      // In case of emergency exit: key || total debt || timestamp || 0L
+      // Message format depends on emergency period:
+      // - Normal redemption: key || totalDebt || timestamp
+      // - Emergency redemption: key || totalDebt || timestamp || 0L
+      // The different message format prevents replay attacks between normal and emergency redemption.
       val message = if (enoughTimeSpent) {
          key ++ longToByteArray(totalDebt) ++ longToByteArray(timestamp) ++ longToByteArray(0L)
       } else {
          key ++ longToByteArray(totalDebt) ++ longToByteArray(timestamp)
       }
 
-      // Tracker's signature authorizing the redemption
+      // Tracker's signature (optional after emergency period)
       val trackerSigBytes = getVar[Coll[Byte]](6).get
 
-      // Split tracker signature into components (Schnorr signature: (a, z))
-      val trackerABytes = trackerSigBytes.slice(0, 33) // Random point a
-      val trackerZBytes = trackerSigBytes.slice(33, trackerSigBytes.size) // Response z
-      val trackerA = decodePoint(trackerABytes) // Decode random point
-      val trackerZ = byteArrayToBigInt(trackerZBytes) // Convert response to big integer
+      // Verify tracker signature if provided (required before emergency period, optional after)
+      // If signature is provided, it MUST be valid. If not provided, emergency period must have passed.
+      val trackerSigProvided = trackerSigBytes.size > 0
+      
+      // Verify tracker signature when provided
+      val properTrackerSignature = if (trackerSigProvided) {
+        // Split tracker signature into components (Schnorr signature: (a, z))
+        val trackerABytes = trackerSigBytes.slice(0, 33) // Random point a
+        val trackerZBytes = trackerSigBytes.slice(33, trackerSigBytes.size) // Response z
+        val trackerA = decodePoint(trackerABytes) // Decode random point
+        val trackerZ = byteArrayToBigInt(trackerZBytes) // Convert response to big integer
 
-      // Compute challenge for tracker signature verification (Fiat-Shamir)
-      val trackerE: Coll[Byte] = blake2b256(trackerABytes ++ message ++ trackerPubKey.getEncoded) // strong Fiat-Shamir
-      val trackerEInt = byteArrayToBigInt(trackerE) // challenge as big integer
+        // Compute challenge for tracker signature verification (Fiat-Shamir)
+        val trackerE: Coll[Byte] = blake2b256(trackerABytes ++ message ++ trackerPubKey.getEncoded) // strong Fiat-Shamir
+        val trackerEInt = byteArrayToBigInt(trackerE) // challenge as big integer
 
-      // Verify tracker Schnorr signature: g^z = a * x^e
-      val properTrackerSignature = (g.exp(trackerZ) == trackerA.multiply(trackerPubKey.exp(trackerEInt)))
+        // Verify tracker Schnorr signature: g^z = a * x^e
+        (g.exp(trackerZ) == trackerA.multiply(trackerPubKey.exp(trackerEInt)))
+      } else {
+        // No tracker signature provided - only allowed after emergency period
+        // Return true to allow redemption without tracker sig after emergency period
+        true
+      }
+
+      // Tracker signature validation:
+      // - If signature provided: must be valid (properTrackerSignature will be true/false)
+      // - If no signature provided: only allowed after emergency period (enoughTimeSpent must be true)
+      val trackerSigValid = if (trackerSigProvided) {
+        properTrackerSignature // Must be valid if provided
+      } else {
+        enoughTimeSpent // Can omit sig only after emergency period
+      }
 
       // Calculate amount being redeemed (in tokens) and verify it doesn't exceed debt
       // Token #1 is the reserve token, same position in input and output (checked by selfPreserved)
@@ -283,7 +307,8 @@
       val redeemed = tokenAmountIn - tokenAmountOut
 
       val debtDelta = (totalDebt - redeemedDebt)
-      val properlyRedeemed = (redeemed > 0) && (redeemed <= debtDelta) && properTrackerSignature
+      // Redemption requires: valid amount + (valid tracker sig OR emergency period with no sig)
+      val properlyRedeemed = (redeemed > 0) && (redeemed <= debtDelta) && trackerSigValid
 
       // Split reserve owner signature into components (Schnorr signature: (a, z))
       val reserveABytes = reserveSigBytes.slice(0, 33) // Random point a

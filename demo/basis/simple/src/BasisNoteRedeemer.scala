@@ -48,7 +48,13 @@ import java.net.{URL, HttpURLConnection}
  * ## Emergency Redemption
  *
  * If tracker is offline, notes can be redeemed against last committed state
- * after emergency period expires (no tracker signature needed).
+ * after emergency period expires (3 days / 2160 blocks):
+ * - **No tracker signature needed** after emergency period
+ * - Message format changes: `key || totalDebt || timestamp || 0L` (note the `|| 0L` suffix)
+ * - Normal redemption (with tracker): `key || totalDebt || timestamp`
+ * - Different message formats prevent replay attacks
+ * - Reserve owner's signature still required (proves debt validity)
+ * - Use empty bytes for tracker signature field when tracker is unavailable
  *
  * ## Required Inputs
  *

@@ -133,7 +133,13 @@ ChainCash implements a decentralized monetary system where different agents mana
 
 **Security Properties**:
 - Tracker cannot steal funds (only certifies inclusion, issuer signature required for redemption)
-- Emergency exit available if tracker goes offline (last committed state redeemable)
+- Emergency exit available if tracker goes offline:
+  - After 3 days (2160 blocks), tracker signature becomes OPTIONAL
+  - Emergency message format: `key || totalDebt || timestamp || 0L`
+  - Normal message format: `key || totalDebt || timestamp`
+  - Different formats prevent replay attacks between normal and emergency redemption
+  - Reserve owner's signature still required (proves debt validity)
+  - Enables true escape from tracker unavailability
 - Anti-censorship protection (previously witnessed notes can still be redeemed)
 
 **See Also**: `contracts/offchain/basis.md` for Basis protocol design, `contracts/offchain/tracker.md` for detailed tracker architecture
@@ -213,9 +219,14 @@ Creditor → Tracker → Reserve Agent
 ```
 Creditor → Reserve Agent (after timeout)
 1. Tracker goes offline
-2. Emergency period expires (e.g., 1 week)
+2. Emergency period expires (3 days / 2160 blocks)
 3. Creditor redeems against last committed tracker state
-4. No tracker signature required
+4. Tracker signature NOT required (optional after emergency period)
+5. Emergency message format used:
+   - Normal: `key || totalDebt || timestamp` (with tracker sig)
+   - Emergency: `key || totalDebt || timestamp || 0L` (no tracker sig needed)
+6. Reserve owner's signature still required (proves debt validity)
+7. Different message formats prevent replay attacks
 ```
 
 ## System Architecture Principles

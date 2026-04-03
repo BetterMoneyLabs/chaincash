@@ -1926,6 +1926,101 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
     }
   }
 
+  // ========== TRUE EMERGENCY REDEMPTION TEST (TRACKER OFFLINE) ==========
+  // This test demonstrates the emergency exit behavior when tracker is completely offline.
+  // After emergency period (3 days / 2160 blocks), notes should be redeemable WITHOUT tracker signature.
+  //
+  // The contract supports two paths:
+  // 1. Normal redemption: tracker signature required (any time)
+  // 2. Emergency redemption: no tracker signature needed (after 3 days)
+  //
+  // Message formats differ to prevent replay attacks:
+  // - Normal: key || totalDebt || timestamp
+  // - Emergency: key || totalDebt || timestamp || 0L
+
+  property("Emergency exit: should succeed without tracker signature after emergency period") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
+      val totalDebt = 500000000L
+      val redeemedDebt = 0L
+      val redeemAmount = totalDebt
+      val newRedeemedDebt = redeemedDebt + redeemAmount
+      val timestamp = System.currentTimeMillis()
+      val key = mkKey(ownerPk, receiverPk)
+
+      // Emergency redemption message WITH 0L suffix (emergency format)
+      // Tracker is offline, so we use emergency message format but no tracker signature
+      val message = mkEmergencyMessage(key, totalDebt, timestamp)
+      val reserveSigBytes = mkSigBytes(SigUtils.sign(message, ownerSecret))
+
+      // NO tracker signature - tracker is offline!
+      // We use empty bytes to simulate missing tracker signature
+      val noTrackerSigBytes = Array[Byte]()
+
+      val TreeAndProof(initialTree, nextTree, proofBytes) = mkTreeAndProof(key, newRedeemedDebt, timestamp)
+      // Create tracker tree with debt record and lookup proof
+      val TrackerTreeAndProof(trackerTree, trackerLookupProof) = mkTrackerTreeAndProof(key, totalDebt)
+
+      val basisInput = mkBasisInput(minValue + totalDebt + feeValue, initialTree,
+        receiverPk, reserveSigBytes, totalDebt, proofBytes, noTrackerSigBytes, None, Some(trackerLookupProof), timestamp)
+
+      // Tracker is more than 3 days old (3 * 720 = 2160 blocks)
+      // After emergency period, redemption should be possible without tracker signature
+      val trackerDataInput = mkTrackerDataInput(trackerTree, Some(3 * 720 + 1))
+
+      val basisOutput = createOut(Constants.basisContract, minValue + feeValue,
+        Array(ErgoValue.of(ownerPk), nextTree, ErgoValue.of(trackerNFTBytes)),
+        Array(new ErgoToken(basisTokenId, 1)))
+      val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
+
+      // Emergency redemption should succeed: tracker is old enough, no tracker signature needed
+      noException should be thrownBy {
+        createTx(Array(basisInput), Array(trackerDataInput),
+          Array(basisOutput, redemptionOutput), fee = None, changeAddress,
+          Array(receiverSecret.toString()), broadcast = false)
+      }
+    }
+  }
+
+  property("Emergency exit: should fail without tracker signature before emergency period") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
+      val totalDebt = 500000000L
+      val redeemedDebt = 0L
+      val redeemAmount = totalDebt
+      val newRedeemedDebt = redeemedDebt + redeemAmount
+      val timestamp = System.currentTimeMillis()
+      val key = mkKey(ownerPk, receiverPk)
+
+      // Normal redemption message (not emergency format)
+      val message = mkMessage(key, totalDebt, timestamp)
+      val reserveSigBytes = mkSigBytes(SigUtils.sign(message, ownerSecret))
+
+      // NO tracker signature - should fail before emergency period
+      val noTrackerSigBytes = Array[Byte]()
+
+      val TreeAndProof(initialTree, nextTree, proofBytes) = mkTreeAndProof(key, newRedeemedDebt, timestamp)
+      // Create tracker tree with debt record and lookup proof
+      val TrackerTreeAndProof(trackerTree, trackerLookupProof) = mkTrackerTreeAndProof(key, totalDebt)
+
+      val basisInput = mkBasisInput(minValue + totalDebt + feeValue, initialTree,
+        receiverPk, reserveSigBytes, totalDebt, proofBytes, noTrackerSigBytes, None, Some(trackerLookupProof), timestamp)
+
+      // Tracker is NOT old enough (only 1 day old, need 3 days)
+      val trackerDataInput = mkTrackerDataInput(trackerTree, Some(1 * 720)) // Only 1 day
+
+      val basisOutput = createOut(Constants.basisContract, minValue + feeValue,
+        Array(ErgoValue.of(ownerPk), nextTree, ErgoValue.of(trackerNFTBytes)),
+        Array(new ErgoToken(basisTokenId, 1)))
+      val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
+
+      // Should fail: tracker signature required before emergency period
+      a[Throwable] should be thrownBy {
+        createTx(Array(basisInput), Array(trackerDataInput),
+          Array(basisOutput, redemptionOutput), fee = None, changeAddress,
+          Array(receiverSecret.toString()), broadcast = false)
+      }
+    }
+  }
+
   // ========== DEBT TRANSFER (NOVATION) TESTS ==========
   // Tests triangular trade: debt transfer from one creditor to another with debtor consent
   // Scenario: A owes B (10 ERG). B wants to pay C (5 ERG).
