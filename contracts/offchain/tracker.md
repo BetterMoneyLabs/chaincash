@@ -55,9 +55,8 @@ The tracker cannot steal money from reserves because:
 ### Emergency Exit
 If the tracker goes offline:
 - After emergency period (3 days / 2160 blocks), notes can be redeemed WITHOUT tracker signature
-- Emergency redemption uses different message format: `key || totalDebt || timestamp || 0L`
-- Normal redemption (with tracker signature): `key || totalDebt || timestamp`
-- Different message formats prevent replay attacks between normal and emergency redemption
+- Same message format used: `key || totalDebt || timestamp`
+- Replay attacks prevented by timestamp verification (must be > stored timestamp)
 - Users can redeem against reserves using the last committed state snapshot
 - Reserve owner's signature is still required (proves debt validity)
 - Tracker signature is optional after emergency period (enables escape from tracker unavailability)

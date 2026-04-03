@@ -329,16 +329,30 @@ Value: Long (cumulative redeemed amount in nanoERG)
 
 ### Emergency Redemption
 
-If tracker becomes unavailable:
+If tracker becomes unavailable, notes can still be redeemed after an emergency period:
+
 ```ergoscript
 val trackerUpdateTime = tracker.creationInfo._1
-val enoughTimeSpent = (HEIGHT - trackerUpdateTime) > 3 * 720 // 3 days
+val enoughTimeSpent = (HEIGHT - trackerUpdateTime) > 3 * 720 // 3 days (2160 blocks)
 
-// Emergency redemption message includes 0L suffix
-val message = key ++ longToByteArray(totalDebt) ++ longToByteArray(0L)
+// Same message format for both normal and emergency redemption
+val message = key ++ longToByteArray(totalDebt) ++ longToByteArray(timestamp)
 
-// Only owner signature required (no tracker sig)
+// Tracker signature optional after emergency period
+val trackerSigValid = if (trackerSigProvided) {
+  verifySchnorr(trackerSig, trackerPubKey, message)
+} else {
+  enoughTimeSpent // Can omit sig only after emergency period
+}
 ```
+
+**Key Properties:**
+- **Emergency period**: 3 days (2160 blocks) from tracker box creation
+- **Tracker signature**: Required normally, optional after emergency period
+- **Message format**: Same for both modes: `key || totalDebt || timestamp`
+- **Replay protection**: Timestamp must be greater than stored timestamp (prevents reuse)
+- **Reserve owner signature**: Always required (proves debt validity)
+- **Security**: Tracker cannot steal funds (owner sig always needed), but users can escape tracker unavailability
 
 ## Implementation Components
 

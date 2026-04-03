@@ -278,15 +278,8 @@
       val trackerUpdateTime = tracker.creationInfo._1
       val enoughTimeSpent = (HEIGHT - trackerUpdateTime) > 3 * 720 // 3 days passed
 
-      // Message format depends on emergency period:
-      // - Normal redemption: key || totalDebt || timestamp
-      // - Emergency redemption: key || totalDebt || timestamp || 0L
-      // The different message format prevents replay attacks between normal and emergency redemption.
-      val message = if (enoughTimeSpent) {
-         key ++ longToByteArray(totalDebt) ++ longToByteArray(timestamp) ++ longToByteArray(0L)
-      } else {
-         key ++ longToByteArray(totalDebt) ++ longToByteArray(timestamp)
-      }
+      // Message to verify signatures: key || totalDebt || timestamp
+      val message = key ++ longToByteArray(totalDebt) ++ longToByteArray(timestamp)
 
       // Tracker's signature (optional after emergency period)
       val trackerSigBytes = getVar[Coll[Byte]](6).get
