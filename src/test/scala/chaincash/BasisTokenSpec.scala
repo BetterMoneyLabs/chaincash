@@ -149,6 +149,9 @@ class BasisTokenSpec extends PropSpec with Matchers with ScalaCheckDrivenPropert
   def mkMessage(key: Array[Byte], totalDebt: Long, timestamp: Long): Array[Byte] =
     key ++ Longs.toByteArray(totalDebt) ++ Longs.toByteArray(timestamp)
 
+  // NOTE: Emergency redemption uses the SAME message format as normal redemption.
+  // The only difference is that tracker signature becomes OPTIONAL after 3 days (2160 blocks).
+  // This function is kept for documentation purposes but is NOT used by the actual contract.
   def mkEmergencyMessage(key: Array[Byte], totalDebt: Long, timestamp: Long): Array[Byte] =
     key ++ Longs.toByteArray(totalDebt) ++ Longs.toByteArray(timestamp) ++ Longs.toByteArray(0L)
 

@@ -1242,7 +1242,10 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
   def mkMessage(key: Array[Byte], totalDebt: Long, timestamp: Long = System.currentTimeMillis()): Array[Byte] =
     key ++ Longs.toByteArray(totalDebt) ++ Longs.toByteArray(timestamp)
 
-  // Message for emergency redemption: key || totalDebt || timestamp || 0L
+  // NOTE: Emergency redemption uses the SAME message format as normal redemption.
+  // The only difference is that tracker signature becomes OPTIONAL after 3 days (2160 blocks).
+  // This function is kept for documentation purposes to show what an "emergency format" would look like,
+  // but it is NOT used by the actual contract.
   def mkEmergencyMessage(key: Array[Byte], totalDebt: Long, timestamp: Long = System.currentTimeMillis()): Array[Byte] =
     key ++ Longs.toByteArray(totalDebt) ++ Longs.toByteArray(timestamp) ++ Longs.toByteArray(0L)
 
@@ -1821,22 +1824,26 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
   }
 
   // ========== EMERGENCY EXIT TESTS ==========
-  // Emergency redemption allows redemption after 3 days (3 * 720 blocks) with special message format
-  // The tracker signature is still required, but the message format includes || 0L suffix
-  // This provides an escape hatch if tracker becomes unavailable (can coordinate off-chain for signature)
+  // Emergency redemption allows redemption after 3 days (3 * 720 blocks) WITHOUT tracker signature.
+  // The contract uses the SAME message format for both normal and emergency redemption:
+  //   Message: key || totalDebt || timestamp
+  // The only difference is:
+  //   - Normal: tracker signature REQUIRED
+  //   - Emergency (3+ days): tracker signature OPTIONAL
+  // This provides an escape hatch if tracker becomes unavailable.
 
-  property("Emergency exit: should succeed with old tracker and valid emergency signature") {
+  property("Emergency exit: should succeed with old tracker and valid tracker signature") {
     createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
       val totalDebt = 500000000L
       val redeemedDebt = 0L
       val redeemAmount = totalDebt
       val newRedeemedDebt = redeemedDebt + redeemAmount
-      val timestamp = System.currentTimeMillis() // Consistent timestamp
+      val timestamp = System.currentTimeMillis()
       val key = mkKey(ownerPk, receiverPk)
-      // Emergency redemption message: key || totalDebt || timestamp || 0L
-      val message = mkEmergencyMessage(key, totalDebt, timestamp)
+      // Use normal message format (same for both normal and emergency redemption)
+      val message = mkMessage(key, totalDebt, timestamp)
       val reserveSigBytes = mkSigBytes(SigUtils.sign(message, ownerSecret))
-      val trackerSigBytes = mkSigBytes(SigUtils.sign(message, trackerSecret)) // VALID tracker sig for emergency message
+      val trackerSigBytes = mkSigBytes(SigUtils.sign(message, trackerSecret)) // Valid tracker sig
       val TreeAndProof(initialTree, nextTree, proofBytes) = mkTreeAndProof(key, newRedeemedDebt, timestamp)
       // Create tracker tree with debt record and lookup proof
       val TrackerTreeAndProof(trackerTree, trackerLookupProof) = mkTrackerTreeAndProof(key, totalDebt)
@@ -1850,7 +1857,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
         Array(new ErgoToken(basisTokenId, 1)))
       val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
 
-      // Emergency redemption should succeed: tracker is old enough and has valid signature
+      // Should succeed: tracker is old enough and has valid signature
       noException should be thrownBy {
         assertTxSucceeds(Array(basisInput), Array(trackerDataInput),
           Array(basisOutput, redemptionOutput), Array(receiverSecret.toString()))
@@ -1858,18 +1865,18 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
     }
   }
 
-  property("Emergency exit: should fail with old tracker but normal message format") {
+  property("Emergency exit: should succeed with old tracker using normal message format") {
     createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
       val totalDebt = 500000000L
       val redeemedDebt = 0L
       val redeemAmount = totalDebt
       val newRedeemedDebt = redeemedDebt + redeemAmount
-      val timestamp = System.currentTimeMillis() // Consistent timestamp
+      val timestamp = System.currentTimeMillis()
       val key = mkKey(ownerPk, receiverPk)
-      // Wrong message: using normal redemption format instead of emergency format (tracker expects || 0L)
-      val message = mkMessage(key, totalDebt, timestamp) // Normal message format
+      // Normal message format works with old tracker (as it should)
+      val message = mkMessage(key, totalDebt, timestamp)
       val reserveSigBytes = mkSigBytes(SigUtils.sign(message, ownerSecret))
-      val trackerSigBytes = mkSigBytes(SigUtils.sign(message, trackerSecret)) // Valid for normal message
+      val trackerSigBytes = mkSigBytes(SigUtils.sign(message, trackerSecret))
       val TreeAndProof(initialTree, nextTree, proofBytes) = mkTreeAndProof(key, newRedeemedDebt, timestamp)
       // Create tracker tree with debt record and lookup proof
       val TrackerTreeAndProof(trackerTree, trackerLookupProof) = mkTrackerTreeAndProof(key, totalDebt)
@@ -1883,11 +1890,10 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
         Array(new ErgoToken(basisTokenId, 1)))
       val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
 
-      // Emergency redemption should fail: message format doesn't match what tracker expects
-      a[Throwable] should be thrownBy {
-        createTx(Array(basisInput), Array(trackerDataInput),
-          Array(basisOutput, redemptionOutput), fee = None, changeAddress,
-          Array(receiverSecret.toString()), broadcast = false)
+      // Should succeed: normal message format works regardless of tracker age
+      noException should be thrownBy {
+        assertTxSucceeds(Array(basisInput), Array(trackerDataInput),
+          Array(basisOutput, redemptionOutput), Array(receiverSecret.toString()))
       }
     }
   }
@@ -1898,10 +1904,10 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       val redeemedDebt = 0L
       val redeemAmount = totalDebt
       val newRedeemedDebt = redeemedDebt + redeemAmount
-      val timestamp = System.currentTimeMillis() // Consistent timestamp
+      val timestamp = System.currentTimeMillis()
       val key = mkKey(ownerPk, receiverPk)
-      // Emergency redemption message: key || totalDebt || timestamp || 0L
-      val message = mkEmergencyMessage(key, totalDebt, timestamp)
+      // Use normal message format
+      val message = mkMessage(key, totalDebt, timestamp)
       val reserveSigBytes = mkSigBytes(SigUtils.sign(message, ownerSecret))
       val invalidTrackerSigBytes = corruptSig(SigUtils.sign(message, trackerSecret)) // corrupted sig
       val TreeAndProof(initialTree, nextTree, proofBytes) = mkTreeAndProof(key, newRedeemedDebt, timestamp)
@@ -1910,14 +1916,14 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
 
       val basisInput = mkBasisInput(minValue + totalDebt + feeValue, initialTree,
         receiverPk, reserveSigBytes, totalDebt, proofBytes, invalidTrackerSigBytes, None, Some(trackerLookupProof), timestamp)
-      // Tracker is more than 3 days old (but tracker signature is still required)
+      // Tracker is more than 3 days old (but invalid signature should still fail)
       val trackerDataInput = mkTrackerDataInput(trackerTree, Some(3 * 720 + 1))
       val basisOutput = createOut(Constants.basisContract, minValue + feeValue,
         Array(ErgoValue.of(ownerPk), nextTree, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
       val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
 
-      // Emergency redemption should fail: tracker signature is still required even for old tracker
+      // Should fail: invalid tracker signature is rejected even for old tracker
       a[Throwable] should be thrownBy {
         createTx(Array(basisInput), Array(trackerDataInput),
           Array(basisOutput, redemptionOutput), fee = None, changeAddress,
@@ -1934,9 +1940,8 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
   // 1. Normal redemption: tracker signature required (any time)
   // 2. Emergency redemption: no tracker signature needed (after 3 days)
   //
-  // Message formats differ to prevent replay attacks:
-  // - Normal: key || totalDebt || timestamp
-  // - Emergency: key || totalDebt || timestamp || 0L
+  // Both paths use the SAME message format: key || totalDebt || timestamp
+  // The only difference is tracker signature optionality after emergency period.
 
   property("Emergency exit: should succeed without tracker signature after emergency period") {
     createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
@@ -1947,9 +1952,8 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       val timestamp = System.currentTimeMillis()
       val key = mkKey(ownerPk, receiverPk)
 
-      // Emergency redemption message WITH 0L suffix (emergency format)
-      // Tracker is offline, so we use emergency message format but no tracker signature
-      val message = mkEmergencyMessage(key, totalDebt, timestamp)
+      // Use normal message format (same for both normal and emergency redemption)
+      val message = mkMessage(key, totalDebt, timestamp)
       val reserveSigBytes = mkSigBytes(SigUtils.sign(message, ownerSecret))
 
       // NO tracker signature - tracker is offline!
