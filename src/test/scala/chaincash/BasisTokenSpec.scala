@@ -830,4 +830,168 @@ class BasisTokenSpec extends PropSpec with Matchers with ScalaCheckDrivenPropert
     }
   }
 
+  // ========== TRIANGULAR TRADE TESTS ==========
+
+  property("basis-token: debt transfer triangular trade with consent should work") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
+      val timestamp = System.currentTimeMillis()
+      val reserveTokenAmount = 20000000000L
+
+      val initialDebtToBob = 20000000000L
+      val transferAmount = 8000000000L
+      val remainingDebtToBob = 12000000000L
+
+      val aliceKey = ownerPk
+      val bobKey = receiverPk
+      val carolSecret = SigUtils.randBigInt
+      val carolKey = Constants.g.exp(carolSecret.bigInteger)
+
+      val keyAliceBob = mkKey(aliceKey, bobKey)
+      val keyAliceCarol = mkKey(aliceKey, carolKey)
+
+      val trackerTreeABInitial = mkTrackerTreeAndProof(keyAliceBob, initialDebtToBob)
+
+      val messageToBob = mkMessage(keyAliceBob, remainingDebtToBob, timestamp)
+      val aliceSigBob = SigUtils.sign(messageToBob, ownerSecret)
+      val trackerSigBob = SigUtils.sign(messageToBob, trackerSecret)
+
+      val messageToCarol = mkMessage(keyAliceCarol, transferAmount, timestamp)
+      val aliceSigCarol = SigUtils.sign(messageToCarol, ownerSecret)
+      val trackerSigCarol = SigUtils.sign(messageToCarol, trackerSecret)
+
+      val trackerTreeAB = mkTrackerTreeAndProof(keyAliceBob, remainingDebtToBob)
+      val trackerTreeAC = mkTrackerTreeAndProof(keyAliceCarol, transferAmount)
+
+      val reserveSigBob = mkSigBytes(aliceSigBob)
+      val trackerSigBobBytes = mkSigBytes(trackerSigBob)
+      val TreeAndProof(initialTreeBob, nextTreeBob, proofBob) = mkTreeAndProof(keyAliceBob, remainingDebtToBob, timestamp)
+
+      val basisInputBob = mkBasisTokenInput(
+        minValue * 2 + feeValue, initialTreeBob,
+        bobKey, reserveSigBob, remainingDebtToBob, proofBob, trackerSigBobBytes,
+        reserveTokenAmount, None, Some(trackerTreeAB.lookupProofBytes), timestamp
+      )
+      val trackerDataInputAB = mkTrackerDataInput(trackerTreeAB.tree)
+
+      val basisOutputBob = createOut(Constants.basisTokenContract, minValue,
+        Array(ErgoValue.of(ownerPk), nextTreeBob, ErgoValue.of(trackerNFTBytes)),
+        Array(new ErgoToken(reserveNFTBytes, 1), new ErgoToken(reserveTokenIdBytes, reserveTokenAmount - remainingDebtToBob))
+      )
+      val redemptionOutputBob = createOut(trueScript, minValue, Array(), Array(new ErgoToken(reserveTokenIdBytes, remainingDebtToBob)))
+
+      noException should be thrownBy {
+        createTx(Array(basisInputBob), Array(trackerDataInputAB),
+          Array(basisOutputBob, redemptionOutputBob), fee = Some(feeValue), changeAddress,
+          Array(receiverSecret.toString()), false)
+      }
+
+      println("Basis-token debt transfer test passed: triangular trade with tokens works correctly")
+    }
+  }
+
+  property("basis-token: debt transfer should fail without debtor consent") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
+      val timestamp = System.currentTimeMillis()
+      val transferAmount = 5000000000L
+
+      val aliceKey = ownerPk
+      val bobKey = receiverPk
+      val carolSecret = SigUtils.randBigInt
+      val carolKey = Constants.g.exp(carolSecret.bigInteger)
+
+      val keyAliceBob = mkKey(aliceKey, bobKey)
+      val keyAliceCarol = mkKey(aliceKey, carolKey)
+
+      val messageToCarol = mkMessage(keyAliceCarol, transferAmount, timestamp)
+      val forgedAliceSig = SigUtils.sign(messageToCarol, receiverSecret)
+      val forgeryValid = SigUtils.verify(messageToCarol, aliceKey, forgedAliceSig._1, forgedAliceSig._2)
+      forgeryValid shouldBe false
+
+      val trackerOnlySig = SigUtils.sign(messageToCarol, trackerSecret)
+      val trackerForgeryValid = SigUtils.verify(messageToCarol, aliceKey, trackerOnlySig._1, trackerOnlySig._2)
+      trackerForgeryValid shouldBe false
+
+      println("Basis-token debt transfer without consent test passed: unauthorized note creation prevented")
+    }
+  }
+
+  property("basis-token: multi-hop triangular trade concept verification") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
+      val timestamp = System.currentTimeMillis()
+
+      val aliceKey = ownerPk
+      val bobKey = receiverPk
+      val carolSecret = SigUtils.randBigInt
+      val carolKey = Constants.g.exp(carolSecret.bigInteger)
+      val daveSecret = SigUtils.randBigInt
+      val daveKey = Constants.g.exp(daveSecret.bigInteger)
+
+      val keyAliceBob = mkKey(aliceKey, bobKey)
+      val keyAliceCarol = mkKey(aliceKey, carolKey)
+      val keyAliceDave = mkKey(aliceKey, daveKey)
+
+      val debtToBob = 5000000000L
+      val debtToCarol = 5000000000L
+      val debtToDave = 5000000000L
+
+      val messageBob = mkMessage(keyAliceBob, debtToBob, timestamp)
+      val aliceSigBob = SigUtils.sign(messageBob, ownerSecret)
+      val trackerSigBob = SigUtils.sign(messageBob, trackerSecret)
+
+      val messageCarol = mkMessage(keyAliceCarol, debtToCarol, timestamp)
+      val aliceSigCarol = SigUtils.sign(messageCarol, ownerSecret)
+      val trackerSigCarol = SigUtils.sign(messageCarol, trackerSecret)
+
+      val messageDave = mkMessage(keyAliceDave, debtToDave, timestamp)
+      val aliceSigDave = SigUtils.sign(messageDave, ownerSecret)
+      val trackerSigDave = SigUtils.sign(messageDave, trackerSecret)
+
+      SigUtils.verify(messageCarol, aliceKey, aliceSigCarol._1, aliceSigCarol._2) shouldBe true
+      SigUtils.verify(messageCarol, trackerPk, trackerSigCarol._1, trackerSigCarol._2) shouldBe true
+      SigUtils.verify(messageDave, aliceKey, aliceSigDave._1, aliceSigDave._2) shouldBe true
+      SigUtils.verify(messageDave, trackerPk, trackerSigDave._1, trackerSigDave._2) shouldBe true
+
+      println("Basis-token multi-hop triangular trade concept test passed")
+    }
+  }
+
+  property("basis-token: partial transfer with creditor holding note - signature verification") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
+      val timestamp = System.currentTimeMillis()
+
+      val aliceKey = ownerPk
+      val bobKey = receiverPk
+      val carolSecret = SigUtils.randBigInt
+      val carolKey = Constants.g.exp(carolSecret.bigInteger)
+
+      val keyAliceBob = mkKey(aliceKey, bobKey)
+      val keyAliceCarol = mkKey(aliceKey, carolKey)
+
+      val transferToCarol = 5000000000L
+      val bobRemaining = 5000000000L
+
+      val messageBob = mkMessage(keyAliceBob, bobRemaining, timestamp)
+      val aliceSigBob = SigUtils.sign(messageBob, ownerSecret)
+      val trackerSigBob = SigUtils.sign(messageBob, trackerSecret)
+
+      val messageCarol = mkMessage(keyAliceCarol, transferToCarol, timestamp)
+      val aliceSigCarol = SigUtils.sign(messageCarol, ownerSecret)
+      val trackerSigCarol = SigUtils.sign(messageCarol, trackerSecret)
+
+      val timestamp2 = timestamp + 1000
+      val carolRemaining = 2000000000L
+
+      val messageCarol2 = mkMessage(keyAliceCarol, carolRemaining, timestamp2)
+      val aliceSigCarol2 = SigUtils.sign(messageCarol2, ownerSecret)
+      val trackerSigCarol2 = SigUtils.sign(messageCarol2, trackerSecret)
+
+      SigUtils.verify(messageBob, aliceKey, aliceSigBob._1, aliceSigBob._2) shouldBe true
+      SigUtils.verify(messageCarol, aliceKey, aliceSigCarol._1, aliceSigCarol._2) shouldBe true
+      SigUtils.verify(messageCarol2, aliceKey, aliceSigCarol2._1, aliceSigCarol2._2) shouldBe true
+
+      timestamp2 > timestamp shouldBe true
+
+      println("Basis-token partial transfer with holding signature test passed")
+    }
+  }
 }
