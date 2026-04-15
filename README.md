@@ -38,7 +38,7 @@ without prior interaction.
 ## Whitepaper And Other Materials
 
 High-level description of ChainCash protocol and its implementation can be found
-in the [whitepaper](https://github.com/ChainCashLabs/chaincash/blob/master/docs/conf/conf.pdf).
+in the [whitepaper](https://github.com/BetterMoneyLabs/chaincash/blob/master/docs/conf/conf.pdf).
 
 More introductory materials:
 
@@ -66,7 +66,7 @@ See `demo/basis/simple/README.md` for detailed instructions.
 ## ChainCash Server
 
 ChainCash server is software acting as a self-sovereign bank with client-side notes
-validation. It can be found at [https://github.com/ChainCashLabs/chaincash-rs](https://github.com/ChainCashLabs/chaincash-rs). 
+validation. It can be found at [https://github.com/BetterMoneyLabs/chaincash-rs](https://github.com/BetterMoneyLabs/chaincash-rs). 
 Initial version of [design document](docs/server.md) is also available. The server has basic HTTP API but no any UI.
 
 ## Contents Of This Repository
@@ -83,7 +83,7 @@ estimation options.
  contracts (note creation, spending, redemption)
 * Offchain part - https://github.com/kushti/chaincash/tree/master/src/main/scala/chaincash/offchain - on-chain data tracking,
   persistence, transaction builders. This is very rough prototype, at the moment better to look into ChainCash Server which 
- is available at [https://github.com/ChainCashLabs/chaincash-rs](https://github.com/ChainCashLabs/chaincash-rs) .
+ is available at [https://github.com/BetterMoneyLabs/chaincash-rs](https://github.com/BetterMoneyLabs/chaincash-rs) .
 
 ## Communications
 
