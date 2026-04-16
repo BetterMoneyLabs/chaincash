@@ -50,3 +50,6 @@ project/metals.sbt
 
 # scala worksheets
 *.worksheet.sc
+
+# VC decks (confidential)
+docs/presentation/vc/
