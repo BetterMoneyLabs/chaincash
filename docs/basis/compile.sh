@@ -1,0 +1,14 @@
+rm basis.aux
+rm basis.out
+rm basis.log
+rm basis.bbl
+rm basis.blg
+pdflatex basis
+bibtex basis
+pdflatex basis
+pdflatex basis
+rm basis.aux
+rm basis.out
+rm basis.log
+rm basis.bbl
+rm basis.blg

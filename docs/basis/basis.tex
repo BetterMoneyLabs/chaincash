@@ -1,0 +1,153 @@
+\documentclass{ifcolog}
+
+\usepackage{color}
+\usepackage{graphicx}
+%% The amssymb package provides various useful mathematical symbols
+\usepackage{amssymb}
+%% The amsthm package provides extended theorem environments
+%\usepackage{amsthm}
+\usepackage{amsmath}
+
+\usepackage{listings}
+
+\usepackage{hyperref}
+
+\usepackage{systeme}
+
+\def\shownotes{1}
+\def\notesinmargins{0}
+
+\ifnum\shownotes=1
+\ifnum\notesinmargins=1
+\newcommand{\authnote}[2]{\marginpar{\parbox{\marginparwidth}{\tiny %
+  \textsf{#1 {\textcolor{blue}{notes: #2}}}}}%
+  \textcolor{blue}{\textbf{\dag}}}
+\else
+\newcommand{\authnote}[2]{
+  \textsf{#1 \textcolor{blue}{: #2}}}
+\fi
+\else
+\newcommand{\authnote}[2]{}
+\fi
+
+\newcommand{\knote}[1]{{\authnote{\textcolor{green}{kushti notes}}{#1}}}
+\newcommand{\mnote}[1]{{\authnote{\textcolor{red}{scalahub notes}}{#1}}}
+
+\usepackage[dvipsnames]{xcolor}
+\usepackage[colorinlistoftodos,prependcaption,textsize=tiny]{todonotes}
+
+
+% type user-defined commands here
+\usepackage[T1]{fontenc}
+
+
+\newcommand{\cc}{ChainCash}
+\newcommand{\basis}{Basis}
+
+\newcommand{\ma}{\mathcal{A}}
+\newcommand{\mb}{\mathcal{B}}
+\newcommand{\he}{\hat{e}}
+\newcommand{\sr}{\stackrel}
+\newcommand{\ra}{\rightarrow}
+\newcommand{\la}{\leftarrow}
+\newcommand{\state}{state}
+
+\newcommand{\ignore}[1]{} 
+\newcommand{\full}[1]{}
+\newcommand{\notfull}[1]{#1}
+\newcommand{\rand}{\stackrel{R}{\leftarrow}}
+\newcommand{\mypar}[1]{\smallskip\noindent\textbf{#1.}}
+
+\begin{document}
+
+\title{Local Credit, Global Settlement: Enhancing Trust-Based Credit Creation with On-Chain Reserve Contracts}
+
+% \addauthor{kushti@protonmail.ch}{kushti}{ChainCash Project}
+
+\authorrunning{}
+\titlerunning{Local Credit, Global Settlement: Trust-Based Credit with On-Chain Reserves}
+
+\jvolume{X}
+\jnumber{Y}
+\jyear{2026}
+\jreceived{received date}
+
+\keywords{blockchain, digital currency, peer-to-peer money, trust-based credit, IOU notes}
+
+\maketitle
+
+\begin{abstract}
+In this work, we propose \basis{}, a framework where both local IOU trust-based currencies as well as global ones using blockchain smart contract powered reserves where there is no trust (possibly connecting local trading circles) can coexist. Coordination with blockchain is needed only during debt note redemption against a reserve contract. Payments are done offchain, so with low fees and no need to use low-security centralized blockchain-like systems with high throughput. For coordination and transparency of debt in the system, a tracker service is used, which can not steal money from reserves. We provide analysis of trust-minimization in regards with tracker activities.
+
+Current offchain payment systems backed by on-chain reserves (Lightning Network, Cashu, Fedimint) require full backing and so do not allow for credit creation. In contrast, \basis{} allows for credit creation with no requirements set on reserves at the protocol level. Then it can be used for community trading without using blockchain (and possibly, without Internet even, just by using a local mesh network), but when trust is insufficient to expand credit, on-chain reserves can be established and used. We expect that on a local scale trust-based economic relationships would dominate, and on a global scale full coverage with reserves would be needed in most cases. The whole system will use limited in disconnected from real-world needs supply blockchain assets only where they are needed (there is no trust), while enabling monetary expansion whenever possible (so where peer-to-peer trust can be established), thus allowing to create a viable alternative to political money.
+\end{abstract}
+
+\section{Introduction}
+
+Peer-to-peer monetary systems, such as \cc{}~\cite{chaincash}, enable decentralized money creation through trust and collateral. While on-chain protocols provide transparency and censorship resistance, they often struggle with scalability and cost when every transaction must be recorded on a public blockchain. Off-chain alternatives, such as payment channels and Layer 2 solutions, improve scalability but introduce new trust assumptions and state management challenges.
+
+In this work, we propose \basis{}, a trust-minimized state tracker designed to complement peer-to-peer monetary systems. \basis{} maintains an off-chain AVL tree of debt relationships between economic agents, witnesses new notes by signing them, and periodically commits state digests to a public blockchain. This design allows for efficient note circulation off-chain while preserving the security properties of on-chain redemption.
+
+The paper is organized as follows. In Section~\ref{sec-design} we describe the design of \basis{}. Section~\ref{sec-security} analyzes security properties. Section~\ref{sec-integration} discusses integration with \cc{}. In Section~\ref{sec-adv} we provide analysis of advantages and drawbacks.
+
+\section{Design}
+\label{sec-design}
+
+We consider a set of economic agents $a_1, ..., a_n$ participating in a peer-to-peer monetary system. Each agent may issue IOU notes, creating debt relationships with other agents. \basis{} tracks these relationships in an AVL tree mapping:
+
+$$\text{Blake2b256}(\text{payerKey} || \text{payeeKey}) \rightarrow (\text{totalDebt}, \text{timestamp})$$
+
+\subsection{Note Witnessing}
+
+When an agent issues a new IOU note, the note contains the issuer's signature and the intended recipient. Before the recipient accepts the note, it may request witnessing from a \basis{} tracker. The tracker verifies the note, updates its local state to include the new debt relationship, and returns a signature certifying that the debt is now tracked.
+
+\subsection{State Commitment}
+
+Periodically, the tracker commits the root digest of its AVL tree to the public blockchain. This commitment serves two purposes: it provides a timestamped checkpoint of the global debt state, and it enables emergency redemption in case the tracker becomes unavailable.
+
+\subsection{Debt Transfer}
+
+When an agent wishes to transfer a portion of its debt to a new creditor, the original debtor signs new notes, the tracker witnesses both the reduction in the old debt and the creation of the new debt, and the old note is cancelled. This enables triangular trade and debt restructuring without requiring full redemption.
+
+\section{Security Analysis}
+\label{sec-security}
+
+\subsection{Tracker Cannot Steal Funds}
+
+The tracker only certifies inclusion of notes in its state. It cannot unilaterally create or redeem notes. The issuer's signature is always required for redemption, ensuring that the tracker cannot steal funds.
+
+\subsection{Emergency Exit}
+
+If the tracker becomes unavailable, an emergency exit mechanism activates after a timeout period (e.g., 3 days or 2160 blocks). After this period, the tracker signature becomes optional for redemption. The same message format is used: $\text{key} || \text{totalDebt} || \text{timestamp}$. Replay attacks are prevented by timestamp verification, and the reserve owner's signature is still required.
+
+\subsection{Anti-Censorship}
+
+Previously witnessed notes can still be redeemed even if the tracker refuses to witness new notes. The last committed state on the blockchain provides a floor for redemption rights.
+
+\section{Integration with \cc{}}
+\label{sec-integration}
+
+\basis{} can operate alongside the on-chain \cc{} protocol. Reserves on the blockchain back the IOU notes tracked by \basis{}. When a creditor wishes to redeem a note, they may do so through the tracker's normal path (with tracker signature) or through the emergency path (after timeout). The tracker monitors collateralization levels and publishes alerts via the NOSTR protocol when thresholds (e.g., 80\% or 100\%) are breached.
+
+\section{Advantages and Drawbacks}
+\label{sec-adv}
+
+Advantages:
+\begin{itemize}
+  \item Scalable off-chain tracking with on-chain security guarantees
+  \item Emergency exit prevents lock-in to a single tracker
+  \item Anti-censorship protections for previously witnessed notes
+  \item Periodic commitments enable global state verification
+\end{itemize}
+
+Drawbacks:
+\begin{itemize}
+  \item Tracker introduces a liveness assumption during normal operation
+  \item State commitments incur on-chain costs
+  \item Privacy concerns from global debt graph visibility
+\end{itemize}
+
+\bibliography{sources}
+\bibliographystyle{plain}
+
+\end{document}
