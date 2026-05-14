@@ -77,9 +77,14 @@
 \maketitle
 
 \begin{abstract}
-In this work, we propose \basis{}, a framework where both local IOU trust-based currencies as well as global ones using blockchain smart contract powered reserves where there is no trust (possibly connecting local trading circles) can coexist. Coordination with blockchain is needed only during debt note redemption against a reserve contract. Payments are done offchain, so with low fees and no need to use low-security centralized blockchain-like systems with high throughput. For coordination and transparency of debt in the system, a tracker service is used, which can not steal money from reserves. We provide analysis of trust-minimization in regards with tracker activities.
+In this work, we propose \basis{}, a framework where both local trust-based (and IOU-based) currencies as well as blockchain-based trust-minimized global ones can coexist via smart contract powered reserves needed when there is no trust (possibly connecting local trading circles). Coordination with blockchain is needed only during debt note redemption against a reserve contract. Payments (debt note transfers) are done offchain, so with low fees and no need to use low-security centralized blockchain-like systems with high throughput. For coordination and transparency of debt in the system, a tracker service is used, which can not steal money from reserves. We provide analysis of trust-minimization in regards with tracker activities.
 
-Current offchain payment systems backed by on-chain reserves (Lightning Network, Cashu, Fedimint) require full backing and so do not allow for credit creation. In contrast, \basis{} allows for credit creation with no requirements set on reserves at the protocol level. Then it can be used for community trading without using blockchain (and possibly, without Internet even, just by using a local mesh network), but when trust is insufficient to expand credit, on-chain reserves can be established and used. We expect that on a local scale trust-based economic relationships would dominate, and on a global scale full coverage with reserves would be needed in most cases. The whole system will use limited in disconnected from real-world needs supply blockchain assets only where they are needed (there is no trust), while enabling monetary expansion whenever possible (so where peer-to-peer trust can be established), thus allowing to create a viable alternative to political money.
+Current offchain payment systems backed by on-chain reserves (Lightning Network, Cashu, Fedimint) require full backing and so do not allow for credit creation. In contrast, \basis{} allows for credit creation with no requirements set for reserves at the protocol level. Then it can be used for community trading without using blockchain (and possibly, without Internet even, just by using a local mesh network), but when trust is insufficient to expand credit, on-chain reserves can be established and used. We expect that on a local scale trust-based economic relationships would dominate, and on a global scale~(e.g. when one community is doing trades with another) full coverage with reserves would be needed in most cases. The whole system will use limited in disconnected from real-world needs supply blockchain assets only where they are needed (there is no trust), while enabling monetary expansion whenever possible (so where peer-to-peer trust can be established), thus allowing to create a viable alternative to political money.
+
+The main payment unit is IOU note, which is signed by the issuer and the tracker. Our design allows for debt transferability, if issuer agrees on that, so if peer A issued debt to peer B, and peer B pays with it, fully or partially, to peer C, with A also co-signing, and then A owes C.
+We show that this design allows for minimal trust to tracker service. A tracker service is committing its state on the blockchain periodically. If a tracker service ceases to exist, it is possible to redeem debt notes against on-chain reserves using this committed state. There could be multiple trackers around the world. We consider different designs, from just centralized server, to federated control, to rollups and sidechains.
+
+We provide implementation of reserve contract as well as offchain clients (tracker server and example clients). We show an example of group trading over mesh network with occasional Internet connection. Another example shows AI agent economies where autonomous agents create credit relationships for services.
 \end{abstract}
 
 \section{Introduction}
@@ -88,7 +93,7 @@ Peer-to-peer monetary systems, such as \cc{}~\cite{chaincash}, enable decentrali
 
 In this work, we propose \basis{}, a trust-minimized state tracker designed to complement peer-to-peer monetary systems. \basis{} maintains an off-chain AVL tree of debt relationships between economic agents, witnesses new notes by signing them, and periodically commits state digests to a public blockchain. This design allows for efficient note circulation off-chain while preserving the security properties of on-chain redemption.
 
-The paper is organized as follows. In Section~\ref{sec-design} we describe the design of \basis{}. Section~\ref{sec-security} analyzes security properties. Section~\ref{sec-integration} discusses integration with \cc{}. In Section~\ref{sec-adv} we provide analysis of advantages and drawbacks.
+The paper is organized as follows. In Section~\ref{sec-design} we describe the design of \basis{}. Section~\ref{sec-security} analyzes security properties. Section~\ref{sec-impl} provides implementation details. In Section~\ref{sec-adv} we provide analysis of advantages and drawbacks.
 
 \section{Design}
 \label{sec-design}
@@ -124,30 +129,39 @@ If the tracker becomes unavailable, an emergency exit mechanism activates after 
 
 Previously witnessed notes can still be redeemed even if the tracker refuses to witness new notes. The last committed state on the blockchain provides a floor for redemption rights.
 
-\section{Integration with \cc{}}
-\label{sec-integration}
+\section{Implementation}
+\label{sec-impl}
 
-\basis{} can operate alongside the on-chain \cc{} protocol. Reserves on the blockchain back the IOU notes tracked by \basis{}. When a creditor wishes to redeem a note, they may do so through the tracker's normal path (with tracker signature) or through the emergency path (after timeout). The tracker monitors collateralization levels and publishes alerts via the NOSTR protocol when thresholds (e.g., 80\% or 100\%) are breached.
+We provide implementation of the \basis{} protocol in software, including smart contracts for on-chain reserves, a tracker server for coordinating off-chain state, and client libraries for issuing and managing IOU notes.
+
+\subsection{Reserve Contract}
+
+The reserve contract is implemented on the Ergo blockchain using the ErgoScript smart contract language. It locks collateral (ERG or custom tokens) and allows redemption when presented with a valid debt note and signatures. The contract enforces the timeout rules for emergency redemption without tracker signatures.
+
+\subsection{Tracker Server}
+
+The tracker server maintains the AVL tree of debt relationships, witnesses new notes by signing them, and periodically commits state digests to the blockchain. It exposes APIs for note witnessing, state queries, and commitment retrieval. The server publishes alerts via the NOSTR protocol for collateralization monitoring.
+
+\subsection{Client Libraries}
+
+Client libraries provide functionality for agents to issue IOU notes, request tracker witnessing, transfer debt to new creditors, and redeem notes against reserves. The libraries handle signature generation, note serialization, and communication with tracker and blockchain nodes.
+
+\subsection{Examples}
+
+We demonstrate two example applications: group trading over a local mesh network with occasional Internet connection, where notes circulate off-chain and synchronize when connectivity is available; and AI agent economies where autonomous agents create credit relationships for services rendered.
+
 
 \section{Advantages and Drawbacks}
 \label{sec-adv}
 
-Advantages:
 \begin{itemize}
-  \item Scalable off-chain tracking with on-chain security guarantees
-  \item Emergency exit prevents lock-in to a single tracker
-  \item Anti-censorship protections for previously witnessed notes
-  \item Periodic commitments enable global state verification
+\item Scalable off-chain tracking with on-chain security guarantees
+\item Emergency exit prevents lock-in to a single tracker
+\item Anti-censorship protections for previously witnessed notes
+\item Periodic commitments enable global state verification
 \end{itemize}
 
-Drawbacks:
-\begin{itemize}
-  \item Tracker introduces a liveness assumption during normal operation
-  \item State commitments incur on-chain costs
-  \item Privacy concerns from global debt graph visibility
-\end{itemize}
-
-\bibliography{sources}
+\bibliography{../conf/sources}
 \bibliographystyle{plain}
 
 \end{document}
