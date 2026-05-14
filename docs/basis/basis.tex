@@ -58,13 +58,15 @@
 \newcommand{\rand}{\stackrel{R}{\leftarrow}}
 \newcommand{\mypar}[1]{\smallskip\noindent\textbf{#1.}}
 
+\titlethanks{}
+
 \begin{document}
 
 \title{Local Credit, Global Settlement: Enhancing Trust-Based Credit Creation with On-Chain Reserve Contracts}
 
-% \addauthor{kushti@protonmail.ch}{kushti}{ChainCash Project}
+\addauthor{kushti@protonmail.ch}{Alexander Chepurnoy}{Better Money Labs}
 
-\authorrunning{}
+\authorrunning{Alexander Chepurnoy}
 \titlerunning{Local Credit, Global Settlement: Trust-Based Credit with On-Chain Reserves}
 
 \jvolume{X}
@@ -72,7 +74,7 @@
 \jyear{2026}
 \jreceived{received date}
 
-\keywords{blockchain, digital currency, peer-to-peer money, trust-based credit, IOU notes}
+\keywords{digital currencies, cryptocurrencies, blockchain, peer-to-peer money, trust-based credit, IOU notes}
 
 \maketitle
 
@@ -91,7 +93,7 @@ We provide implementation of reserve contract as well as offchain clients (track
 
 Peer-to-peer monetary systems, such as \cc{}~\cite{chaincash}, enable decentralized money creation through trust and collateral. While on-chain protocols provide transparency and censorship resistance, they often struggle with scalability and cost when every transaction must be recorded on a public blockchain. Off-chain alternatives, such as payment channels and Layer 2 solutions, improve scalability but introduce new trust assumptions and state management challenges.
 
-In this work, we propose \basis{}, a trust-minimized state tracker designed to complement peer-to-peer monetary systems. \basis{} maintains an off-chain AVL tree of debt relationships between economic agents, witnesses new notes by signing them, and periodically commits state digests to a public blockchain. This design allows for efficient note circulation off-chain while preserving the security properties of on-chain redemption.
+In this work, we propose \basis{}, a monetary framework designed for peer-to-peer credit creation and settlement. \basis{} enables local trust-based currencies to coexist with blockchain-backed global reserves, maintaining an off-chain AVL tree of debt relationships between economic agents, witnessing new notes by signing them, and periodically committing state digests to a public blockchain. This design allows for efficient note circulation off-chain while preserving the security properties of on-chain redemption.
 
 The paper is organized as follows. In Section~\ref{sec-design} we describe the design of \basis{}. Section~\ref{sec-security} analyzes security properties. Section~\ref{sec-impl} provides implementation details. In Section~\ref{sec-adv} we provide analysis of advantages and drawbacks.
 
@@ -146,9 +148,17 @@ The tracker server maintains the AVL tree of debt relationships, witnesses new n
 
 Client libraries provide functionality for agents to issue IOU notes, request tracker witnessing, transfer debt to new creditors, and redeem notes against reserves. The libraries handle signature generation, note serialization, and communication with tracker and blockchain nodes.
 
-\subsection{Examples}
+\subsection{Mesh Network Trading}
 
-We demonstrate two example applications: group trading over a local mesh network with occasional Internet connection, where notes circulate off-chain and synchronize when connectivity is available; and AI agent economies where autonomous agents create credit relationships for services rendered.
+We demonstrate community trading over mesh networks using Meshtastic LoRa devices. In this scenario, Alice and Bob trade in a village without Internet connectivity. Alice's device creates an IOU note for goods purchased, which is propagated via mesh radio (Bluetooth/WiFi Direct/LoRa) to Bob's device. A local tracker running on a community server signs the IOU, updating the debt ledger. Multiple transactions accumulate off-chain, and when Internet connectivity becomes available through a gateway node, Bob aggregates the IOUs and submits a batch redemption transaction to the Ergo blockchain. This demonstrates offline credit-based trading without forced collateralization, with blockchain used only for final settlement.
+
+Key features demonstrated include: offline transaction creation via mesh propagation, local tracker signature and debt ledger maintenance, batch settlement to reduce blockchain fees, and credit-based trading without collateral requirements.
+
+\subsection{AI Agent Credit Creation}
+
+We demonstrate autonomous credit creation among AI agents in a software development workflow. A Repo Agent posts a development task with a budget, a Dev Agent completes the work and submits a pull request, and a Test Agent reviews and tests the code. The Repo Agent creates an IOU note (e.g., 10 ERG) backed by its reserve, which the Dev Agent accepts. The Dev Agent then transfers a portion (e.g., 3 ERG) to the Test Agent for testing services. All agents have Basis wallets with credit limits based on their reputation and payment history. Humans can provide reserve backing as economic feedback, but the agents negotiate terms, create IOUs, and settle debts autonomously without human intervention for each transaction.
+
+This demonstrates: autonomous task negotiation and IOU creation, multi-agent payment splitting, credit limits based on agent reputation, and human reserve backing as optional economic feedback rather than required collateral.
 
 
 \section{Advantages and Drawbacks}
