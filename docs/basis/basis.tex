@@ -100,21 +100,29 @@ The paper is organized as follows. In Section~\ref{sec-design} we describe the d
 \section{Design}
 \label{sec-design}
 
-We consider a set of economic agents $a_1, ..., a_n$ participating in a peer-to-peer monetary system. Each agent may issue IOU notes, creating debt relationships with other agents. \basis{} tracks these relationships in an AVL tree mapping:
+We consider a set of economic agents $a_1, ..., a_n$ participating in a peer-to-peer monetary system. Each agent may issue IOU notes, creating debt relationships with other agents. Note acceptance is always optional and at the discretion of the counterparty.
 
-$$\text{Blake2b256}(\text{payerKey} || \text{payeeKey}) \rightarrow (\text{totalDebt}, \text{timestamp})$$
+\subsection{Note Creation}
 
-\subsection{Note Witnessing}
+When an agent (the payer) wishes to create a debt obligation to another agent (the payee), it creates an IOU note containing the payer's signature, the payee's public key, the debt amount, and a timestamp. The note may optionally reference a specific on-chain reserve contract that backs the debt. Before the payee accepts the note, it may request witnessing from a \basis{} tracker. The tracker verifies the note, updates its local state to record the new debt relationship, and returns a tracker signature certifying that the debt is now tracked. The payee accepts the witnessed note as a valid claim against the payer.
 
-When an agent issues a new IOU note, the note contains the issuer's signature and the intended recipient. Before the recipient accepts the note, it may request witnessing from a \basis{} tracker. The tracker verifies the note, updates its local state to include the new debt relationship, and returns a signature certifying that the debt is now tracked.
+\subsection{Note Redemption}
 
-\subsection{State Commitment}
+A payee holding a witnessed IOU note may redeem it against the payer's reserve at any time. To redeem, the payee presents the note along with both the payer's and tracker's signatures to the reserve contract. The contract verifies the signatures, checks the debt amount against the tracker's committed state, and releases the corresponding collateral to the payee. If the reserve has insufficient collateral, the payee may still hold the note as a claim and attempt redemption later, or the payer may be required to top up the reserve.
 
-Periodically, the tracker commits the root digest of its AVL tree to the public blockchain. This commitment serves two purposes: it provides a timestamped checkpoint of the global debt state, and it enables emergency redemption in case the tracker becomes unavailable.
+In the case where the tracker becomes unavailable, an emergency redemption path exists: after a timeout period (e.g., 3 days or 2160 blocks), the tracker signature becomes optional. The payee can redeem using only the payer's signature and the last committed tracker state from the blockchain, preventing funds from being locked indefinitely.
 
 \subsection{Debt Transfer}
 
-When an agent wishes to transfer a portion of its debt to a new creditor, the original debtor signs new notes, the tracker witnesses both the reduction in the old debt and the creation of the new debt, and the old note is cancelled. This enables triangular trade and debt restructuring without requiring full redemption.
+When an agent wishes to transfer a portion of its debt to a new creditor, the process resembles triangular trade. Suppose peer A owes peer B, and peer B wishes to transfer part of this debt to peer C. Peer B requests peer A to co-sign new notes: one reducing the debt A→B and another creating debt A→C. The tracker witnesses both the reduction in the old debt and the creation of the new debt, and the old note is cancelled. After the transfer, peer A owes peer C directly. This enables debt restructuring and circular trade without requiring full redemption and re-issuance.
+
+\subsection{Tracker State}
+
+\basis{} tracks all debt relationships in an AVL tree maintained by the tracker. The tree maps a composite key to the current debt state:
+
+$$\text{Blake2b256}(\text{payerKey} || \text{payeeKey}) \rightarrow (\text{totalDebt}, \text{timestamp})$$
+
+Periodically, the tracker commits the root digest of this AVL tree to the public blockchain. This commitment provides a timestamped checkpoint of the global debt state and enables emergency redemption when the tracker is unavailable.
 
 \section{Security Analysis}
 \label{sec-security}
