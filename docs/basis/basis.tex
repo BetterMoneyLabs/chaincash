@@ -67,12 +67,6 @@
 \addauthor{kushti@protonmail.ch}{Alexander Chepurnoy}{Better Money Labs}
 
 \authorrunning{Alexander Chepurnoy}
-\titlerunning{Local Credit, Global Settlement: Trust-Based Credit with On-Chain Reserves}
-
-\jvolume{X}
-\jnumber{Y}
-\jyear{2026}
-\jreceived{received date}
 
 \keywords{digital currencies, cryptocurrencies, blockchain, peer-to-peer money, trust-based credit, IOU notes}
 
@@ -93,7 +87,7 @@ We provide implementation of reserve contract as well as offchain clients (track
 
 Peer-to-peer monetary systems, such as \cc{}~\cite{chaincash}, enable decentralized (peer-to-peer) money creation through trust and collateral. While on-chain protocols provide transparency and censorship resistance, they often struggle with scalability and cost when every transaction must be recorded on a public blockchain. Off-chain alternatives, such as payment channels and Layer 2 solutions, improve scalability but introduce new trust assumptions, and also do not allow for expansion on top of blockchain assets.
 
-By expansion, we mean creating new monetary instruments (such as credit, IOUs, or representative tokens) that exceed the value of the underlying locked blockchain collateral. This is needed because the emission schedules of decentralized blockchain assets like Bitcoin or Ergo are algorithmically predetermined and entirely disconnected from real-world economic demand. Their supply cannot expand or contract in response to productive activity, trade volumes, or credit needs, making them inherently inelastic. Centralized alternatives like USDT or USDC reintroduce the very trust assumptions that blockchain technology sought to eliminate, requiring users to rely on opaque reserves, auditing processes, and issuer solvency. Basis bridges this gap by enabling elastic credit creation backed by trust, while still anchoring to on-chain reserves when trust is insufficient.
+By expansion, we mean creating new monetary instruments (such as credit, IOUs, or representative tokens) that exceed the value of the underlying locked blockchain collateral. This is needed because the emission schedules of decentralized blockchain assets like Bitcoin or Ergo are algorithmically predetermined and entirely disconnected from real-world economic demand. Their supply cannot expand or contract in response to productive activity, trade volumes, or credit needs, making them inherently inelastic. Centralized alternatives like USDT or USDC reintroduce the very trust assumptions that blockchain technology sought to eliminate, requiring users to rely on opaque reserves, auditing processes, and issuer solvency. There is need to bridge this gap by enabling elastic credit creation backed by trust, while still anchoring to on-chain reserves when trust is insufficient.
 
 In this work, we propose \basis{}, a monetary framework designed for peer-to-peer credit creation and settlement. \basis{} enables local trust-based currencies to coexist with blockchain-backed global reserves, maintaining an off-chain AVL tree of debt relationships between economic agents, witnessing new notes by signing them, and periodically committing state digests to a public blockchain. This design allows for efficient note circulation off-chain while preserving the security properties of on-chain redemption.
 
