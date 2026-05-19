@@ -98,7 +98,7 @@ The \basis{} protocol comprises two main components: on-chain reserve contracts 
 
 We provide open-source implementations of both the smart contracts and the tracker service~\cite{chaincashcode,basistracker}, which we describe in Section~\ref{sec-impl}.
 
-The paper is organized as follows. In Section~\ref{sec-design} we describe the design of \basis{} in detail. Section~\ref{sec-security} analyzes its security properties. Section~\ref{sec-impl} provides implementation details. In Section~\ref{sec-adv} we provide analysis of advantages and drawbacks of the protocol.
+The paper is organized as follows. In Section~\ref{sec-design} we describe the design of \basis{} in detail. Section~\ref{sec-impl} provides implementation details. Section~\ref{sec-security} analyzes its security properties. In Section~\ref{sec-adv} we provide analysis of advantages and drawbacks of the protocol.
 
 \section{Design}
 \label{sec-design}
@@ -107,25 +107,61 @@ We consider a fully flat peer-to-peer monetary system an economic agent may free
 
 \subsection{Note Creation}
 
-When an agent (the payer) wishes to create a debt obligation to another agent (the payee), it creates an IOU note containing the payer's signature, the payee's public key, the debt amount, and a timestamp. The note may be associated with an on-chain reserve contract that backs the debt, if such reserve does exist. Before the payee accepts the note, it may request witnessing from a \basis{} tracker. The tracker verifies the note, updates its local state to record the new debt relationship, and returns a tracker signature certifying that the debt is now tracked. The payee accepts the witnessed note as a valid claim against the payer.
+When an agent (the payer) wishes to create a debt obligation to another agent (the payee), it creates an IOU note containing the payer's signature, the payee's public key, the debt amount, and a timestamp. The note may be associated with an on-chain reserve contract that backs the debt, if such reserve does exist. For the payee to accept the note, it must contain a valid tracker signature certifying that the tracker has recorded the debt in its authenticated state. The payee verifies this signature along with the payer's signature and the note's contents before accepting the note as a valid claim against the payer.
 
 \subsection{Note Redemption}
 
-A payee holding a witnessed IOU note may redeem it against the payer's reserve at any time. To redeem, the payee presents the note along with both the payer's and tracker's signatures to the reserve contract. The contract verifies the signatures, checks the debt amount against the tracker's committed state, and releases the corresponding collateral to the payee. If the reserve has insufficient collateral, the payee may still hold the note as a claim and attempt redemption later, or the payer may be required to top up the reserve.
+A payee holding a witnessed IOU note may redeem it against the payer's reserve at any time by interacting with on-chain smart contract only. To redeem, the payee presents the note along with both the payer's and tracker's signatures to the reserve contract. The contract verifies the signatures, checks the debt amount against the tracker's committed state, and releases the corresponding collateral to the payee. If the reserve has insufficient collateral, the payee may still hold the note as a claim and attempt redemption later, or the payer may be required to top up the reserve. It is also possible to redeem the note partly.
 
-In the case where the tracker becomes unavailable, an emergency redemption path exists: after a timeout period (e.g., 3 days or 2160 blocks), the tracker signature becomes optional. The payee can redeem using only the payer's signature and the last committed tracker state from the blockchain, preventing funds from being locked indefinitely.
+In the case where the tracker becomes unavailable, an emergency redemption path exists: after a timeout period (e.g., 3 days), the tracker signature becomes optional. The payee can redeem using only the payer's signature and the last committed tracker state from the blockchain, preventing funds from being locked indefinitely.
 
 \subsection{Debt Transfer}
 
-When an agent wishes to transfer a portion of its debt to a new creditor, the process resembles triangular trade. Suppose peer A owes peer B, and peer B wishes to transfer part of this debt to peer C. Peer B requests peer A to co-sign new notes: one reducing the debt A→B and another creating debt A→C. The tracker witnesses both the reduction in the old debt and the creation of the new debt, and the old note is cancelled. After the transfer, peer A owes peer C directly. This enables debt restructuring and circular trade without requiring full redemption and re-issuance.
+When an agent wishes to transfer a portion of its debt to a new creditor, the process resembles triangular trade. Suppose peer A owes peer B, and peer B wishes to transfer part of this debt to peer C. Peer B requests peer A to co-sign new notes: one reducing the debt A→B and another creating debt A→C. The tracker witnesses both the reduction in the old debt and the creation of the new debt, and the old note is replaced with a new one. After the transfer, peer A owes peer C directly. This enables debt restructuring and circular trade without requiring full redemption and re-issuance.
 
 \subsection{Tracker State}
 
 \basis{} tracks all debt relationships in an AVL tree maintained by the tracker. The tree maps a composite key to the current debt state:
 
-$$\text{Blake2b256}(\text{payerKey} || \text{payeeKey}) \rightarrow (\text{totalDebt}, \text{timestamp})$$
+$$\text{hash}(\text{payerKey} || \text{payeeKey}) \rightarrow (\text{totalDebt}, \text{timestamp})$$,
+
+where $$\text{hash}$$ is a cryptographically strong hash function.
 
 Periodically, the tracker commits the root digest of this AVL tree to the public blockchain. This commitment provides a timestamped checkpoint of the global debt state and enables emergency redemption when the tracker is unavailable.
+
+\section{Implementation}
+\label{sec-impl}
+
+We provide implementation of the \basis{} protocol in software, including smart contracts for on-chain reserves, a tracker server for coordinating off-chain state, and client libraries for issuing and managing IOU notes.
+
+The smart contracts and documentation are available at~\cite{chaincashcode}, and the tracker server implementation is available at~\cite{basistracker}.
+
+\subsection{Reserve Contract}
+
+The reserve contract is implemented on the Ergo blockchain using the ErgoScript smart contract language~\cite{ergo-whitepaper,ergoscript}, and is available at~\cite{reservecontract}. It locks collateral (ERG or custom tokens) and allows redemption when presented with a valid debt note and signatures. The contract enforces the timeout rules for emergency redemption without tracker signatures.
+
+\subsection{Tracker Server}
+
+The tracker server is implemented in Rust and maintains an in-memory authenticated tree of all debt relationships. When a payer creates a note, the tracker verifies it, updates its local state, and returns a signature certifying the debt. The tree stores cumulative debt amounts indexed by the hash of the payer and payee public keys, enabling efficient lookups and proof generation.
+
+The server exposes an HTTP API for note creation, querying, and redemption preparation. It also monitors the Ergo blockchain for reserve boxes and periodically submits commitment transactions that embed the current state digest on-chain. This allows light clients to verify debt claims and enables emergency redemption if the tracker goes offline.
+
+\subsection{Client Libraries}
+
+Client libraries provide functionality for agents to issue IOU notes, request tracker witnessing, transfer debt to new creditors, and redeem notes against reserves. The libraries handle signature generation, note serialization, and communication with tracker and blockchain nodes.
+
+\subsection{Mesh Network Trading}
+
+We demonstrate community trading over mesh networks using Meshtastic LoRa devices. In this scenario, Alice and Bob are in a village with no direct Internet connectivity, but a local tracker running on a community server has connectivity to the Ergo blockchain via a satellite or cellular uplink. Alice creates an IOU note for goods purchased and sends it to Bob over the mesh network (Bluetooth/WiFi Direct/LoRa). Bob forwards the note to the tracker through the same mesh, and the tracker---being online---verifies it, updates its local state, signs it, and commits the updated digest to the blockchain. Multiple transactions accumulate this way, with the tracker continuously updating the on-chain state. When Bob later wishes to redeem, the tracker provides the necessary proof from its committed state, and the redemption transaction is submitted directly to the blockchain. This demonstrates offline credit-based trading for end users without forced collateralization, while the tracker maintains blockchain connectivity for state commitments and settlement.
+
+Notably, the tracker's Internet connectivity can in principle be limited or occasional, as it may operate in SPV or NiPoPoW client mode, syncing with the blockchain only periodically rather than maintaining a full node connection~\cite{ergoclient}. This makes the architecture suitable for regions with intermittent or censored connectivity.
+
+\subsection{AI Agent Credit Creation}
+
+We demonstrate autonomous credit creation among AI agents in a software development workflow. A Repo Agent posts a development task with a budget, a Dev Agent completes the work and submits a pull request, and a Test Agent reviews and tests the code. The Repo Agent creates an IOU note (e.g., 10 ERG) backed by its reserve, which the Dev Agent accepts. The Dev Agent then transfers a portion (e.g., 3 ERG) to the Test Agent for testing services. All agents have Basis wallets with credit limits based on their reputation and payment history. Humans can provide reserve backing as economic feedback, but the agents negotiate terms, create IOUs, and settle debts autonomously without human intervention for each transaction.
+
+This demonstrates: autonomous task negotiation and IOU creation, multi-agent payment splitting, credit limits based on agent reputation, and human reserve backing as optional economic feedback rather than required collateral.
+
 
 \section{Security Analysis}
 \label{sec-security}
@@ -141,38 +177,6 @@ If the tracker becomes unavailable, an emergency exit mechanism activates after 
 \subsection{Anti-Censorship}
 
 Previously witnessed notes can still be redeemed even if the tracker refuses to witness new notes. The last committed state on the blockchain provides a floor for redemption rights.
-
-\section{Implementation}
-\label{sec-impl}
-
-We provide implementation of the \basis{} protocol in software, including smart contracts for on-chain reserves, a tracker server for coordinating off-chain state, and client libraries for issuing and managing IOU notes.
-
-The smart contracts and documentation are available at~\cite{chaincashcode}, and the tracker server implementation is available at~\cite{basistracker}.
-
-\subsection{Reserve Contract}
-
-The reserve contract is implemented on the Ergo blockchain using the ErgoScript smart contract language. It locks collateral (ERG or custom tokens) and allows redemption when presented with a valid debt note and signatures. The contract enforces the timeout rules for emergency redemption without tracker signatures.
-
-\subsection{Tracker Server}
-
-The tracker server maintains the AVL tree of debt relationships, witnesses new notes by signing them, and periodically commits state digests to the blockchain. It exposes APIs for note witnessing, state queries, and commitment retrieval. The server publishes alerts via the NOSTR protocol for collateralization monitoring.
-
-\subsection{Client Libraries}
-
-Client libraries provide functionality for agents to issue IOU notes, request tracker witnessing, transfer debt to new creditors, and redeem notes against reserves. The libraries handle signature generation, note serialization, and communication with tracker and blockchain nodes.
-
-\subsection{Mesh Network Trading}
-
-We demonstrate community trading over mesh networks using Meshtastic LoRa devices. In this scenario, Alice and Bob trade in a village without Internet connectivity. Alice's device creates an IOU note for goods purchased, which is propagated via mesh radio (Bluetooth/WiFi Direct/LoRa) to Bob's device. A local tracker running on a community server signs the IOU, updating the debt ledger. Multiple transactions accumulate off-chain, and when Internet connectivity becomes available through a gateway node, Bob aggregates the IOUs and submits a batch redemption transaction to the Ergo blockchain. This demonstrates offline credit-based trading without forced collateralization, with blockchain used only for final settlement.
-
-Key features demonstrated include: offline transaction creation via mesh propagation, local tracker signature and debt ledger maintenance, batch settlement to reduce blockchain fees, and credit-based trading without collateral requirements.
-
-\subsection{AI Agent Credit Creation}
-
-We demonstrate autonomous credit creation among AI agents in a software development workflow. A Repo Agent posts a development task with a budget, a Dev Agent completes the work and submits a pull request, and a Test Agent reviews and tests the code. The Repo Agent creates an IOU note (e.g., 10 ERG) backed by its reserve, which the Dev Agent accepts. The Dev Agent then transfers a portion (e.g., 3 ERG) to the Test Agent for testing services. All agents have Basis wallets with credit limits based on their reputation and payment history. Humans can provide reserve backing as economic feedback, but the agents negotiate terms, create IOUs, and settle debts autonomously without human intervention for each transaction.
-
-This demonstrates: autonomous task negotiation and IOU creation, multi-agent payment splitting, credit limits based on agent reputation, and human reserve backing as optional economic feedback rather than required collateral.
-
 
 \section{Advantages and Drawbacks}
 \label{sec-adv}
