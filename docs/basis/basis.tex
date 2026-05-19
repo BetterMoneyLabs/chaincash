@@ -132,7 +132,7 @@ Periodically, the tracker commits the root digest of this AVL tree to the public
 \section{Implementation}
 \label{sec-impl}
 
-We provide implementation of the \basis{} protocol in software, including smart contracts for on-chain reserves, a tracker server for coordinating off-chain state, and client libraries for issuing and managing IOU notes.
+We provide implementation of the \basis{} protocol in form of executable code, including smart contracts for on-chain reserves, a tracker server for coordinating off-chain state, and client libraries for issuing and managing IOU notes.
 
 The smart contracts and documentation are available at~\cite{chaincashcode}, and the tracker server implementation is available at~\cite{basistracker}.
 
@@ -165,6 +165,23 @@ This demonstrates: autonomous task negotiation and IOU creation, multi-agent pay
 
 \section{Security Analysis}
 \label{sec-security}
+
+In this section we provide preliminary security analysis
+
+\subsection{Tracker's Trust Model}
+
+For all the tracker-related trust and security issues, the most natural and also easiest in our case solution
+is to reduce trust in tracker itself. The simplest option which is implemented at the moment is just a single trusted entity.
+There are following options to improve the tracker service then:
+
+\begin{itemize}
+    \item{Federated service}: we may have signing key being shared among several parties. With Schnorr signature scheme being
+    used, it can be done via MuSig2 protocol. \knote{cite} Blockchain commitment to the tracker state then can be protected
+    by multi-signature lock as well. In principle, signing and state commitments can be protected by different committees even.
+    \item{Sidechain}: \knote{finish}
+
+\end{itemize}
+
 
 \subsection{Tracker Cannot Steal Funds}
 
