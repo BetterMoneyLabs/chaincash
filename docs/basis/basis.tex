@@ -76,8 +76,8 @@ In this work, we propose \basis{}, a monetary framework in which both local trus
 
 Current offchain payment systems backed by on-chain reserves (Lightning Network~\cite{poon2016bitcoin}, Cashu~\cite{calle2023cashu}, Fedimint~\cite{elsworth2023fedimint}) require full backing and so do not allow for credit creation. In contrast, \basis{} allows for credit creation with no requirements set for reserves at the protocol level. Then it can be used for community trading without using blockchain at all (and possibly, without Internet even, just by using a local mesh network), but when trust is insufficient to expand credit, on-chain reserves can be established and used. We expect that on a local scale trust-based economic relationships would dominate, and on a global scale~(for example, when one community is doing trades with another) full debt coverage with reserves would be needed in most cases. The whole system will use limited in disconnected from real-world needs supply blockchain assets only where they are needed (there is no trust), while enabling monetary expansion whenever possible to do that without enforcement (so where pure peer-to-peer trust can be established), thus allowing to create a viable alternative to political money.
 
-The mean of payment is an IOU note, which is signed by the issuer and also by a witnessing tracker. Our design allows for debt transferability, if issuer agrees on that, so if peer A issued debt to peer B, and peer B pays with it, fully or partially, to peer C, with A also co-signing, and then A owes C.
-We show that this design allows for minimal trust to tracker service. A tracker service is committing its state on the blockchain periodically. If a tracker service ceases to exist, it is possible to redeem debt notes against on-chain reserves using this committed state. There could be multiple trackers around the world. We consider different designs, from just centralized server, to federated control, to rollups and sidechains.
+The mean of payment is an IOU note, which is signed by the issuer and also by a witnessing tracker. Our design allows for debt transferability, if the issuer agrees: if peer A issued debt to peer B, and peer B wishes to transfer this debt (fully or partially) to peer C, peer A signs an updated note reducing the debt to B and a new note creating the debt to C. After the tracker updates its state, peer A owes C directly.
+We show that this design allows for minimal trust to tracker service. A tracker service is committing its state on the blockchain periodically. If a tracker service ceases to exist, it is possible to redeem debt notes against on-chain reserves using this committed state. There could be multiple trackers around the world. We consider different tracker designs, from just centralized server, to federated control, to rollups and sidechains.
 
 We provide implementation of reserve contract as well as offchain clients (tracker server and example clients). We show an example of group trading over mesh network with occasional Internet connection. Another example shows AI agent economies where autonomous agents create credit relationships for services.
 \end{abstract}
@@ -96,7 +96,9 @@ In this work, we propose \basis{}, a monetary framework designed for peer-to-pee
 
 The \basis{} protocol comprises two main components: on-chain reserve contracts and an off-chain tracker service. Reserve contracts are smart contracts deployed on a public blockchain that lock collateral and enforce redemption rules. They verify cryptographic proofs of debt, check signatures from both the debtor and the tracker, and release collateral to creditors upon valid redemption requests. The tracker service maintains an authenticated ledger of all debt relationships, signs newly created IOU notes to certify their inclusion in the system state, and periodically commits cryptographic summaries of this state to the blockchain. This commitment enables participants to verify debt claims and provides an emergency redemption path if the tracker becomes unavailable.
 
-The paper is organized as follows. In Section~\ref{sec-design} we describe the design of \basis{} in details. Section~\ref{sec-security} analyzes its security properties. Section~\ref{sec-impl} provides implementation details. In Section~\ref{sec-adv} we provide analysis of advantages and drawbacks of the protocol.
+We provide open-source implementations of both the smart contracts and the tracker service~\cite{chaincashcode,basistracker}, which we describe in Section~\ref{sec-impl}.
+
+The paper is organized as follows. In Section~\ref{sec-design} we describe the design of \basis{} in detail. Section~\ref{sec-security} analyzes its security properties. Section~\ref{sec-impl} provides implementation details. In Section~\ref{sec-adv} we provide analysis of advantages and drawbacks of the protocol.
 
 \section{Design}
 \label{sec-design}
@@ -144,6 +146,8 @@ Previously witnessed notes can still be redeemed even if the tracker refuses to 
 \label{sec-impl}
 
 We provide implementation of the \basis{} protocol in software, including smart contracts for on-chain reserves, a tracker server for coordinating off-chain state, and client libraries for issuing and managing IOU notes.
+
+The smart contracts and documentation are available at~\cite{chaincashcode}, and the tracker server implementation is available at~\cite{basistracker}.
 
 \subsection{Reserve Contract}
 
