@@ -125,26 +125,32 @@ object BasisNoteRedeemer extends App {
     payerKey: String,
     payeeKey: String,
     totalDebt: Long,
-    totalDebtERG: Double,
+    totalDebtERG: Option[Double],
     timestamp: Option[Long],
     payerSignature: Option[SignatureJson],
     trackerSignature: Option[SignatureJson],
     signature: Option[SignatureJson], // legacy field for backward compatibility
-    message: String,
+    message: Option[String],
     messageFormat: Option[String],
-    noteKey: String
+    noteKey: Option[String]
   ) {
     // Get timestamp from note or message (for backward compatibility)
     def getTimestamp: Long = {
       timestamp.getOrElse {
-        // Extract timestamp from message if not provided directly
-        // Message format: key (32 bytes) || totalDebt (8 bytes) || timestamp (8 bytes)
-        val messageBytes = Base16.decode(message).get
-        if (messageBytes.length >= 48) {
-          Longs.fromByteArray(messageBytes.slice(40, 48))
-        } else {
-          System.currentTimeMillis() // Fallback to current time
-        }
+        message.flatMap { m =>
+          val messageBytes = Base16.decode(m).toOption
+          messageBytes.filter(_.length >= 48).map(bytes => Longs.fromByteArray(bytes.slice(40, 48)))
+        }.getOrElse(System.currentTimeMillis())
+      }
+    }
+
+    // Reconstruct message from keys + debt + timestamp for signature verification
+    def getMessage: Array[Byte] = {
+      message.flatMap(m => Base16.decode(m).toOption).getOrElse {
+        val payerKeyBytes = Base16.decode(payerKey).get
+        val payeeKeyBytes = Base16.decode(payeeKey).get
+        val ts = getTimestamp
+        Blake2b256(payerKeyBytes ++ payeeKeyBytes) ++ Longs.toByteArray(totalDebt) ++ Longs.toByteArray(ts)
       }
     }
 
@@ -497,13 +503,13 @@ object BasisNoteRedeemer extends App {
     println()
 
     val note = noteFromJson(noteJson)
-    val message = Base16.decode(noteJson.message).get
+    val message = noteJson.getMessage
     val timestampStr = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new java.util.Date(note.timestamp))
 
     println("--- Note Details ---")
     println(s"Payer:     ${noteJson.payerKey.take(16)}...")
     println(s"Payee:     ${noteJson.payeeKey.take(16)}...")
-    println(s"Amount:    ${noteJson.totalDebt} nanoERG (${noteJson.totalDebtERG} ERG)")
+    println(s"Amount:    ${noteJson.totalDebt} nanoERG (${noteJson.totalDebt.toDouble / 1000000000} ERG)")
     println(s"Timestamp: $timestampStr")
     println()
 

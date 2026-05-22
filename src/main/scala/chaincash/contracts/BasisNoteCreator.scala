@@ -115,11 +115,8 @@ object BasisNoteCreator extends App {
        |  "payerKey": "$payerKeyHex",
        |  "payeeKey": "$payeeKeyHex",
        |  "totalDebt": ${note.totalDebt},
-       |  "totalDebtERG": ${note.totalDebt.toDouble / 1000000000},
        |  "payerSignature": {"a": "$sigAHex", "z": "${note.signatureZ.toString(16)}"},
-       |  "trackerSignature": {"a": "$trackerSigAHex", "z": "${trackerSig.signatureZ.toString(16)}"},
-       |  "message": "${Base16.encode(note.message)}",
-       |  "noteKey": "${Base16.encode(Blake2b256((payerKeyHex ++ payeeKeyHex).getBytes))}"
+       |  "trackerSignature": {"a": "$trackerSigAHex", "z": "${trackerSig.signatureZ.toString(16)}"}
        |}""".stripMargin
   }
 
