@@ -184,6 +184,9 @@
 
     // action and reserve output index. By passing them instead of hard-coding, we allow for multiple notes to be
     // redeemed at once, which can be used for atomic mutual debt clearing etc
+
+    // todo: 2 todos to be addressed before real world deployments, see below
+
     val v = getVar[Byte](0).get
     val action = v / 10
     val index = v % 10 // reserve output position
@@ -366,6 +369,7 @@
         (selfOut.value - SELF.value >= 100000000) // at least 0.1 ERG added
       )
     } else {
+      // todo: make an option for refund in 1-2 months , to protect reserve owner from censorship
       sigmaProp(false)
     }
 
