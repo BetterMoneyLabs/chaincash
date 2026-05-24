@@ -63,13 +63,19 @@
 
 \title{Local Credit, Global Settlement: Enhancing Trust-Based Credit Creation with On-Chain Reserve Contracts}
 
-\addauthor{kushti@protonmail.ch}{Alexander Chepurnoy}{Better Money Labs}
-
 \authorrunning{Alexander Chepurnoy}
+\titlerunning{Local Credit, Global Settlement}
 
 \keywords{digital currencies, cryptocurrencies, blockchain, peer-to-peer money, trust-based credit, IOU notes}
 
 \maketitle
+
+\begin{center}
+\textsc{Alexander Chepurnoy}\\
+\textit{Better Money Labs}\\
+\texttt{kushti@protonmail.ch}
+\end{center}
+\vspace{1em}
 
 \begin{abstract}
 In this work, we propose \basis{}, a monetary framework in which both local trust-based (and IOU-based) currencies as well as blockchain-based trust-minimized global ones can coexist via smart contract powered reserves needed when there is no trust. Coordination with blockchain is needed only during debt note redemption against a reserve contract. Payments (debt note transfers) are done offchain, so with low fees and no need to use low-security centralized blockchain-like systems with high throughput. For coordination and transparency of debt in the system, a tracker service is used, which can not steal money from reserves. We provide analysis of trust-minimization in regards with tracker activities.
@@ -121,10 +127,7 @@ When an agent wishes to transfer a portion of its debt to a new creditor, the pr
 
 \subsection{Tracker State}
 
-\basis{} tracks all debt relationships in an AVL tree maintained by the tracker. The tree maps a composite key to the current debt state:
-
-$$\text{hash}(\text{payerKey} || \text{payeeKey}) \rightarrow (\text{totalDebt}, \text{timestamp})$$,
-
+\basis{} tracks all debt relationships in an AVL tree maintained by the tracker. The tree maps a composite key to the current debt state as $$\text{hash}(\text{payerKey} || \text{payeeKey}) \rightarrow (\text{totalDebt}, \text{timestamp})$$,
 where $$\text{hash}$$ is a cryptographically strong hash function.
 
 Periodically, the tracker commits the root digest of this AVL tree to the public blockchain. This commitment provides a timestamped checkpoint of the global debt state and enables emergency redemption when the tracker is unavailable.
@@ -190,7 +193,7 @@ The tracker only certifies inclusion of notes in its state. It cannot unilateral
 
 \subsection{Emergency Exit}
 
-If the tracker becomes unavailable, an emergency exit mechanism activates after a timeout period (e.g., 3 days or 2160 blocks). After this period, the tracker signature becomes optional for redemption. The same message format is used: $\text{key} || \text{totalDebt} || \text{timestamp}$. Replay attacks are prevented by timestamp verification, and the reserve owner's signature is still required.
+If the tracker becomes unavailable, an emergency exit mechanism activates after a timeout period (e.g., 3 days or 2,160 blocks). After this period, the tracker signature becomes optional for redemption. The same message format is used: $\text{key} || \text{totalDebt} || \text{timestamp}$. Replay attacks are prevented by timestamp verification, and the reserve owner's signature is still required.
 
 \subsection{Anti-Censorship}
 
