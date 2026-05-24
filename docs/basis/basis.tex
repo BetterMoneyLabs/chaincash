@@ -125,8 +125,9 @@ When an agent wishes to transfer a portion of its debt to a new creditor, the pr
 
 \subsection{Tracker State}
 
-\basis{} tracks all debt relationships in an AVL tree maintained by the tracker. The tree maps a composite key to the current debt state as $$\text{hash}(\text{payerKey} || \text{payeeKey}) \rightarrow (\text{totalDebt}, \text{timestamp})$$,
-where $$\text{hash}$$ is a cryptographically strong hash function.
+\basis{} tracks all debt relationships in an AVL tree maintained by the tracker. The tree maps a composite key to the current debt state:
+$$\text{hash}(\text{payerKey} || \text{payeeKey}) \rightarrow (\text{totalDebt}, \text{timestamp}),$$
+where $\text{hash}$ is a cryptographically strong hash function.
 
 Periodically, the tracker commits the root digest of this AVL tree to the public blockchain. This commitment provides a timestamped checkpoint of the global debt state and enables emergency redemption when the tracker is unavailable.
 
