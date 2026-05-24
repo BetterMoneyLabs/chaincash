@@ -78,7 +78,7 @@
 \vspace{1em}
 
 \begin{abstract}
-In this work, we propose \basis{}, a monetary framework in which both local trust-based currencies as well as blockchain-based trust-minimized global ones can coexist via smart contract powered reserves needed when there is no trust. Coordination with blockchain is needed only during debt note redemption against a reserve contract. Payments (debt note transfers) are done offchain, so with low fees and no need to use low-security centralized blockchain-like systems with high throughput. For coordination and transparency of debt in the system, a tracker service is used, which cannot steal money from reserves. We provide analysis of trust-minimization in regards with tracker activities.
+In this work, we propose \basis{}, a monetary framework in which both local trust-based currencies as well as global blockchain-based trust-minimized ones can coexist via smart contract powered reserves needed when there is no trust. Coordination with blockchain is needed only during debt note redemption against a reserve contract. Payments (debt note transfers) are done offchain, so with low fees and no need to use low-security centralized blockchain-like systems with high throughput. For coordination and transparency of debt in the system, a tracker service is used, which cannot steal money from reserves. We provide analysis of trust-minimization regarding tracker activities.
 
 Current offchain payment systems backed by on-chain reserves (Lightning Network~\cite{poon2016bitcoin}, Cashu~\cite{calle2023cashu}, Fedimint~\cite{elsworth2023fedimint}) require full backing and so do not allow for credit creation. In contrast, \basis{} allows for credit creation with no requirements set for reserves at the protocol level. Then it can be used for community trading without using blockchain at all (and possibly, without Internet even, just by using a local mesh network), but when trust is insufficient to expand credit, on-chain reserves can be established and used. We expect that on a local scale trust-based economic relationships would dominate, and on a global scale~(for example, when one community is doing trades with another) full debt coverage with reserves would be needed in most cases. The whole system will use limited in disconnected from real-world needs supply blockchain assets only where they are needed (there is no trust), while enabling monetary expansion whenever possible to do that without enforcement (so where pure peer-to-peer trust can be established), thus allowing to create a viable alternative to political money.
 
@@ -92,11 +92,11 @@ We provide implementation of the reserve contract as well as offchain clients (t
 
 Peer-to-peer monetary systems, such as \cc{}~\cite{chaincash}, enable decentralized (peer-to-peer) money creation through trust and collateral. While on-chain protocols provide transparency and censorship resistance, they often struggle with scalability and cost when every transaction must be recorded on a public blockchain. Off-chain alternatives, such as payment channels and Layer 2 solutions, improve scalability but introduce new trust assumptions, and also do not allow for expansion on top of blockchain assets.
 
-By expansion, we mean creating new monetary instruments (such as credit, IOUs, or representative tokens) that exceed the value of the underlying locked blockchain collateral. This is needed because the emission schedules of decentralized blockchain assets like Bitcoin or Ergo are algorithmically predetermined and entirely disconnected from real-world economic demand. Their supply cannot expand or contract in response to productive activity, trade volumes, or credit needs, making them inherently inelastic. Centralized alternatives like USDT or USDC reintroduce the very trust assumptions that blockchain technology sought to eliminate, requiring users to rely on opaque reserves, auditing processes, and issuer solvency. There is a need to bridge this gap by enabling elastic credit creation backed by trust, and this trust should be minimized in nature, so to be peer-to-peer, while still anchoring to on-chain reserves when trust is insufficient.
+By expansion, we mean creating new monetary instruments (such as credit, IOUs, or representative tokens) that exceed the value of the underlying locked blockchain collateral. This is needed because the emission schedules of decentralized blockchain assets like Bitcoin or Ergo are algorithmically predetermined and entirely disconnected from real-world economic demand. Their supply cannot expand or contract in response to productive activity, trade volumes, or credit needs, making them inherently inelastic. Centralized alternatives like USDT or USDC reintroduce the very trust assumptions that blockchain technology sought to eliminate, requiring users to rely on opaque reserves, auditing processes, and issuer solvency. There is a need to bridge this gap by enabling elastic credit creation backed by trust, and this trust should be minimized in nature, so as to be peer-to-peer, while still anchoring to on-chain reserves when trust is insufficient.
 
 Existing offchain payment systems demonstrate different approaches to this problem but fall short of enabling credit expansion. The Lightning Network~\cite{poon2016bitcoin} operates through bidirectional payment channels secured by hash time-locked contracts, requiring participants to lock collateral on-chain proportional to their maximum channel capacity. Cashu~\cite{calle2023cashu} implements Chaumian blind signatures to provide privacy-preserving ecash tokens, but the mint must hold full reserves backing all issued tokens. Fedimint~\cite{elsworth2023fedimint} uses federated custody with threshold signatures to improve upon single custodian models, yet still requires full collateralization and introduces trust in the federation members. All three systems fundamentally require full backing of offchain liabilities with on-chain assets, preventing any form of credit creation or monetary expansion.
 
-In this work, we propose \basis{}, a monetary framework designed for peer-to-peer credit creation and settlement. \basis{} enables participants to issue IOU notes without mandatory collateral reserves, allowing elastic credit creation backed purely by trust when counterparty relationships allow for that. On-chain reserves serve as optional settlement backing for inter-community or low-trust transactions, rather than as a prerequisite for all the economic interactions. This flexibility allows \basis{} to support both purely trust-based local currencies and fully collateralized global settlement within a unified framework. The offchain protocol maintainer (the tracker) regularly updates an efficient and verifiable commitment to offchain debt relationships between economic agents, witnessing new notes by signing them, and periodically committing state digests to a public blockchain. This design allows for efficient note circulation offchain while preserving the security properties of on-chain redemption.
+In this work, we propose \basis{}, a monetary framework designed for peer-to-peer credit creation and settlement. \basis{} enables participants to issue IOU notes without mandatory collateral reserves, allowing elastic credit creation backed purely by trust when counterparty relationships allow it. On-chain reserves serve as optional settlement backing for inter-community or low-trust transactions, rather than as a prerequisite for all economic interactions. This flexibility allows \basis{} to support both purely trust-based local currencies and fully collateralized global settlement within a unified framework. The offchain protocol maintainer (the tracker) regularly updates its efficient and verifiable commitment to offchain debt relationships between economic agents, witnessing new notes by signing them, and periodically committing state digests to a public blockchain. This design allows for efficient note circulation offchain while preserving the security properties of on-chain redemption.
 
 The \basis{} protocol comprises two main components: on-chain reserve contracts and an offchain tracker service. Reserve contracts are smart contracts deployed on a public blockchain that lock collateral and enforce redemption rules. They verify cryptographic proofs of debt, check signatures from both the debtor and the tracker, and release collateral to creditors upon valid redemption requests. The tracker service maintains an authenticated ledger of all debt relationships, signs newly created IOU notes to certify their inclusion in the system state, and periodically commits cryptographic summaries of this state to the blockchain. This commitment enables participants to verify debt claims and provides an emergency redemption path if the tracker becomes unavailable.
 
@@ -107,7 +107,7 @@ The paper is organized as follows. In Section~\ref{sec-design} we describe the d
 \section{Design}
 \label{sec-design}
 
-We consider a fully flat peer-to-peer monetary system an economic agent may freely join. Each agent may issue IOU notes, creating debt relationships with other agents. Note acceptance is always optional and at the discretion of the counterparty.
+We consider a fully flat peer-to-peer monetary system where any economic agent may freely join. Each agent may issue IOU notes, thus creating debt relationships with other agents. Note acceptance is always optional and at the discretion of the counterparty.
 
 \subsection{Note Creation}
 
@@ -125,7 +125,7 @@ When an agent wishes to transfer a portion of its debt to a new creditor, the pr
 
 \subsection{Tracker State}
 
-\basis{} tracks all debt relationships in an AVL tree maintained by the tracker. The tree maps a composite key to the current debt state:
+\basis{} tracks all debt relationships in an AVL tree~\cite{reyzin2017improving} maintained by the tracker. The tree maps a composite key to the current debt state:
 $$\text{hash}(\text{payerKey} || \text{payeeKey}) \rightarrow (\text{totalDebt}, \text{timestamp}),$$
 where $\text{hash}$ is a cryptographically strong hash function.
 
@@ -144,9 +144,9 @@ The reserve contract is implemented on the Ergo blockchain using the ErgoScript 
 
 \subsection{Tracker Server}
 
-The tracker server is implemented in Rust and maintains an in-memory authenticated tree of all debt relationships. When a payer creates a note, the tracker verifies it, updates its local state, and returns a signature certifying the debt. The tree stores cumulative debt amounts indexed by the hash of the payer and payee public keys, enabling efficient lookups and proof generation.
+The tracker server is implemented in Rust~\cite{matsakis2014rust} and maintains an in-memory authenticated tree of all debt relationships. When a payer creates a note, the tracker verifies it, updates its local state, and returns a signature certifying the debt. The tree stores cumulative debt amounts indexed by the hash of the payer and payee public keys, enabling efficient lookups and proof generation.
 
-The server exposes an HTTP API for note creation, querying, and redemption preparation. It also monitors the Ergo blockchain for reserve boxes and periodically submits commitment transactions that embed the current state digest on-chain. This allows light clients to verify debt claims and enables emergency redemption if the tracker goes offline.
+The server exposes an HTTP API for note creation, querying, and redemption preparation. It also monitors the Ergo blockchain for reserve boxes and periodically submits commitment transactions that embed the current state digest on-chain. This allows parties other than the tracker to verify debt claims, redeem them on-chain, and provides an emergency redemption path if the tracker goes offline.
 
 \subsection{Client Libraries}
 
@@ -156,19 +156,19 @@ Client libraries provide functionality for agents to issue IOU notes, request tr
 
 We demonstrate community trading over mesh networks using Meshtastic LoRa devices. In this scenario, Alice and Bob are in a village with no direct Internet connectivity, but a local tracker running on a community server has connectivity to the Ergo blockchain via a satellite or cellular uplink. Alice creates an IOU note for goods purchased and sends it to Bob over the mesh network (Bluetooth/WiFi Direct/LoRa). Bob forwards the note to the tracker through the same mesh, and the tracker---being online---verifies it, updates its local state, signs it, and commits the updated digest to the blockchain. Multiple transactions accumulate this way, with the tracker continuously updating the on-chain state. When Bob later wishes to redeem, the tracker provides the necessary proof from its committed state, and the redemption transaction is submitted directly to the blockchain. This demonstrates offline credit-based trading for end users without forced collateralization, while the tracker maintains blockchain connectivity for state commitments and settlement.
 
-Notably, the tracker's Internet connectivity can in principle be limited or occasional, as it may operate in SPV or NiPoPoW client mode, syncing with the blockchain only periodically rather than maintaining a full node connection~\cite{ergoclient}. This makes the architecture suitable for regions with intermittent or censored connectivity.
+Notably, the tracker's Internet connectivity can in principle be limited or occasional, as it may operate in SPV~\cite{nakamoto2008bitcoin} or NiPoPoW~\cite{kiayias2020non} client mode, syncing with the blockchain only periodically rather than maintaining a full node connection~\cite{ergoclient}. This makes the architecture suitable for regions with intermittent or censored connectivity.
 
 \subsection{AI Agent Credit Creation}
 
-We also demonstrate how \basis{} can be used in autonomous credit creation among AI agents in a software development workflow. A repo agent posts a development task with a budget, a dev agent completes the work and submits a pull request, and a test agent reviews and tests the code. The repo agent creates an IOU note (e.g., 10 ERG) backed by its reserve, which the dev agent accepts. The dev agent then transfers a portion (e.g., 3 ERG) to the test agent for testing services. All agents have Basis wallets with credit limits based on their reputation and payment history. Humans can provide reserve backing as economic feedback, but the agents negotiate terms, create IOUs, and settle debts autonomously without human intervention for each transaction.
+We also demonstrate how \basis{} can be used in autonomous credit creation among AI agents in a software development workflow. Initially, agents interact purely on trust without any reserves. A repo agent posts a development task with a budget, a dev agent completes the work and submits a pull request, and a test agent reviews and tests the code. The repo agent creates an IOU note (e.g., 10 ERG) for the dev agent, and the dev agent transfers a portion (e.g., 3 ERG) to the test agent for testing services. All these transactions occur autonomously without human intervention and without any collateral backing.
 
-This demonstrates: autonomous task negotiation and IOU creation, multi-agent payment splitting, credit limits based on agent reputation, and human reserve backing as optional economic feedback rather than required collateral.
+After observing the agents' work, humans may manually review the output and choose to back the agents by depositing assets into on-chain reserves. Once reserves are established, the IOU notes become redeemable against collateral. This creates a two-phase economy: first, agents build reputation through pure trust-based credit creation, and then humans provide reserve backing as economic validation of the agents' productive work. By creating credit first and earning reserves later, AI agents essentially create money through their economic activity, and humans then decide how sound that money is based on whether they provide backing after reviewing the agents' swarm output.
 
 
 \section{Security Analysis}
 \label{sec-security}
 
-In this section we provide preliminary security analysis for \basis{} on-chain and offchain parts.
+In this section we provide preliminary security analysis for \basis{} offchain tracker.
 
 \subsection{Tracker's Trust Model}
 
@@ -196,10 +196,12 @@ If the tracker becomes unavailable, an emergency exit mechanism activates after 
 
 \subsection{Anti-Censorship}
 
-Previously witnessed notes can still be redeemed even if the tracker refuses to witness new notes. Pseudonymous nature
-would allow for payments recipient to pick another public key just, network level anonymization could be needed in this case.
+The tracker cannot steal but it can refuse to witness debt notes for some issuer or recipient at some point. The pseudonymous nature
+would allow a payment recipient to pick another public key easily. However, network level anonymization could be needed in this case.
 To avoid reserve owner censorship, the reserve contract has a refund option, which allows the reserve owner to withdraw funds without a tracker after a long enough time.
-Another option is to use blind signatures and zero-knowledge proofs~(of no-doublespend, and so on) to have tracker signing a note without knowledge of sender and receiver~(beyond what zero-knowledge proofs may reveal).
+If the tracker is implemented as a trusted server or federation, it may disallow redemption by omitting a note from committed data on-chain. In a sidechain
+implementation, this can be prevented through consensus rules, or by storing a commitment to all previously published commitments, which can be enforced through on-chain contract logic for commitment updates.
+Future research should investigate a possibility to use blind signatures and zero-knowledge proofs~(of no-doublespend, and so on) to have the tracker sign a note without knowledge of sender and receiver~(beyond what zero-knowledge proofs may reveal).
 
 
 \bibliography{../conf/sources}
