@@ -98,7 +98,7 @@ The \basis{} protocol comprises two main components: on-chain reserve contracts 
 
 We provide open-source implementations of both the smart contracts and the tracker service~\cite{chaincashcode,basistracker}, which we describe in Section~\ref{sec-impl}.
 
-The paper is organized as follows. In Section~\ref{sec-design} we describe the design of \basis{} in detail. Section~\ref{sec-impl} provides implementation details. Section~\ref{sec-security} analyzes its security properties. In Section~\ref{sec-adv} we provide analysis of advantages and drawbacks of the protocol.
+The paper is organized as follows. In Section~\ref{sec-design} we describe the design of \basis{} in detail. Section~\ref{sec-impl} provides implementation details. Section~\ref{sec-security} analyzes its security properties.
 
 \section{Design}
 \label{sec-design}
@@ -196,16 +196,9 @@ If the tracker becomes unavailable, an emergency exit mechanism activates after 
 
 Previously witnessed notes can still be redeemed even if the tracker refuses to witness new notes. Pseudonymous nature
 would allow for payments recipient to pick another public key just, network level anonymization could be needed in this case.
+To avoid reserve owner censorship, the reserve contract has a refund option, which allows reserve owner to withdraw funds with no tracker after long enough time.
+Another option is to use blind signatures and zero-knowledge proofs~(of no-doublespend, and so on) to have tracker signing a note without knowledge of sender and receiver~(beyond what zero-knowledge proofs may reveal).
 
-\section{Advantages and Drawbacks}
-\label{sec-adv}
-
-\begin{itemize}
-\item Scalable off-chain tracking with on-chain security guarantees
-\item Emergency exit prevents lock-in to a single tracker
-\item Anti-censorship protections for previously witnessed notes
-\item Periodic commitments enable global state verification
-\end{itemize}
 
 \bibliography{../conf/sources}
 \bibliographystyle{plain}
