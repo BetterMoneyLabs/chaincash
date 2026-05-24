@@ -158,7 +158,7 @@ Notably, the tracker's Internet connectivity can in principle be limited or occa
 
 \subsection{AI Agent Credit Creation}
 
-We demonstrate autonomous credit creation among AI agents in a software development workflow. A Repo Agent posts a development task with a budget, a Dev Agent completes the work and submits a pull request, and a Test Agent reviews and tests the code. The Repo Agent creates an IOU note (e.g., 10 ERG) backed by its reserve, which the Dev Agent accepts. The Dev Agent then transfers a portion (e.g., 3 ERG) to the Test Agent for testing services. All agents have Basis wallets with credit limits based on their reputation and payment history. Humans can provide reserve backing as economic feedback, but the agents negotiate terms, create IOUs, and settle debts autonomously without human intervention for each transaction.
+We also demonstrate how \basis{} can be used in autonomous credit creation among AI agents in a software development workflow. A repo agent posts a development task with a budget, a dev agent completes the work and submits a pull request, and a test agent reviews and tests the code. The repo agent creates an IOU note (e.g., 10 ERG) backed by its reserve, which the dev agent accepts. The dev agent then transfers a portion (e.g., 3 ERG) to the test agent for testing services. All agents have Basis wallets with credit limits based on their reputation and payment history. Humans can provide reserve backing as economic feedback, but the agents negotiate terms, create IOUs, and settle debts autonomously without human intervention for each transaction.
 
 This demonstrates: autonomous task negotiation and IOU creation, multi-agent payment splitting, credit limits based on agent reputation, and human reserve backing as optional economic feedback rather than required collateral.
 
@@ -166,7 +166,7 @@ This demonstrates: autonomous task negotiation and IOU creation, multi-agent pay
 \section{Security Analysis}
 \label{sec-security}
 
-In this section we provide preliminary security analysis
+In this section we provide preliminary security analysis for \basis{} on-chain and offchain parts.
 
 \subsection{Tracker's Trust Model}
 
@@ -178,10 +178,11 @@ There are following options to improve the tracker service then:
     \item{Federated service}: we may have signing key being shared among several parties. With Schnorr signature scheme being
     used, it can be done via MuSig2 protocol. \knote{cite} Blockchain commitment to the tracker state then can be protected
     by multi-signature lock as well. In principle, signing and state commitments can be protected by different committees even.
-    \item{Sidechain}: \knote{finish}
-
+    \item{Sidechain}: to witness debt notes, a dedicated blokchain based ledger can be used. In case of permissioned consensus
+     trust assumptions are not different from a federated service. In case of permissionless Proof-of-Work consensus,
+     censorship-resistance can be improved in principle. To avoid higher fees to be paid to miners, merged mined sidechain
+     option can be used.
 \end{itemize}
-
 
 \subsection{Tracker Cannot Steal Funds}
 
@@ -193,7 +194,8 @@ If the tracker becomes unavailable, an emergency exit mechanism activates after 
 
 \subsection{Anti-Censorship}
 
-Previously witnessed notes can still be redeemed even if the tracker refuses to witness new notes. The last committed state on the blockchain provides a floor for redemption rights.
+Previously witnessed notes can still be redeemed even if the tracker refuses to witness new notes. Pseudonymous nature
+would allow for payments recipient to pick another public key just, network level anonymization could be needed in this case.
 
 \section{Advantages and Drawbacks}
 \label{sec-adv}
