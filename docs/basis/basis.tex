@@ -82,7 +82,7 @@ In this work, we propose \basis{}, a monetary framework in which both local trus
 
 Current offchain payment systems backed by on-chain reserves (Lightning Network~\cite{poon2016bitcoin}, Cashu~\cite{calle2023cashu}, Fedimint~\cite{elsworth2023fedimint}) require full backing and so do not allow for credit creation. In contrast, \basis{} allows for credit creation with no requirements set for reserves at the protocol level. Then it can be used for community trading without using blockchain at all (and possibly, without Internet even, just by using a local mesh network), but when trust is insufficient to expand credit, on-chain reserves can be established and used. We expect that on a local scale trust-based economic relationships would dominate, and on a global scale~(for example, when one community is doing trades with another) full debt coverage with reserves would be needed in most cases. The whole system will use limited in disconnected from real-world needs supply blockchain assets only where they are needed (there is no trust), while enabling monetary expansion whenever possible to do that without enforcement (so where pure peer-to-peer trust can be established), thus allowing to create a viable alternative to political money.
 
-The mean of payment is an IOU note, which is signed by the issuer and also by a witnessing tracker. Our design allows for debt transferability, if the issuer agrees: if peer A issued debt to peer B, and peer B wishes to transfer this debt (fully or partially) to peer C, peer A signs an updated note reducing the debt to B and a new note creating the debt to C. After the tracker updates its state, peer A owes C directly.
+The means of payment is an IOU note, which is signed by the issuer and also by a witnessing tracker. Our design allows for debt transferability, if the issuer agrees: if peer A issued debt to peer B, and peer B wishes to transfer this debt (fully or partially) to peer C, peer A signs an updated note reducing the debt to B and a new note creating the debt to C. After the tracker updates its state, peer A owes C directly.
 We show that this design allows for minimal trust to tracker service. A tracker service is committing its state on the blockchain periodically. If a tracker service ceases to exist, it is possible to redeem debt notes against on-chain reserves using this committed state. There could be multiple trackers around the world. We consider different tracker designs, from just centralized server, to federated control, to rollups and sidechains.
 
 We provide implementation of reserve contract as well as offchain clients (tracker server and example clients). We show an example of group trading over mesh network with occasional Internet connection. Another example shows AI agent economies where autonomous agents create credit relationships for services.
@@ -111,7 +111,7 @@ We consider a fully flat peer-to-peer monetary system an economic agent may free
 
 \subsection{Note Creation}
 
-When an agent (the payer) wishes to create a debt obligation to another agent (the payee), it creates an IOU note containing the payer's signature, the payee's public key, the debt amount, and a timestamp. The note may be associated with an on-chain reserve contract that backs the debt, if such reserve does exist. For the payee to accept the note, it must contain a valid tracker signature certifying that the tracker has recorded the debt in its authenticated state. The payee verifies this signature along with the payer's signature and the note's contents before accepting the note as a valid claim against the payer.
+When an agent (the payer) wishes to create a debt obligation to another agent (the payee), it creates an IOU note containing the payer's signature, the payee's public key, the debt amount, and a timestamp. The note may be associated with an on-chain reserve contract that backs the debt, if such a reserve exists. For the payee to accept the note, it must contain a valid tracker signature certifying that the tracker has recorded the debt in its authenticated state. The payee verifies this signature along with the payer's signature and the note's contents before accepting the note as a valid claim against the payer.
 
 \subsection{Note Redemption}
 
@@ -178,7 +178,7 @@ There are following options to improve the tracker service then:
 
 \begin{itemize}
     \item{Federated service}: we may have signing key being shared among several parties. With Schnorr signature scheme being
-    used, it can be done via MuSig2 protocol~\cite{nick2021musig2} Blockchain commitment to the tracker state then can be protected
+    used, it can be done via MuSig2 protocol~\cite{nick2021musig2}. Blockchain commitment to the tracker state then can be protected
     by multi-signature lock as well. In principle, signing and state commitments can be protected by different committees even.
     \item{Sidechain}: to witness debt notes, a dedicated blockchain based ledger can be used. In case of permissioned consensus
      trust assumptions are not different from a federated service. In case of permissionless Proof-of-Work consensus,
