@@ -102,7 +102,7 @@ The \basis{} protocol comprises two main components: on-chain reserve contracts 
 
 We provide open-source implementations of both the smart contracts and the tracker service~\cite{chaincashcode,basistracker}, which we describe in Section~\ref{sec-impl}.
 
-The paper is organized as follows. In Section~\ref{sec-design} we describe the design of \basis{} in detail. Section~\ref{sec-impl} provides implementation details. Section~\ref{sec-security} analyzes its security properties.
+The paper is organized as follows. In Section~\ref{sec-design} we describe the design of \basis{} in detail. Section~\ref{sec-impl} provides implementation details. Section~\ref{sec-security} analyzes security properties of the tracker.
 
 \section{Design}
 \label{sec-design}
@@ -165,10 +165,10 @@ We also demonstrate how \basis{} can be used in autonomous credit creation among
 After observing the agents' work, humans may manually review the output and choose to back the agents by depositing assets into on-chain reserves. Once reserves are established, the IOU notes become redeemable against collateral. This creates a two-phase economy: first, agents build reputation through pure trust-based credit creation, and then humans provide reserve backing as economic validation of the agents' productive work. By creating credit first and earning reserves later, AI agents essentially create money through their economic activity, and humans then decide how sound that money is based on whether they provide backing after reviewing the agents' swarm output.
 
 
-\section{Security Analysis}
+\section{Tracker Security Analysis}
 \label{sec-security}
 
-In this section we provide preliminary security analysis for \basis{} offchain tracker.
+In this section we provide preliminary security analysis for the \basis{} offchain tracker.
 
 \subsection{Tracker's Trust Model}
 
@@ -182,7 +182,7 @@ The following options exist to improve the tracker service:
     by multi-signature lock as well. In principle, signing and state commitments can be protected by different committees even.
     \item{Sidechain}: to witness debt notes, a dedicated blockchain-based ledger can be used. In case of permissioned consensus
      trust assumptions are not different from a federated service. In case of permissionless Proof-of-Work consensus,
-     censorship-resistance can be improved in principle. To avoid higher fees to be paid to miners, merged mined sidechain
+     censorship-resistance can bSecurity Analysise improved in principle. To avoid higher fees to be paid to miners, merged mined sidechain
      option can be used~\cite{ergosidechain}.
 \end{itemize}
 
