@@ -65,33 +65,40 @@ Rio de Janeiro, Brazil, June 8–12, 2026
 
 ## Offchain Payments Today: No Monetary Expansion
 
-### Existing Digital Systems
+### Existing Bitcoin Layer-2 Systems
 
-- **Lightning Network**, **Cashu**, **Fedimint**: all require **100% collateral**
-- No **credit creation** or **monetary expansion** possible
-- Blockchain fees too high for **micropayments**
-- No solutions for **occasionally-connected** communities
+| System | Mechanism | Collateral Requirement |
+|--------|-----------|------------------------|
+| **Lightning Network** | Bidirectional payment channels | **100% locked on-chain** |
+| **Cashu** | Chaumian blind signatures (e-cash) | **100% mint reserves** |
+| **Fedimint** | Federated threshold custody | **100% federation backing** |
 
-### How Different from Community Currencies
-
-> A currency that requires full backing *before* any trade happens cannot respond to local economic demand. It is **inelastic by design**.
-
-- Community currencies need **elastic supply** matching real activity
-- Trust within communities is an **underutilized resource**
-- Technology should **enable credit**, not enforce full collateralization
+> **All three require full backing of off-chain liabilities with on-chain assets.**
 
 ---
 
-## Basis: A Protocol for Community Credit
+## The Problem: No Credit Expansion
 
-### Core Principle
+- Supply is capped by locked collateral
+- Cannot respond to growing economic activity
 
-> **Enable elastic credit creation backed by trust, anchored to on-chain reserves only when trust is insufficient**
+### Contrast with Community Currencies
+
+- Community currencies (LETS, Time Banks, WIR) thrive on **trust-based credit**
+- Existing digital systems **discard this principle** by enforcing full collateralization
+- **Trust within communities becomes an underutilized resource**
+
+---
+
+## Basis: A Protocol to unify Community Credit and Blockchain Assets
+
+> **Enable elastic credit creation backed by trust, use on-chain reserves only when trust is insufficient**
 
 ### How It Works
 
 - **Local trust-based IOUs** circulate within communities
-- **On-chain reserves** serve as optional settlement backing
+- **On-chain reserves** serve as optional backing
+- Individual IOU note acceptance 
 - **Off-chain payments** — low fees, no blockchain bottleneck
 - **Tracker service** coordinates debt state transparently
 
@@ -101,15 +108,13 @@ Rio de Janeiro, Brazil, June 8–12, 2026
 │ (Issuer) │   (signed by both) │(Receiver)│
 └────┬─────┘                    └────┬─────┘
      │                               │
-     └──────► Tracker (witness) ◄───┘
+     └──────► Tracker (witness) ◄────┘
               (commits state to chain)
 ```
 
 ---
 
 ## Note Creation: Issuing Community Credit
-
-### Step by Step
 
 1. **Payer** (e.g., a community member) creates an IOU note:
    - Payer's **signature**
@@ -121,11 +126,7 @@ Rio de Janeiro, Brazil, June 8–12, 2026
 2. **Tracker** (community coordinator / federation) verifies and **signs**
    - Certifies inclusion in authenticated state
 
-3. **Payee** accepts after verifying both signatures
-
-### Key Point
-
-> **Acceptance is always voluntary** — every participant decides whom to trust. No protocol-level enforcement.
+3. **Payee** accepts after verifying both signatures. **Acceptance is always voluntary**
 
 ---
 
