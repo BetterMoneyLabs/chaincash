@@ -63,6 +63,32 @@ Rio de Janeiro, Brazil, June 8–12, 2026
 
 ---
 
+## The Need for Monetary Expansion
+
+### Blockchain Assets Are Inelastic
+
+- Bitcoin, Ergo, and similar assets have **algorithmically predetermined emission schedules**
+- Supply **cannot expand or contract** in response to real-world economic demand
+- Entirely **disconnected** from productive activity, trade volumes, or credit needs
+
+---
+
+## ChainCash: On-Chain Notes with Collective Backing
+
+- Peer-to-peer money creation through trust and/or collateral
+- Notes backed by **all previous spenders** in the chain
+- Redemption against **any reserve** in spending history,
+    with re-redemption later possible against and earlier one
+- Fully on-chain — **transparency and censorship resistance**
+
+### Limitation
+
+- Every transaction recorded on the blockchain
+- Scalability and cost issues for frequent use
+- Hard to apply in **community currency** settings with many small payments
+
+---
+
 ## Offchain Payments Today: No Monetary Expansion
 
 ### Existing Bitcoin Layer-2 Systems
@@ -123,10 +149,12 @@ Rio de Janeiro, Brazil, June 8–12, 2026
    - **Timestamp**
    - Optional: **reserve contract** for extra backing
 
-2. **Tracker** (community coordinator / federation) verifies and **signs**
-   - Certifies inclusion in authenticated state
+2. **Payee** verifies payer's signature and note contents
+   - **Acceptance is always voluntary** — each participant decides whom to trust
 
-3. **Payee** accepts after verifying both signatures. **Acceptance is always voluntary**
+3. **Tracker signature** is obtained later
+   - Required only for **redemption** against a reserve contract
+   - Certifies the debt was recorded in tracker's authenticated state
 
 ---
 
