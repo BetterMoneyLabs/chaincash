@@ -52,7 +52,8 @@ style: |
 ---
 
 # Local Credit, Global Settlement
-## Enhancing Trust-Based Credit Creation with On-Chain Reserve Contracts
+## Enhancing Trust-Based Credit Creation 
+##   with On-Chain Reserve Contracts
 
 **Alexander Chepurnoy**
 *Ergo*
@@ -78,14 +79,14 @@ Rio de Janeiro, Brazil, June 8–12, 2026
 - Peer-to-peer money creation through trust and/or collateral
 - Notes backed by **all previous spenders** in the chain
 - Redemption against **any reserve** in spending history,
-    with re-redemption later possible against and earlier one
+    with re-redemption later possible against an earlier one
 - Fully on-chain — **transparency and censorship resistance**
 
 ### Limitation
 
 - Every transaction recorded on the blockchain
 - Scalability and cost issues for frequent use
-- Hard to apply in **community currency** settings with many small payments
+- Hard to apply in **community currency** setting with many small payments
 
 ---
 
@@ -99,7 +100,6 @@ Rio de Janeiro, Brazil, June 8–12, 2026
 | **Cashu** | Chaumian blind signatures (e-cash) | **100% mint reserves** |
 | **Fedimint** | Federated threshold custody | **100% federation backing** |
 
-> **All three require full backing of off-chain liabilities with on-chain assets.**
 
 ---
 
@@ -118,10 +118,6 @@ Rio de Janeiro, Brazil, June 8–12, 2026
 
 ## Basis: A Protocol to unify Community Credit and Blockchain Assets
 
-> **Enable elastic credit creation backed by trust, use on-chain reserves only when trust is insufficient**
-
-### How It Works
-
 - **Local trust-based IOUs** circulate within communities
 - **On-chain reserves** serve as optional backing
 - Individual IOU note acceptance 
@@ -131,7 +127,7 @@ Rio de Janeiro, Brazil, June 8–12, 2026
 ```
 ┌──────────┐      IOU Note      ┌──────────┐
 │  Payer   │ ─────────────────► │  Payee   │
-│ (Issuer) │   (signed by both) │(Receiver)│
+│ (Issuer) │   (signed)         │(Receiver)│
 └────┬─────┘                    └────┬─────┘
      │                               │
      └──────► Tracker (witness) ◄────┘
@@ -151,6 +147,7 @@ Rio de Janeiro, Brazil, June 8–12, 2026
 
 2. **Payee** verifies payer's signature and note contents
    - **Acceptance is always voluntary** — each participant decides whom to trust
+   - Sends to tracker
 
 3. **Tracker signature** is obtained later
    - Required only for **redemption** against a reserve contract
@@ -158,13 +155,13 @@ Rio de Janeiro, Brazil, June 8–12, 2026
 
 ---
 
-## Note Redemption: From Trust to Settlement
+## Debt Redemption
 
 ### Standard Redemption (Trust + Collateral)
 
 - Payee presents the **witnessed IOU** to the **reserve contract**
 - Contract verifies payer's signature, tracker's signature, debt amount
-- Collateral is **released to payee**
+- Redeemed amount is **released to payee** by the reserve contract
 
 ### Emergency Exit (Tracker Unavailable)
 
@@ -172,7 +169,6 @@ Rio de Janeiro, Brazil, June 8–12, 2026
 - Redeem using payer's signature + last committed tracker state
 - **Replay attacks prevented** by timestamp verification
 
-> This protects communities against tracker failure or censorship — funds are never locked indefinitely.
 
 ---
 
@@ -196,7 +192,7 @@ Before:                    After Transfer:
   - Reduced debt A→B
   - New debt A→C
 - Tracker witnesses both; old note replaced
-- **A now owes C directly** — credit circulates!
+- **A now owes C directly**
 
 ---
 
@@ -258,28 +254,6 @@ Village (no direct Internet)
 
 3. **Phase 3 — Hybrid Economy**: Local trust dominates internally, reserves handle external settlement
 
-> **Monetary elasticity**: supply expands with community trust, contracts when trust is insufficient.
-
----
-
-## Scenario 3: Solidarity Economy Network
-
-### Cooperatives and Mutual Credit
-
-- **Worker cooperatives** trade goods/services on credit
-- **Mutual credit clearing** via debt transfer (triangular trade)
-- **Tracker federation** run by cooperative assembly
-- **Emergency exit** protects members against federation failure
-
-```
-Co-op A ──IOU──► Co-op B
-   │                │
-   └──IOU──► Co-op C◄──IOU──┘
-
-Circular debt cleared via tracker
-No blockchain fees for day-to-day trade
-```
-
 ---
 
 ## Security & Trust Minimization
@@ -304,57 +278,29 @@ No blockchain fees for day-to-day trade
 
 ---
 
-## Why Blockchain? Why Ergo?
+## Implementation
 
-### Role of On-Chain Reserves
-
-- **Not** for day-to-day transactions
-- **Settlement layer** for low-trust or cross-community trades
-- **Emergency anchor** if tracker fails
-- **Limited blockchain use** — only where trust is truly insufficient
-
-### Why Ergo?
-
-- **UTXO model**: perfect for tokenized collateral
-- **Smart contracts**: expressive redemption logic
-- **Low fees**: viable for small settlements
-- **PoW security**: no trusted validators
-- **NiPoPoWs / SPV**: lightweight sync for intermittent connectivity
+- Ergo blockchain as it has all the needed functionalities and superior for offchain protocols
+- Supports ERG as well as custom tokens (stablecoins etc) for reserves
+- Offchain debt tracker
 
 ---
 
-## Relation to Conference Themes
 
-| Theme | How Basis Addresses It |
-|-------|------------------------|
-| **Digitalization & technologies** | Blockchain-backed IOUs, mesh network support, digital sovereignty |
-| **Territories & participation** | Local credit for communities, voluntary acceptance, democratic tracker governance |
-| **Public policies & government relations** | Municipal currency potential, no legal tender enforcement, individual choice |
-| **Environment & sustainability** | Minimal energy use (off-chain payments), no mining for transactions |
-| **History & theories** | Mutual credit tradition extended with cryptographic trust minimization |
-
----
-
-## Contributions
-
-1. **Basis protocol**: P2P credit creation with **optional** on-chain reserves
-2. **Open-source implementations**: smart contracts + tracker server + clients
-3. **Security analysis**: trust-minimization properties of tracker
-4. **Real-world demos**: mesh network trading + solidarity economy scenarios
-
-### Resources
+## Resources
 
 - Paper & code: `github.com/ChainCashLabs/chaincash`
-- Whitepaper: `docs/conf/conf.pdf`
+- Whitepaper: `https://github.com/BetterMoneyLabs/chaincash/blob/master/docs/basis/basis.pdf`
+- Tracker: `https://github.com/BetterMoneyLabs/basis-tracker`
+- Everything is open sourced and under public domain
+- Contributions are much needed
 
 ---
 
 ## Thank You
 
-### Local Credit, Global Settlement
-
 **Alexander Chepurnoy**
-*Better Money Labs*
+*Ergo*
 `kushti@protonmail.ch`
 
 **github.com/ChainCashLabs/chaincash**
