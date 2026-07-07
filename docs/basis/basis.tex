@@ -111,7 +111,7 @@ We consider a fully flat peer-to-peer monetary system where any economic agent m
 
 \subsection{Note Creation}
 
-When an agent (the payer) wishes to create a debt obligation to another agent (the payee), it creates an IOU note containing the payer's signature, the payee's public key, the debt amount, and a timestamp. The note may be associated with an on-chain reserve contract that backs the debt, if such a reserve exists. For the payee to accept the note, it must contain a valid tracker signature certifying that the tracker has recorded the debt in its authenticated state. The payee verifies this signature along with the payer's signature and the note's contents before accepting the note as a valid claim against the payer.
+When an agent (the payer) wishes to create a debt obligation to another agent (the payee), it creates an IOU note containing the payer's signature, the payee's public key, the debt amount, and a timestamp. The note may be associated with an on-chain reserve contract that backs the debt, if such a reserve exists. The payee verifies the payer's signature and the note's contents before accepting the note as a valid claim against the payer. The tracker signature is not required for acceptance; it is only needed later for redemption against a reserve contract, where the tracker certifies that the debt was recorded in its authenticated state.
 
 \subsection{Note Redemption}
 
