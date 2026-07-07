@@ -115,7 +115,8 @@ object BasisDeployer extends App {
     println("=== Basis Reserve Contract Deployment Information ===")
     println()
 
-    println(s"Contract Address: ${basisAddress.toString}")
+    println(s"Basis contract Address: ${basisAddress.toString}")
+    println(s"Basis Ergo Tree: ${basisErgoTree.bytesHex}")
     println(s"Network: ${networkType.name}")
     println(s"Network Prefix: $networkPrefix")
     println()
