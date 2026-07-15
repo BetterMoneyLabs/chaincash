@@ -15,8 +15,9 @@ class BasisDeployerSpec extends PropSpec with Matchers {
     basisErgoTree should not be null
 
     val basisAddress = Constants.getAddressFromErgoTree(basisErgoTree)
-    // Address should be valid Ergo address (starts with valid prefix for the network)
-    basisAddress.toString should (startWith("9") or startWith("W") or startWith("3") or startWith("RtQ"))
+    // Address should be a valid mainnet P2S address, round-trippable via the encoder
+    basisAddress shouldBe a [org.ergoplatform.Pay2SAddress]
+    Constants.ergoAddressEncoder.fromString(basisAddress.toString).get shouldEqual basisAddress
   }
 
   property("BasisDeployer should create valid deployment request") (pending)

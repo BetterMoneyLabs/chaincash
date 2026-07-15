@@ -1,6 +1,6 @@
 package chaincash.contracts
 
-import chaincash.contracts.Constants.chainCashPlasmaParameters
+import chaincash.contracts.Constants.basisPlasmaParameters
 import com.google.common.primitives.Longs
 import scorex.crypto.hash.Blake2b256
 import scorex.util.encode.Base16
@@ -106,7 +106,7 @@ object TrackerBoxSetup extends App {
    */
   def createTrackerTree(alicePubKeyHex: String, bobPubKeyHex: String, totalDebt: Long): AvlTree = {
     // Create empty PlasmaMap
-    val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](InsertOnly, chainCashPlasmaParameters)
+    val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](InsertOnly, basisPlasmaParameters)
 
     // Decode public keys from hex
     val alicePubKeyBytes = Base16.decode(alicePubKeyHex).get

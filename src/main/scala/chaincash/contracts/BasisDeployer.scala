@@ -41,9 +41,9 @@ object BasisDeployer extends App {
   val basisErgoTree = Constants.compile(basisContractScript)
   val basisAddress = Constants.getAddressFromErgoTree(basisErgoTree)
 
-  // Use Constants.chainCashPlasmaParameters for consistency with BasisNoteRedeemer and TrackerBoxSetup
+  // Use Constants.basisPlasmaParameters for consistency with BasisNoteRedeemer and TrackerBoxSetup
   val InsertOnly = AvlTreeFlags(insertAllowed = true, updateAllowed = false, removeAllowed = false)
-  def emptyPlasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](InsertOnly, Constants.chainCashPlasmaParameters)
+  def emptyPlasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](InsertOnly, Constants.basisPlasmaParameters)
   val emptyTreeErgoValue: ErgoValue[AvlTree] = emptyPlasmaMap.ergoValue
   val emptyTree: AvlTree = emptyTreeErgoValue.getValue
 

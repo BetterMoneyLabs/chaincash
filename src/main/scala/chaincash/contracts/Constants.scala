@@ -42,9 +42,12 @@ object Constants {
 
 
   // ChainCash AVL tree parameters
-  // keyLength = 32 (Blake2b256 hash of ownerKey || receiverKey)
+  // keyLength = 40 (positionBytes ++ reserveId = 8 + 32 bytes)
   // valueLength = None (dynamic, for Long values)
-  val chainCashPlasmaParameters = PlasmaParameters(32, None)
+  val chainCashPlasmaParameters = PlasmaParameters(40, None)
+  // Basis AVL tree parameters
+  // keyLength = 32 (Blake2b256 hash of ownerKey || receiverKey)
+  val basisPlasmaParameters = PlasmaParameters(32, None)
   def emptyPlasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, chainCashPlasmaParameters)
   val emptyTreeErgoValue: ErgoValue[AvlTree] = emptyPlasmaMap.ergoValue
   val emptyTree: AvlTree = emptyTreeErgoValue.getValue
