@@ -1,9 +1,8 @@
 package chaincash.contracts
 
 import org.scalatest.{Matchers, PropSpec}
-import sigmastate.Values.GroupElementConstant
-import sigmastate.basics.CryptoConstants
-import sigmastate.eval.CGroupElement
+import sigma.ast.GroupElementConstant
+import sigma.crypto.CryptoConstants
 
 class BasisDeployerSpec extends PropSpec with Matchers {
 

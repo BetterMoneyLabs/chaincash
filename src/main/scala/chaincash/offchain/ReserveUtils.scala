@@ -1,14 +1,16 @@
 package chaincash.offchain
 
+import SigUtils._
 import io.circe.syntax.EncoderOps
 import org.ergoplatform.ErgoBox.R4
-import org.ergoplatform.{ErgoBoxCandidate, JsonCodecs, P2PKAddress, UnsignedErgoLikeTransaction, UnsignedInput}
+import org.ergoplatform.sdk.JsonCodecs
+import org.ergoplatform.{ErgoBoxCandidate, P2PKAddress, UnsignedErgoLikeTransaction, UnsignedInput}
 import scorex.crypto.hash.Digest32
-import sigmastate.Values.GroupElementConstant
-import sigmastate.eval.Colls
-import special.sigma.GroupElement
-import sigmastate.eval._
-import sigmastate.interpreter.ContextExtension
+import sigma.ast.GroupElementConstant
+import sigma.Colls
+import sigma.GroupElement
+import sigma.interpreter.ContextExtension
+import sigma.data.Digest32Coll
 
 trait ReserveUtils extends WalletUtils with JsonCodecs {
   import chaincash.contracts.Constants.reserveErgoTree

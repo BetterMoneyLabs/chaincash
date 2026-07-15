@@ -1,14 +1,24 @@
 package chaincash.offchain
 
-import sigmastate.basics.CryptoConstants
-import special.sigma.GroupElement
-import sigmastate.eval._
-import sigmastate.basics.SecP256K1Group
+import sigma.crypto.CryptoConstants
+import sigma.GroupElement
+import sigma.crypto.SecP256K1Group
+import sigma.data.{CBigInt, CGroupElement}
 import java.security.SecureRandom
 import scala.annotation.tailrec
 import scorex.crypto.hash.Blake2b256
 
 object SigUtils {
+
+  implicit def javaBigIntegerToSigmaBigInt(b: java.math.BigInteger): sigma.BigInt = CBigInt(b)
+
+  implicit def scalaBigIntToSigmaBigInt(b: BigInt): sigma.BigInt = CBigInt(b.bigInteger)
+
+  implicit def groupElementToEcPointType(ge: GroupElement): sigma.crypto.EcPointType =
+    ge.asInstanceOf[CGroupElement].wrappedValue
+
+  implicit def ecPointTypeToGroupElement(ep: sigma.crypto.EcPointType): GroupElement =
+    CGroupElement(ep)
 
   def randBigInt: BigInt = {
     val random = new SecureRandom()
@@ -19,14 +29,14 @@ object SigUtils {
 
   @tailrec
   def sign(msg: Array[Byte], secretKey: BigInt): (GroupElement, BigInt) = {
-    val g: GroupElement = CryptoConstants.dlogGroup.generator
+    val g: GroupElement = CGroupElement(CryptoConstants.dlogGroup.generator)
 
     val pk = g.exp(secretKey.bigInteger)
 
     val r = randBigInt
     val a: GroupElement = g.exp(r.bigInteger)
     val e = Blake2b256(a.getEncoded.toArray ++ msg ++ pk.getEncoded.toArray)
-    val z = (r + secretKey * BigInt(e)) % CryptoConstants.groupOrder
+    val z = (r + secretKey * BigInt(e)) % SecP256K1Group.q
 
     if(z.bitLength <= 255) {
       (a, z)
@@ -44,7 +54,7 @@ object SigUtils {
    * @return true if signature is valid
    */
   def verify(msg: Array[Byte], publicKey: GroupElement, a: GroupElement, z: BigInt): Boolean = {
-    val g: GroupElement = CryptoConstants.dlogGroup.generator
+    val g: GroupElement = CGroupElement(CryptoConstants.dlogGroup.generator)
     val e = Blake2b256(a.getEncoded.toArray ++ msg ++ publicKey.getEncoded.toArray)
     val eBigInt = BigInt(e)
     val lhs = g.exp(z.bigInteger)

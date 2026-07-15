@@ -3,6 +3,7 @@ package chaincash
 import chaincash.contracts.Constants
 import chaincash.contracts.Constants.chainCashPlasmaParameters
 import chaincash.offchain.SigUtils
+import chaincash.offchain.SigUtils._
 import com.google.common.primitives.Longs
 import io.circe.parser
 import org.ergoplatform.P2PKAddress
@@ -13,11 +14,10 @@ import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import scorex.crypto.hash.Blake2b256
 import scorex.util.encode.Base16
-import sigmastate.AvlTreeFlags
-import sigmastate.basics.DLogProtocol.ProveDlog
-import sigmastate.eval._
-import sigmastate.serialization.GroupElementSerializer
-import special.sigma.{AvlTree, GroupElement}
+import sigma.data.AvlTreeFlags
+import sigma.data.ProveDlog
+import sigma.serialization.{GroupElementSerializer, ValueSerializer}
+import sigma.{AvlTree, GroupElement}
 import work.lithos.plasma.PlasmaParameters
 import work.lithos.plasma.collections.PlasmaMap
 
@@ -122,7 +122,7 @@ class BasisContractConditionsSpec extends PropSpec with Matchers with ScalaCheck
   // Parse totalDebt from extension R3 (format: 05 + zigzag-encoded varint)
   val totalDebtBytes = Base16.decode(extensionR3).get
   // Use ValueSerializer to decode the Long value
-  val totalDebt = sigmastate.serialization.ValueSerializer.deserialize(totalDebtBytes).asInstanceOf[sigmastate.Values.LongConstant].value
+  val totalDebt = sigma.serialization.ValueSerializer.deserialize(totalDebtBytes).asInstanceOf[sigma.ast.Constant[sigma.ast.SLong.type]].value
 
   // Get actual signatures (skip Coll type 0e and length byte)
   val reserveSigBytes = Base16.decode(extensionR2.drop(4)).get
@@ -169,7 +169,7 @@ class BasisContractConditionsSpec extends PropSpec with Matchers with ScalaCheck
   // Create redemption message: key || totalDebt
   val redemptionMessage = debtKey ++ Longs.toByteArray(totalDebt)
   val (trackerSigA, trackerSigZ) = SigUtils.sign(redemptionMessage, trackerSecret)
-  val freshTrackerSigBytes = sigmastate.serialization.GroupElementSerializer.toBytes(trackerSigA) ++ trackerSigZ.toByteArray
+  val freshTrackerSigBytes = GroupElementSerializer.toBytes(trackerSigA) ++ trackerSigZ.toByteArray
 
   // Change address for transaction building (use a mock key we have the secret for)
   val mockReceiverSecret = SigUtils.randBigInt
@@ -286,7 +286,7 @@ class BasisContractConditionsSpec extends PropSpec with Matchers with ScalaCheck
 
   def hasScriptValidationFailure(t: Throwable): Boolean =
     Iterator.iterate[Throwable](t)(_.getCause).takeWhile(_ != null).exists {
-      case _: sigmastate.exceptions.InterpreterException => true
+      case _: sigma.exceptions.InterpreterException => true
       case _ => false
     }
 
@@ -880,8 +880,8 @@ class BasisContractConditionsSpec extends PropSpec with Matchers with ScalaCheck
 
       // Serialize the expected tree to extract the digest
       // Format: type(1 byte) + digest(32 bytes) + proof(...)
-      import sigmastate.serialization.ValueSerializer
-      import sigmastate.Values.AvlTreeConstant
+      import sigma.serialization.ValueSerializer
+      import sigma.ast.AvlTreeConstant
       // Get the actual AvlTree from ErgoValue and wrap in AvlTreeConstant for serialization
       val actualAvlTree = expectedTrackerTree.getValue()
       val expectedTreeBytes = ValueSerializer.serialize(AvlTreeConstant(actualAvlTree))

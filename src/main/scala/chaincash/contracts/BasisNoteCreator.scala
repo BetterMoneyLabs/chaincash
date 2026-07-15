@@ -4,10 +4,10 @@ import chaincash.offchain.SigUtils
 import com.google.common.primitives.Longs
 import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Blake2b256
-import sigmastate.basics.CryptoConstants
-import sigmastate.eval._
-import sigmastate.serialization.GroupElementSerializer
-import special.sigma.GroupElement
+import chaincash.offchain.SigUtils._
+import sigma.crypto.CryptoConstants
+import sigma.serialization.GroupElementSerializer
+import sigma.GroupElement
 
 /**
  * Utility for creating Basis IOU notes with tracker signature.

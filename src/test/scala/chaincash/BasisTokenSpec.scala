@@ -3,6 +3,7 @@ package chaincash
 import chaincash.contracts.Constants
 import chaincash.contracts.Constants.chainCashPlasmaParameters
 import chaincash.offchain.SigUtils
+import chaincash.offchain.SigUtils._
 import com.google.common.primitives.Longs
 import org.ergoplatform.P2PKAddress
 import org.ergoplatform.appkit.impl.{ErgoScriptContract, ErgoTreeContract, OutBoxImpl}
@@ -12,11 +13,10 @@ import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import scorex.crypto.hash.Blake2b256
 import scorex.util.encode.Base16
-import sigmastate.AvlTreeFlags
-import sigmastate.basics.DLogProtocol.ProveDlog
-import sigmastate.eval._
-import sigmastate.serialization.GroupElementSerializer
-import special.sigma.{AvlTree, GroupElement}
+import sigma.data.AvlTreeFlags
+import sigma.data.ProveDlog
+import sigma.serialization.GroupElementSerializer
+import sigma.{AvlTree, GroupElement}
 import work.lithos.plasma.PlasmaParameters
 import work.lithos.plasma.collections.PlasmaMap
 
@@ -228,7 +228,7 @@ class BasisTokenSpec extends PropSpec with Matchers with ScalaCheckDrivenPropert
   }
 
   def mkTrackerDataInput(
-    trackerTree: ErgoValue[AvlTree] = ErgoValue.of(emptyTree),
+    trackerTree: ErgoValue[AvlTree] = emptyTreeErgoValue,
     creationHeightOffset: Option[Int] = None
   )(implicit ctx: BlockchainContext): InputBox = {
     val builder = ctx.newTxBuilder().outBoxBuilder
@@ -252,7 +252,7 @@ class BasisTokenSpec extends PropSpec with Matchers with ScalaCheckDrivenPropert
 
   private def hasScriptValidationFailure(t: Throwable): Boolean =
     Iterator.iterate[Throwable](t)(_.getCause).takeWhile(_ != null).exists {
-      case _: sigmastate.exceptions.InterpreterException => true
+      case _: sigma.exceptions.InterpreterException => true
       case _ => false
     }
 
@@ -349,7 +349,7 @@ class BasisTokenSpec extends PropSpec with Matchers with ScalaCheckDrivenPropert
         ctx.newTxBuilder().outBoxBuilder
           .value(minValue)
           .tokens(new ErgoToken(reserveNFTBytes, 1), new ErgoToken(reserveTokenIdBytes, initialReserveTokenAmount))
-          .registers(ErgoValue.of(ownerPk), ErgoValue.of(emptyTree), ErgoValue.of(trackerNFTBytes))
+          .registers(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes))
           .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisTokenContract))
           .build()
           .convertToInputWith(fakeTxId1, fakeIndex)
@@ -365,7 +365,7 @@ class BasisTokenSpec extends PropSpec with Matchers with ScalaCheckDrivenPropert
 
       val basisOutput = createOut(
         Constants.basisTokenContract, minValue * 2,
-        Array(ErgoValue.of(ownerPk), ErgoValue.of(emptyTree), ErgoValue.of(trackerNFTBytes)),
+        Array(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(reserveNFTBytes, 1), new ErgoToken(reserveTokenIdBytes, initialReserveTokenAmount + topUpAmount))
       )
 
@@ -424,7 +424,7 @@ class BasisTokenSpec extends PropSpec with Matchers with ScalaCheckDrivenPropert
         ctx.newTxBuilder().outBoxBuilder
           .value(minValue)
           .tokens(new ErgoToken(reserveNFTBytes, 1), new ErgoToken(reserveTokenIdBytes, 1000000000L))
-          .registers(ErgoValue.of(ownerPk), ErgoValue.of(emptyTree), ErgoValue.of(trackerNFTBytes))
+          .registers(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes))
           .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisTokenContract))
           .build()
           .convertToInputWith(fakeTxId1, fakeIndex)
@@ -440,7 +440,7 @@ class BasisTokenSpec extends PropSpec with Matchers with ScalaCheckDrivenPropert
 
       val basisOutput = createOut(
         Constants.basisTokenContract, minValue,
-        Array(ErgoValue.of(ownerPk), ErgoValue.of(emptyTree), ErgoValue.of(trackerNFTBytes)),
+        Array(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(reserveNFTBytes, 1), new ErgoToken(reserveTokenIdBytes, 1000000000L))
       )
 

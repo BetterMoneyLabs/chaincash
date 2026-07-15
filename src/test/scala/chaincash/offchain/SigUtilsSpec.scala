@@ -1,14 +1,11 @@
 package chaincash.offchain
 
+import chaincash.offchain.SigUtils._
 import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.hash.Blake2b256
-import sigmastate.basics.CryptoConstants
-import sigmastate.eval._
-import special.sigma.GroupElement
+import sigma.crypto.CryptoConstants
+import sigma.GroupElement
 
-/**
- * Tests for SigUtils sign/verify roundtrip
- */
 class SigUtilsSpec extends PropSpec with Matchers {
 
   val g = CryptoConstants.dlogGroup.generator

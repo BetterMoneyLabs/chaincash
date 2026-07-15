@@ -1,5 +1,6 @@
 package chaincash.offchain
 
+import SigUtils._
 import io.circe.parser.parse
 import org.ergoplatform.ErgoBox
 import scorex.util.{ModifierId, ScorexLogging}
@@ -7,7 +8,7 @@ import scorex.util.encode.Base16
 import TrackingTypes._
 import chaincash.offchain.DbEntities.heightKey
 import org.ergoplatform.ErgoBox.R4
-import sigmastate.Values.GroupElementConstant
+import sigma.ast.{Constant, GroupElementConstant, SType}
 
 trait TrackingUtils extends WalletUtils with HttpUtils with ScorexLogging {
 
@@ -47,7 +48,7 @@ trait TrackingUtils extends WalletUtils with HttpUtils with ScorexLogging {
           val rd = ReserveData(box, IndexedSeq.empty, liabilites = 0L) // todo: fix liabilities
           box.additionalRegisters.get(R4).foreach { v =>
             v match {
-              case owner: GroupElementConstant if owner == GroupElementConstant(myPoint) =>
+              case owner: Constant[SType] if owner == GroupElementConstant(myPoint) =>
                 DbEntities.myReserves.add(rd.reserveNftId)
               case _ =>
                 log.warn(s"Reserve R4 miss for $v")

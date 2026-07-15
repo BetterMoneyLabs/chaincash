@@ -1,15 +1,16 @@
 package chaincash.contracts
 
+import chaincash.offchain.SigUtils._
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.appkit.{AppkitHelpers, ErgoValue, NetworkType}
 import scorex.crypto.hash.Blake2b256
 import scorex.util.encode.Base58
-import sigmastate.eval.CGroupElement
-import sigmastate.basics.CryptoConstants
-import sigmastate.AvlTreeFlags
-import sigmastate.Values.ErgoTree
-import sigmastate.lang.{CompilerSettings, SigmaCompiler, TransformingSigmaBuilder}
-import special.sigma.{AvlTree, GroupElement}
+import sigma.crypto.CryptoConstants
+import sigma.data.AvlTreeFlags
+import sigma.ast.ErgoTree
+import sigma.compiler.{CompilerSettings, SigmaCompiler}
+import sigma.ast.TransformingSigmaBuilder
+import sigma.{AvlTree, GroupElement}
 import work.lithos.plasma.PlasmaParameters
 import work.lithos.plasma.collections.PlasmaMap
 
@@ -48,7 +49,7 @@ object Constants {
   val emptyTreeErgoValue: ErgoValue[AvlTree] = emptyPlasmaMap.ergoValue
   val emptyTree: AvlTree = emptyTreeErgoValue.getValue
 
-  val g: GroupElement = CGroupElement(CryptoConstants.dlogGroup.generator)
+  val g: GroupElement = CryptoConstants.dlogGroup.generator
 
   val reserveContract = readContract("onchain/reserve.es", Map.empty)
   val reserveErgoTree = compile(reserveContract)

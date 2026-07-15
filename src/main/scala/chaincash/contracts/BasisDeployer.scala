@@ -3,10 +3,10 @@ package chaincash.contracts
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.appkit.{ErgoValue, NetworkType}
 import scorex.crypto.encode.Base16
-import sigmastate.AvlTreeFlags
-import sigmastate.Values.{AvlTreeConstant, GroupElementConstant}
-import sigmastate.serialization.{GroupElementSerializer, ValueSerializer}
-import special.sigma.AvlTree
+import sigma.data.AvlTreeFlags
+import sigma.ast.{AvlTreeConstant, Constant, GroupElementConstant, SType}
+import sigma.serialization.{GroupElementSerializer, ValueSerializer}
+import sigma.AvlTree
 import work.lithos.plasma.PlasmaParameters
 import work.lithos.plasma.collections.PlasmaMap
 
@@ -21,7 +21,7 @@ object BasisDeployer extends App {
    * Alice's public key derived from her Ergo address
    * In production, this would come from the wallet, not a hardcoded secret
    */
-  val exampleOwnerKey: GroupElementConstant = {
+  val exampleOwnerKey: Constant[SType] = {
     val alicePubKey = ParticipantKeys.alicePublicKey
     GroupElementConstant(alicePubKey)
   }
@@ -56,7 +56,7 @@ object BasisDeployer extends App {
    * @return JSON string for deployment request
    */
   def createBasisDeploymentRequest(
-    ownerPublicKey: GroupElementConstant,
+    ownerPublicKey: Constant[SType],
     trackerNftId: String,
     reserveTokenId: String,
     initialCollateral: Long = 100000000L // 0.1 ERG

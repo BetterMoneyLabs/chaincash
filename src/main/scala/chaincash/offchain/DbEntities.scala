@@ -1,19 +1,19 @@
 package chaincash.offchain
 
+import SigUtils._
 import com.google.common.primitives.{Longs, Shorts}
 import org.bouncycastle.util.BigIntegers
 import org.ergoplatform.ErgoBox
 import org.ergoplatform.wallet.boxes.ErgoBoxSerializer
 import scorex.util.ModifierId
 import scorex.util.encode.Base16
-import sigmastate.eval.CGroupElement
-import sigmastate.serialization.GroupElementSerializer
+import sigma.GroupElement
+import sigma.serialization.GroupElementSerializer
 import swaydb.{Glass, _}
 import swaydb.data.slice.Slice
 import swaydb.serializers.Default._
 import swaydb.serializers.Serializer
 import TrackingTypes._
-import sigmastate.basics.CryptoConstants.EcPointType
 
 object DbEntities {
 
@@ -21,11 +21,11 @@ object DbEntities {
 
   val oracleRateKey = "goldprice"
 
-  implicit object EcPointSerializer extends Serializer[EcPointType] {
-    override def write(modifierId: EcPointType): Slice[Byte] =
-      ByteArraySerializer.write(GroupElementSerializer.toBytes(modifierId))
+  implicit object GroupElementSwayDbSerializer extends Serializer[GroupElement] {
+    override def write(ge: GroupElement): Slice[Byte] =
+      ByteArraySerializer.write(GroupElementSerializer.toBytes(ge))
 
-    override def read(slice: Slice[Byte]): EcPointType = {
+    override def read(slice: Slice[Byte]): GroupElement = {
       val bytes = ByteArraySerializer.read(slice)
       GroupElementSerializer.fromBytes(bytes)
     }
@@ -123,7 +123,7 @@ object DbEntities {
   val state = persistent.Map[String, String, Nothing, Glass](dir = "db/state")
 
   // ecpoint -> reserve index
-  val reserveKeys = persistent.Map[EcPointType, ReserveNftId, Nothing, Glass](dir = "db/reserveKeys")
+  val reserveKeys = persistent.Map[GroupElement, ReserveNftId, Nothing, Glass](dir = "db/reserveKeys")
 
   val myReserves = persistent.Set[ReserveNftId, Nothing, Glass](dir = "db/my-reserves")
   //todo: save myNotes as well ?

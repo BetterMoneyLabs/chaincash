@@ -1,14 +1,14 @@
 package chaincash.offchain
 
+import SigUtils._
 import chaincash.contracts.Constants
 import org.ergoplatform.ErgoBox
 import org.ergoplatform.ErgoBox.R5
 import scorex.util.ModifierId
 import scorex.util.encode.Base16
-import sigmastate.Values.GroupElementConstant
-import sigmastate.eval.CGroupElement
-import sigmastate.basics.CryptoConstants.EcPointType
-import sigmastate.serialization.GroupElementSerializer
+import sigma.ast.{Constant, SType}
+import sigma.GroupElement
+import sigma.serialization.GroupElementSerializer
 import work.lithos.plasma.collections.PlasmaMap
 
 object TrackingTypes {
@@ -17,12 +17,15 @@ object TrackingTypes {
   type NoteTokenId = ModifierId
   type NoteId = ModifierId
 
-  case class SigData(reserveId: ReserveNftId, valueBacked: Long, a: EcPointType, z: BigInt)
+  case class SigData(reserveId: ReserveNftId, valueBacked: Long, a: GroupElement, z: BigInt)
 
   case class NoteData(currentUtxo: ErgoBox, history: IndexedSeq[SigData]) {
 
-    def holder: EcPointType = {
-      currentUtxo.get(R5).get.asInstanceOf[GroupElementConstant].value.asInstanceOf[CGroupElement].wrappedValue
+    def holder: GroupElement = {
+      currentUtxo.get(R5).get.asInstanceOf[Constant[SType]].value match {
+        case ge: GroupElement => ge
+        case _ => throw new IllegalStateException("R5 is not a GroupElement")
+      }
     }
 
     def restoreProver: PlasmaMap[Array[Byte], Array[Byte]] = {

@@ -1,5 +1,6 @@
 package chaincash.offchain
 
+import SigUtils._
 import chaincash.contracts.Constants
 import chaincash.contracts.Constants.{noteErgoTree, reserveErgoTree}
 import chaincash.offchain.TrackingTypes.NoteData
@@ -9,18 +10,18 @@ import org.ergoplatform.ErgoBox.{R4, R5, R6}
 import org.ergoplatform.sdk.wallet.Constants.eip3DerivationPath
 import org.ergoplatform.sdk.wallet.secrets.ExtendedSecretKey
 import org.ergoplatform.sdk.wallet.settings.EncryptionSettings
-import org.ergoplatform.wallet.interface4j.SecretString
+import org.ergoplatform.sdk.SecretString
 import org.ergoplatform.wallet.secrets.JsonSecretStorage
 import org.ergoplatform.wallet.settings.SecretStorageSettings
 import org.ergoplatform.{DataInput, ErgoBoxCandidate, P2PKAddress, UnsignedErgoLikeTransaction, UnsignedInput}
 import scorex.crypto.hash.Digest32
 import scorex.util.encode.Base16
-import sigmastate.Values.{AvlTreeConstant, ByteArrayConstant, ByteConstant, GroupElementConstant, LongConstant}
-import sigmastate.eval.Colls
-import sigmastate.interpreter.ContextExtension
-import sigmastate.eval._
-import sigmastate.serialization.GroupElementSerializer
-import special.sigma.GroupElement
+import sigma.ast.{AvlTreeConstant, ByteArrayConstant, ByteConstant, GroupElementConstant, LongConstant}
+import sigma.Colls
+import sigma.interpreter.ContextExtension
+import sigma.serialization.GroupElementSerializer
+import sigma.GroupElement
+import sigma.data.Digest32Coll
 
 trait NoteUtils extends WalletUtils {
   // create note with nominal of `amountMg` mg of gold

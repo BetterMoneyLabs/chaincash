@@ -1,7 +1,7 @@
 package chaincash.offchain
 
 import TrackingTypes.{NoteData, NoteId, ReserveNftId}
-import sigmastate.basics.CryptoConstants.EcPointType
+import sigma.GroupElement
 
 trait NotePredicate {
   /**
@@ -17,7 +17,7 @@ trait NotePredicate {
 // todo: tests
 // Collateral or Whitelist (CoW) predicate #1
 // at least 100% collateralized or current holder whitelisted
-class CoW1Predicate(whitelist: Set[EcPointType]) extends NotePredicate {
+class CoW1Predicate(whitelist: Set[GroupElement]) extends NotePredicate {
 
   /**
    * Whether a note with identifier `noteId` can be accepted

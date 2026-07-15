@@ -3,6 +3,7 @@ package chaincash
 import chaincash.contracts.Constants
 import chaincash.contracts.Constants.chainCashPlasmaParameters
 import chaincash.offchain.SigUtils
+import chaincash.offchain.SigUtils._
 import com.google.common.primitives.Longs
 import org.ergoplatform.P2PKAddress
 import org.ergoplatform.appkit.impl.{ErgoScriptContract, ErgoTreeContract, OutBoxImpl}
@@ -12,11 +13,10 @@ import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import scorex.crypto.hash.Blake2b256
 import scorex.util.encode.{Base16, Base64}
-import sigmastate.AvlTreeFlags
-import sigmastate.basics.DLogProtocol.ProveDlog
-import sigmastate.eval._
-import sigmastate.serialization.{GroupElementSerializer, ValueSerializer}
-import special.sigma.{AvlTree, GroupElement}
+import sigma.data.AvlTreeFlags
+import sigma.data.ProveDlog
+import sigma.serialization.{GroupElementSerializer, ValueSerializer}
+import sigma.{AvlTree, GroupElement}
 import work.lithos.plasma.PlasmaParameters
 import work.lithos.plasma.collections.{PlasmaMap, Proof}
 
@@ -271,7 +271,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .outBoxBuilder
           .value(minValue)
           .tokens(new ErgoToken(basisTokenId, 1))
-          .registers(ErgoValue.of(ownerPk), ErgoValue.of(emptyTree), ErgoValue.of(trackerNFTBytes))
+          .registers(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes))
           .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
           .build()
           .convertToInputWith(fakeTxId1, fakeIndex)
@@ -293,7 +293,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       val basisOutput = createOut(
         Constants.basisContract,
         minValue + topUpAmount,
-        Array(ErgoValue.of(ownerPk), ErgoValue.of(emptyTree), ErgoValue.of(trackerNFTBytes)),
+        Array(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1))
       )
 
@@ -492,7 +492,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .outBoxBuilder
           .value(minValue)
           .tokens(new ErgoToken(trackerNFTBytes, 1))
-          .registers(ErgoValue.of(trackerPk), ErgoValue.of(emptyTree))
+          .registers(ErgoValue.of(trackerPk), emptyTreeErgoValue)
           .contract(ctx.compileContract(ConstantsBuilder.empty(), "{false}"))
           .build()
           .convertToInputWith(fakeTxId2, fakeIndex)
@@ -595,7 +595,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .outBoxBuilder
           .value(minValue)
           .tokens(new ErgoToken(trackerNFTBytes, 1))
-          .registers(ErgoValue.of(trackerPk), ErgoValue.of(emptyTree))
+          .registers(ErgoValue.of(trackerPk), emptyTreeErgoValue)
           .contract(ctx.compileContract(ConstantsBuilder.empty(), "{false}"))
           .build()
           .convertToInputWith(fakeTxId2, fakeIndex)
@@ -646,7 +646,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .outBoxBuilder
           .value(minValue)
           .tokens(new ErgoToken(basisTokenId, 1))
-          .registers(ErgoValue.of(ownerPk), ErgoValue.of(emptyTree), ErgoValue.of(trackerNFTBytes))
+          .registers(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes))
           .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
           .build()
           .convertToInputWith(fakeTxId1, fakeIndex)
@@ -668,7 +668,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       val basisOutput = createOut(
         Constants.basisContract,
         minValue + topUpAmount,
-        Array(ErgoValue.of(ownerPk), ErgoValue.of(emptyTree), ErgoValue.of(trackerNFTBytes)),
+        Array(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1))
       )
 
@@ -754,7 +754,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .outBoxBuilder
           .value(minValue)
           .tokens(new ErgoToken(trackerNFTBytes, 1))
-          .registers(ErgoValue.of(trackerPk), ErgoValue.of(emptyTree))
+          .registers(ErgoValue.of(trackerPk), emptyTreeErgoValue)
           .contract(ctx.compileContract(ConstantsBuilder.empty(), "{false}"))
           .build()
           .convertToInputWith(fakeTxId2, fakeIndex)
@@ -861,7 +861,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .outBoxBuilder
           .value(minValue)
           .tokens(new ErgoToken(trackerNFTBytes, 1))
-          .registers(ErgoValue.of(trackerPk), ErgoValue.of(emptyTree))
+          .registers(ErgoValue.of(trackerPk), emptyTreeErgoValue)
           .contract(ctx.compileContract(ConstantsBuilder.empty(), "{false}"))
           .build()
           .convertToInputWith(fakeTxId2, fakeIndex)
@@ -964,7 +964,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .outBoxBuilder
           .value(minValue)
           .tokens(new ErgoToken(trackerNFTBytes, 1))
-          .registers(ErgoValue.of(trackerPk), ErgoValue.of(emptyTree))
+          .registers(ErgoValue.of(trackerPk), emptyTreeErgoValue)
           .contract(ctx.compileContract(ConstantsBuilder.empty(), "{false}"))
           .build()
           .convertToInputWith(fakeTxId2, fakeIndex)
@@ -1064,7 +1064,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .outBoxBuilder
           .value(minValue)
           .tokens(new ErgoToken(trackerNFTBytes, 1))
-          .registers(ErgoValue.of(trackerPk), ErgoValue.of(emptyTree))
+          .registers(ErgoValue.of(trackerPk), emptyTreeErgoValue)
           .contract(ctx.compileContract(ConstantsBuilder.empty(), "{false}"))
           .build()
           .convertToInputWith(fakeTxId2, fakeIndex)
@@ -1171,7 +1171,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .outBoxBuilder
           .value(minValue)
           .tokens(new ErgoToken(trackerNFTBytes, 1))
-          .registers(ErgoValue.of(trackerPk), ErgoValue.of(emptyTree))
+          .registers(ErgoValue.of(trackerPk), emptyTreeErgoValue)
           .contract(ctx.compileContract(ConstantsBuilder.empty(), "{false}"))
           .build()
           .convertToInputWith(fakeTxId2, fakeIndex)
@@ -1328,7 +1328,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
   // The contract reads tracker.R5[AvlTree] for potential validation of tracker state.
   // For emergency redemption tests, set creationHeight to ctx.getHeight - 3 * 720 - 1 or more
   def mkTrackerDataInput(
-    trackerTree: ErgoValue[AvlTree] = ErgoValue.of(emptyTree),
+    trackerTree: ErgoValue[AvlTree] = emptyTreeErgoValue,
     creationHeightOffset: Option[Int] = None
   )(implicit ctx: BlockchainContext): InputBox = {
     val builder = ctx.newTxBuilder().outBoxBuilder
@@ -1345,19 +1345,20 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       .convertToInputWith(fakeTxId2, fakeIndex)
   }
 
-  // Script validation failures throw sigmastate.exceptions.InterpreterException
-  // with message "Script reduced to false". We check the cause chain to handle wrapped exceptions.
+  // Script validation failures throw sigma.exceptions.InterpreterException
+
+  // Has a sigmastate interpreter exception somewhere in the cause chain
+  private def hasScriptValidationFailure(t: Throwable): Boolean =
+    Iterator.iterate[Throwable](t)(_.getCause).takeWhile(_ != null).exists {
+      // Any InterpreterException indicates script-level failure (sigmaProp false, AVL proof invalid, etc.)
+      case _: sigma.exceptions.InterpreterException => true
+      case _ => false
+    }
+
   private def formatCauseChain(t: Throwable): String =
     Iterator.iterate[Throwable](t)(_.getCause).takeWhile(_ != null).zipWithIndex.map {
       case (e, i) => s"[$i] ${e.getClass.getName}: ${Option(e.getMessage).getOrElse("<no message>")}"
     }.mkString("\n")
-
-  // Any InterpreterException indicates script-level failure (sigmaProp false, AVL proof invalid, etc.)
-  private def hasScriptValidationFailure(t: Throwable): Boolean =
-    Iterator.iterate[Throwable](t)(_.getCause).takeWhile(_ != null).exists {
-      case _: sigmastate.exceptions.InterpreterException => true
-      case _ => false
-    }
 
   // Known builder/selection error keywords in class names that indicate construction failure
   private val constructionErrorClassKeywords = Seq(
@@ -1673,12 +1674,12 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       // Create a different tree for testing the failure case
       val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, chainCashPlasmaParameters)
       plasmaMap.insert((Blake2b256("test".getBytes), Array[Byte](1, 2, 3)))
-      val differentTree = plasmaMap.ergoValue.getValue
+      val differentTree = plasmaMap.ergoValue
 
       val basisInput = ctx.newTxBuilder().outBoxBuilder
         .value(minValue)
         .tokens(new ErgoToken(basisTokenId, 1))
-        .registers(ErgoValue.of(ownerPk), ErgoValue.of(emptyTree), ErgoValue.of(trackerNFTBytes))
+        .registers(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes))
         .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
         .build()
         .convertToInputWith(fakeTxId1, fakeIndex)
@@ -1692,13 +1693,13 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
 
       // FAIL CASE: Output with DIFFERENT tree - violates top-up tree preservation
       val badBasisOutput = createOut(Constants.basisContract, minValue + topUpAmount,
-        Array(ErgoValue.of(ownerPk), ErgoValue.of(differentTree), ErgoValue.of(trackerNFTBytes)),
+        Array(ErgoValue.of(ownerPk), differentTree, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
       assertTxFails(Array(basisInput, fundingBox), Array(), Array(badBasisOutput), Array(ownerSecret.toString()))
 
       // CONTROL: Use same tree → tx succeeds
       val goodBasisOutput = createOut(Constants.basisContract, minValue + topUpAmount,
-        Array(ErgoValue.of(ownerPk), ErgoValue.of(emptyTree), ErgoValue.of(trackerNFTBytes)),
+        Array(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
       noException should be thrownBy {
         assertTxSucceeds(Array(basisInput, fundingBox), Array(), Array(goodBasisOutput), Array(ownerSecret.toString()))
@@ -1747,7 +1748,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
   }
 
   // Create a deterministically invalid signature by corrupting a valid one
-  private def corruptSig(sig: (special.sigma.GroupElement, BigInt)): Array[Byte] = {
+  private def corruptSig(sig: (sigma.GroupElement, BigInt)): Array[Byte] = {
     val b = mkSigBytes(sig).clone()
     b(0) = (b(0) ^ 0x01).toByte // flip one bit
     b

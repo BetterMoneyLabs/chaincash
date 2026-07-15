@@ -2,8 +2,8 @@ package chaincash.contracts
 
 import Constants._
 import scorex.util.encode.Base16
-import sigmastate.Values.ByteArrayConstant
-import sigmastate.serialization.ValueSerializer
+import sigma.ast.ByteArrayConstant
+import sigma.serialization.ValueSerializer
 
 object ContractsPrinter extends App {
 

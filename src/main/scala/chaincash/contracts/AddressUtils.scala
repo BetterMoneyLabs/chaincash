@@ -3,10 +3,11 @@ package chaincash.contracts
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.P2PKAddress
 import scorex.crypto.encode.{Base16, Base58}
-import sigmastate.basics.CryptoConstants
-import sigmastate.eval._
-import sigmastate.serialization.GroupElementSerializer
-import special.sigma.GroupElement
+import chaincash.offchain.SigUtils._
+import sigma.crypto.CryptoConstants
+import sigma.serialization.GroupElementSerializer
+import sigma.GroupElement
+import sigma.ast._
 
 /**
  * Object for deriving public keys from Ergo addresses.
@@ -33,10 +34,10 @@ object AddressUtils {
     
     // Get the proposition (public key) from the address
     // ErgoAddress stores the underlying proposition which contains the public key
-    import sigmastate.Values._
+    import sigma.ast._
     ergoAddress match {
       case p2pk: P2PKAddress =>
-        p2pk.pubkey.value.getEncoded.toArray
+        GroupElementSerializer.toBytes(p2pk.pubkey.value)
       case other =>
         throw new IllegalArgumentException(s"Only P2PK addresses are supported, got: ${other.getClass.getSimpleName}")
     }
@@ -49,9 +50,7 @@ object AddressUtils {
    * @return GroupElement representing the public key
    */
   def derivePublicKeyFromAddress(address: String): GroupElement = {
-    val pubkeyBytes = extractPublicKeyBytesFromAddress(address)
-    val ecPoint = GroupElementSerializer.fromBytes(pubkeyBytes)
-    CGroupElement(ecPoint)
+    GroupElementSerializer.fromBytes(extractPublicKeyBytesFromAddress(address))
   }
 
   /**
@@ -72,8 +71,7 @@ object AddressUtils {
    * @return GroupElement representing the public key
    */
   def derivePublicKeyFromSecret(secretKey: BigInt): GroupElement = {
-    val g = CryptoConstants.dlogGroup.generator
-    CGroupElement(g.exp(secretKey.bigInteger))
+    CryptoConstants.dlogGroup.generator.exp(secretKey.bigInteger)
   }
 
   /**
@@ -117,7 +115,7 @@ object AddressUtils {
    * @param ergoTree The compiled ErgoTree
    * @return Hex-encoded ergoTree bytes
    */
-  def deriveErgoTreeFromContract(ergoTree: sigmastate.Values.ErgoTree): String = {
+  def deriveErgoTreeFromContract(ergoTree: sigma.ast.ErgoTree): String = {
     Base16.encode(ergoTree.bytes)
   }
 }
