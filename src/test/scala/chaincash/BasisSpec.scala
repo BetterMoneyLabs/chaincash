@@ -2938,4 +2938,119 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       println("Insufficient collateral test passed: redemption rejected")
     }
   }
+
+  property("basis multiple partial consecutive redemptions should work") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
+      val totalDebt = 1000000000L // 1 ERG total debt
+      val redeem1 = 300000000L   // 0.3 ERG first redemption
+      val redeem2 = 400000000L   // 0.4 ERG second redemption
+      val redeem3 = 300000000L  // 0.3 ERG third redemption (exhausts debt)
+
+      // Strictly increasing timestamps (contract enforces timestamp > storedTimestamp)
+      val t1 = 1000000000000L
+      val t2 = t1 + 1
+      val t3 = t2 + 1
+
+      val key = mkKey(ownerPk, receiverPk)
+      val tracker = mkTrackerTreeAndProof(key, totalDebt)
+      val trackerInput = mkTrackerDataInput(tracker.tree)
+
+      // --- Redemption 1: empty reserve tree -> (t1, redeem1) ---
+      val TreeAndProof(emptyTree, tree1, proof1) = mkTreeAndProof(key, redeem1, t1)
+      val message1 = mkMessage(key, totalDebt, t1)
+      val reserveSig1 = mkSigBytes(SigUtils.sign(message1, ownerSecret))
+      val trackerSig1 = mkSigBytes(SigUtils.sign(message1, trackerSecret))
+
+      val basisInput1 = mkBasisInput(
+        minValue + totalDebt + feeValue,
+        emptyTree, receiverPk, reserveSig1, totalDebt, proof1,
+        trackerSig1, None, Some(tracker.lookupProofBytes), t1
+      )
+      val basisOutput1 = createOut(Constants.basisContract,
+        minValue + totalDebt - redeem1 + feeValue,
+        Array(ErgoValue.of(ownerPk), tree1, ErgoValue.of(trackerNFTBytes)),
+        Array(new ErgoToken(basisTokenId, 1)))
+      val redemption1 = createOut(trueScript, redeem1, Array(), Array())
+
+      val tx1 = createTx(Array(basisInput1), Array(trackerInput),
+        Array(basisOutput1, redemption1), fee = None, changeAddress,
+        Array(receiverSecret.toString()), broadcast = false)
+
+      // --- Redemption 2: (t1, redeem1) -> (t2, redeem1+redeem2) ---
+      val lookupMap2 = new PlasmaMap[Array[Byte], Array[Byte]](basisReserveFlags, chainCashPlasmaParameters)
+      lookupMap2.insertOrUpdate(key -> (Longs.toByteArray(t1) ++ Longs.toByteArray(redeem1)))
+      val lookupProof2 = lookupMap2.lookUp(key).proof.bytes
+
+      val updateMap2 = new PlasmaMap[Array[Byte], Array[Byte]](basisReserveFlags, chainCashPlasmaParameters)
+      updateMap2.insertOrUpdate(key -> (Longs.toByteArray(t1) ++ Longs.toByteArray(redeem1)))
+      val insertProof2 = updateMap2.insertOrUpdate(key -> (Longs.toByteArray(t2) ++ Longs.toByteArray(redeem1 + redeem2))).proof.bytes
+      val tree2 = updateMap2.ergoValue
+
+      val message2 = mkMessage(key, totalDebt, t2)
+      val reserveSig2 = mkSigBytes(SigUtils.sign(message2, ownerSecret))
+      val trackerSig2 = mkSigBytes(SigUtils.sign(message2, trackerSecret))
+
+      val basisInput2 = tx1.getOutputsToSpend.get(0).withContextVars(
+        new ContextVar(0, ErgoValue.of(0: Byte)),
+        new ContextVar(1, ErgoValue.of(receiverPk)),
+        new ContextVar(2, ErgoValue.of(reserveSig2)),
+        new ContextVar(3, ErgoValue.of(totalDebt)),
+        new ContextVar(4, ErgoValue.of(t2)),
+        new ContextVar(5, ErgoValue.of(insertProof2)),
+        new ContextVar(6, ErgoValue.of(trackerSig2)),
+        new ContextVar(7, ErgoValue.of(lookupProof2)),
+        new ContextVar(8, ErgoValue.of(tracker.lookupProofBytes))
+      )
+
+      val basisOutput2 = createOut(Constants.basisContract,
+        minValue + totalDebt - redeem1 - redeem2 + feeValue,
+        Array(ErgoValue.of(ownerPk), tree2, ErgoValue.of(trackerNFTBytes)),
+        Array(new ErgoToken(basisTokenId, 1)))
+      val redemption2 = createOut(trueScript, redeem2, Array(), Array())
+
+      val tx2 = createTx(Array(basisInput2), Array(trackerInput),
+        Array(basisOutput2, redemption2), fee = None, changeAddress,
+        Array(receiverSecret.toString()), broadcast = false)
+
+      // --- Redemption 3: (t2, redeem1+redeem2) -> (t3, totalDebt) ---
+      val lookupMap3 = new PlasmaMap[Array[Byte], Array[Byte]](basisReserveFlags, chainCashPlasmaParameters)
+      lookupMap3.insertOrUpdate(key -> (Longs.toByteArray(t1) ++ Longs.toByteArray(redeem1)))
+      lookupMap3.insertOrUpdate(key -> (Longs.toByteArray(t2) ++ Longs.toByteArray(redeem1 + redeem2)))
+      val lookupProof3 = lookupMap3.lookUp(key).proof.bytes
+
+      val updateMap3 = new PlasmaMap[Array[Byte], Array[Byte]](basisReserveFlags, chainCashPlasmaParameters)
+      updateMap3.insertOrUpdate(key -> (Longs.toByteArray(t1) ++ Longs.toByteArray(redeem1)))
+      updateMap3.insertOrUpdate(key -> (Longs.toByteArray(t2) ++ Longs.toByteArray(redeem1 + redeem2)))
+      val insertProof3 = updateMap3.insertOrUpdate(key -> (Longs.toByteArray(t3) ++ Longs.toByteArray(totalDebt))).proof.bytes
+      val tree3 = updateMap3.ergoValue
+
+      val message3 = mkMessage(key, totalDebt, t3)
+      val reserveSig3 = mkSigBytes(SigUtils.sign(message3, ownerSecret))
+      val trackerSig3 = mkSigBytes(SigUtils.sign(message3, trackerSecret))
+
+      val basisInput3 = tx2.getOutputsToSpend.get(0).withContextVars(
+        new ContextVar(0, ErgoValue.of(0: Byte)),
+        new ContextVar(1, ErgoValue.of(receiverPk)),
+        new ContextVar(2, ErgoValue.of(reserveSig3)),
+        new ContextVar(3, ErgoValue.of(totalDebt)),
+        new ContextVar(4, ErgoValue.of(t3)),
+        new ContextVar(5, ErgoValue.of(insertProof3)),
+        new ContextVar(6, ErgoValue.of(trackerSig3)),
+        new ContextVar(7, ErgoValue.of(lookupProof3)),
+        new ContextVar(8, ErgoValue.of(tracker.lookupProofBytes))
+      )
+
+      val basisOutput3 = createOut(Constants.basisContract,
+        minValue + totalDebt - redeem1 - redeem2 - redeem3 + feeValue,
+        Array(ErgoValue.of(ownerPk), tree3, ErgoValue.of(trackerNFTBytes)),
+        Array(new ErgoToken(basisTokenId, 1)))
+      val redemption3 = createOut(trueScript, redeem3, Array(), Array())
+
+      noException should be thrownBy {
+        createTx(Array(basisInput3), Array(trackerInput),
+          Array(basisOutput3, redemption3), fee = None, changeAddress,
+          Array(receiverSecret.toString()), broadcast = false)
+      }
+    }
+  }
 }
