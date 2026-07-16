@@ -165,10 +165,15 @@ object BasisConstants {
   // Action codes for Basis contract
   val REDEEM_ACTION: Byte = 0
   val TOP_UP_ACTION: Byte = 1
+  val INITIATE_REFUND_ACTION: Byte = 2
+  val COMPLETE_REFUND_ACTION: Byte = 3
 
   // Minimum top-up amount (0.1 ERG)
   val MIN_TOP_UP_AMOUNT: Long = 100000000L
 
   // Emergency redemption time (3 days in blocks, assuming ~2.5 min per block)
   val EMERGENCY_REDEMPTION_TIME_IN_BLOCKS: Int = 3 * 720
+
+  // Refund waiting period (2 months in blocks, assuming ~2 min per block)
+  val REFUND_PERIOD_BLOCKS: Int = 43200
 }

@@ -43,6 +43,24 @@
     //  * always possible to top up the reserve. To redeem partially, reserve holder can make an offchain payment to self (A -> A)
     //    updating the cumulative debt, then redeem the desired amount.
     //
+    // Refund (reserve owner exit):
+    //  * The reserve owner can unilaterally exit, without tracker or creditor cooperation,
+    //    protecting the owner from censorship. To protect creditors from the owner draining
+    //    collateral behind their backs, refund is two-phase:
+    //    1. initiate refund (#2): owner signs a transaction setting R7 to the initiation height
+    //       (current height or slightly in the future, to tolerate delayed block inclusion).
+    //    2. complete refund (#3): after refundPeriod (2 months) has passed since R7, the owner
+    //       signs a transaction spending the box and taking all funds.
+    //  * Redemptions remain fully enabled during and after the waiting period: creditors have
+    //    2 months to redeem their notes before the owner can withdraw.
+    //  * Redemption is also not disabled after the deadline, so an owner who initiated but never
+    //    completed the refund does not freeze the reserve (a late redemption races with the
+    //    refund completion; creditors had 2 months to act).
+    //  * Only full withdrawal is supported: a partial refund would require tracker attestation
+    //    of outstanding debt, reintroducing the censorship vector the refund protects against.
+    //  * Wallets and trackers should monitor reserves for R7 being set and notify creditors;
+    //    acceptance predicates should reject new notes backed by reserves with a pending refund.
+    //
     // Debt Transfer (Novation):
     //  * The scheme supports transferring debt obligations between creditors with debtor consent.
     //  * Example: A owes debt to B. B wants to buy from C. If A agrees, A can sign new notes:
@@ -157,10 +175,15 @@
     //         and cumulativeRedeemedAmount is the total amount redeemed (Long, 8 bytes big-endian)
     //         Value format: timestamp (8 bytes) ++ redeemedAmount (8 bytes) = 16 bytes total
     //  - R6 - NFT id of tracker server (bytes) // todo: support multiple payment servers by using a tree
+    //  - R7 - refund initiation height (Long). Absent or 0 = no refund pending.
+    //         Set when the reserve owner announces intent to withdraw (action #2).
+    //         After refundPeriod blocks, the owner may withdraw all funds (action #3).
     //
     // Actions:
-    //  - redeem note (#0)
-    //  - top up      (#1)
+    //  - redeem note       (#0)
+    //  - top up            (#1)
+    //  - initiate refund   (#2)
+    //  - complete refund   (#3)
     //
     //  Tracker box registers:
     //  - R4 - tracker's signing key (GroupElement)
@@ -185,7 +208,7 @@
     // action and reserve output index. By passing them instead of hard-coding, we allow for multiple notes to be
     // redeemed at once, which can be used for atomic mutual debt clearing etc
 
-    // todo: 2 todos to be addressed before real world deployments, see below
+    // todo: insertOrUpdate & multiple trackers to be supported (see R6 todo) before real world deployments
 
     val v = getVar[Byte](0).get
     val action = v / 10
@@ -193,6 +216,12 @@
 
     val ownerKey = SELF.R4[GroupElement].get // reserve owner's key
     val selfOut = OUTPUTS(index)
+
+    // Refund waiting period: 2 months (60 days * 720 blocks/day)
+    val refundPeriod = 43200
+
+    // Refund initiation height (0 if no refund is pending)
+    val refundHeight = SELF.R7[Long].getOrElse(0L)
 
     // common checks for all the paths (not incl. ERG value and R5 check)
     val selfPreserved =
@@ -349,6 +378,10 @@
       // Verify tree was properly updated in output
       val properRedemptionTree = nextTree == selfOut.R5[AvlTree].get
 
+      // Pending refund flag (if any) must be preserved: redemption must not
+      // cancel or alter a refund announced by the reserve owner
+      val refundPreserved = selfOut.R7[Long].getOrElse(0L) == refundHeight
+
       // Verify receiver's signature on transaction bytes
       val receiverCondition = proveDlog(receiver)
 
@@ -360,16 +393,37 @@
                 properRedemptionTree &&
                 properReserveSignature &&
                 properlyRedeemed &&
+                refundPreserved &&
                 receiverCondition)
     } else if (action == 1) {
       // top up
       sigmaProp(
         selfPreserved &&
         selfOut.R5[AvlTree].get == SELF.R5[AvlTree].get && // as R5 register preservation is not checked in selfPreserved
+        selfOut.R7[Long].getOrElse(0L) == refundHeight && // pending refund flag (if any) must be preserved
         (selfOut.value - SELF.value >= 100000000) // at least 0.1 ERG added
       )
+    } else if (action == 2) {
+      // initiate refund: reserve owner announces intent to withdraw, starting
+      // the refundPeriod countdown during which creditors can still redeem.
+      // One-shot only: re-initiation (which would reset the timer) is not allowed.
+      sigmaProp(
+        selfPreserved &&
+        selfOut.value >= SELF.value && // no funds can be taken out at initiation
+        selfOut.R5[AvlTree].get == SELF.R5[AvlTree].get && // redemption tree preserved
+        selfOut.R7[Long].get >= HEIGHT && // no backdating (>= to tolerate delayed block inclusion)
+        refundHeight == 0L // no refund pending yet
+      ) && proveDlog(ownerKey)
+    } else if (action == 3) {
+      // complete refund: after the waiting period the owner takes all funds,
+      // destroying the reserve box. Creditors had refundPeriod blocks to redeem.
+      // Owner's signature covers the whole transaction, so the owner controls
+      // the destination of funds and tokens.
+      sigmaProp(
+        refundHeight > 0L && // refund was initiated
+        HEIGHT >= refundHeight + refundPeriod // waiting period is over
+      ) && proveDlog(ownerKey)
     } else {
-      // todo: make an option for refund in 1-2 months , to protect reserve owner from censorship
       sigmaProp(false)
     }
 

@@ -226,6 +226,21 @@ Creditor → Reserve Agent (after timeout)
 7. Replay attacks prevented by timestamp verification
 ```
 
+### Reserve Owner Refund (Censorship-Resistant Exit)
+Implemented in both `contracts/offchain/basis.es` (ERG reserve) and
+`contracts/offchain/basis-token.es` (token reserve).
+```
+Reserve Owner (two-phase, unilateral)
+1. Initiate refund (action #2): owner signs tx setting R7 to initiation height
+   (current or slightly future-dated; backdating rejected; one-shot only)
+2. Creditors monitor R7 and have 43200 blocks (~2 months) to redeem notes
+3. Redemptions and top-ups remain enabled during and after the window (R7 preserved)
+4. Complete refund (action #3): after the waiting period, owner signs tx taking
+   all funds, destroying the reserve box
+5. Only full withdrawal supported
+6. Acceptance predicates should reject new notes backed by reserves with pending refund
+```
+
 ## System Architecture Principles
 
 ### Collective Backing

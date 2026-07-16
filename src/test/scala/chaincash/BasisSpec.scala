@@ -690,6 +690,490 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
     }
   }
 
+  // ========== REFUND TESTS ==========
+
+  val refundPeriod = 43200L // must match refundPeriod in basis.es
+
+  property("basis initiate refund should work") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
+
+      // Basis reserve input (no R7 yet - no refund pending)
+      val basisInput =
+        ctx
+          .newTxBuilder()
+          .outBoxBuilder
+          .value(minValue)
+          .tokens(new ErgoToken(basisTokenId, 1))
+          .registers(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .build()
+          .convertToInputWith(fakeTxId1, fakeIndex)
+          .withContextVars(
+            new ContextVar(0, ErgoValue.of(20: Byte)) // action 2, index 0
+          )
+
+      // Funding box to pay the transaction fee
+      val fundingBox =
+        ctx
+          .newTxBuilder()
+          .outBoxBuilder
+          .value(feeValue)
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), fakeScript))
+          .build()
+          .convertToInputWith(fakeTxId2, fakeIndex)
+
+      // Basis output with R7 set to initiation height. Slightly future-dated height is
+      // allowed (>= HEIGHT) to tolerate delayed inclusion into a block.
+      val basisOutput = createOut(
+        Constants.basisContract,
+        minValue,
+        Array(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes), ErgoValue.of(ctx.getHeight.toLong + 5)),
+        Array(new ErgoToken(basisTokenId, 1))
+      )
+
+      noException should be thrownBy {
+        createTx(
+          Array[InputBox](basisInput, fundingBox),
+          Array[InputBox](),
+          Array[OutBoxImpl](basisOutput),
+          fee = None,
+          changeAddress,
+          Array[String](ownerSecret.toString()),
+          false
+        )
+      }
+    }
+  }
+
+  property("basis initiate refund should fail without owner signature") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
+
+      val basisInput =
+        ctx
+          .newTxBuilder()
+          .outBoxBuilder
+          .value(minValue)
+          .tokens(new ErgoToken(basisTokenId, 1))
+          .registers(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .build()
+          .convertToInputWith(fakeTxId1, fakeIndex)
+          .withContextVars(
+            new ContextVar(0, ErgoValue.of(20: Byte)) // action 2, index 0
+          )
+
+      val fundingBox =
+        ctx
+          .newTxBuilder()
+          .outBoxBuilder
+          .value(feeValue)
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), fakeScript))
+          .build()
+          .convertToInputWith(fakeTxId2, fakeIndex)
+
+      val basisOutput = createOut(
+        Constants.basisContract,
+        minValue,
+        Array(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes), ErgoValue.of(ctx.getHeight.toLong)),
+        Array(new ErgoToken(basisTokenId, 1))
+      )
+
+      // Signed with receiver's secret instead of reserve owner's
+      a[Throwable] should be thrownBy {
+        createTx(
+          Array[InputBox](basisInput, fundingBox),
+          Array[InputBox](),
+          Array[OutBoxImpl](basisOutput),
+          fee = None,
+          changeAddress,
+          Array[String](receiverSecret.toString()),
+          false
+        )
+      }
+    }
+  }
+
+  property("basis initiate refund should fail when refund is already pending") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
+
+      // Input with R7 already set - refund was already initiated
+      val basisInput =
+        ctx
+          .newTxBuilder()
+          .outBoxBuilder
+          .value(minValue)
+          .tokens(new ErgoToken(basisTokenId, 1))
+          .registers(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes), ErgoValue.of(500L))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .build()
+          .convertToInputWith(fakeTxId1, fakeIndex)
+          .withContextVars(
+            new ContextVar(0, ErgoValue.of(20: Byte)) // action 2, index 0
+          )
+
+      val fundingBox =
+        ctx
+          .newTxBuilder()
+          .outBoxBuilder
+          .value(feeValue)
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), fakeScript))
+          .build()
+          .convertToInputWith(fakeTxId2, fakeIndex)
+
+      val basisOutput = createOut(
+        Constants.basisContract,
+        minValue,
+        Array(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes), ErgoValue.of(ctx.getHeight.toLong)),
+        Array(new ErgoToken(basisTokenId, 1))
+      )
+
+      assertTxFails(
+        Array(basisInput, fundingBox),
+        Array(),
+        Array(basisOutput),
+        Array(ownerSecret.toString())
+      )
+    }
+  }
+
+  property("basis initiate refund should fail with backdated initiation height") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
+
+      val basisInput =
+        ctx
+          .newTxBuilder()
+          .outBoxBuilder
+          .value(minValue)
+          .tokens(new ErgoToken(basisTokenId, 1))
+          .registers(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .build()
+          .convertToInputWith(fakeTxId1, fakeIndex)
+          .withContextVars(
+            new ContextVar(0, ErgoValue.of(20: Byte)) // action 2, index 0
+          )
+
+      val fundingBox =
+        ctx
+          .newTxBuilder()
+          .outBoxBuilder
+          .value(feeValue)
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), fakeScript))
+          .build()
+          .convertToInputWith(fakeTxId2, fakeIndex)
+
+      // Backdating R7 would shorten the creditor protection window - must be rejected
+      val basisOutput = createOut(
+        Constants.basisContract,
+        minValue,
+        Array(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes), ErgoValue.of(ctx.getHeight.toLong - 10)),
+        Array(new ErgoToken(basisTokenId, 1))
+      )
+
+      assertTxFails(
+        Array(basisInput, fundingBox),
+        Array(),
+        Array(basisOutput),
+        Array(ownerSecret.toString())
+      )
+    }
+  }
+
+  property("basis initiate refund should fail when taking funds out") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
+
+      val basisInput =
+        ctx
+          .newTxBuilder()
+          .outBoxBuilder
+          .value(minValue)
+          .tokens(new ErgoToken(basisTokenId, 1))
+          .registers(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .build()
+          .convertToInputWith(fakeTxId1, fakeIndex)
+          .withContextVars(
+            new ContextVar(0, ErgoValue.of(20: Byte)) // action 2, index 0
+          )
+
+      // Output value decreased (fee is paid from the reserve) - not allowed at initiation
+      val basisOutput = createOut(
+        Constants.basisContract,
+        minValue - feeValue,
+        Array(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes), ErgoValue.of(ctx.getHeight.toLong)),
+        Array(new ErgoToken(basisTokenId, 1))
+      )
+
+      assertTxFails(
+        Array(basisInput),
+        Array(),
+        Array(basisOutput),
+        Array(ownerSecret.toString())
+      )
+    }
+  }
+
+  property("basis complete refund should work after waiting period") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
+
+      // Refund was initiated refundPeriod blocks ago
+      val refundHeight = ctx.getHeight.toLong - refundPeriod
+
+      val basisInput =
+        ctx
+          .newTxBuilder()
+          .outBoxBuilder
+          .value(minValue)
+          .tokens(new ErgoToken(basisTokenId, 1))
+          .registers(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes), ErgoValue.of(refundHeight))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .build()
+          .convertToInputWith(fakeTxId1, fakeIndex)
+          .withContextVars(
+            new ContextVar(0, ErgoValue.of(30: Byte)) // action 3, index 0
+          )
+
+      // Refund output: all funds and the reserve token leave the contract
+      val refundOutput = createOut(
+        trueScript,
+        minValue - feeValue,
+        Array(),
+        Array(new ErgoToken(basisTokenId, 1))
+      )
+
+      noException should be thrownBy {
+        assertTxSucceeds(
+          Array(basisInput),
+          Array(),
+          Array(refundOutput),
+          Array(ownerSecret.toString())
+        )
+      }
+    }
+  }
+
+  property("basis complete refund should fail before waiting period is over") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
+
+      // Refund initiated only refundPeriod - 1 blocks ago
+      val refundHeight = ctx.getHeight.toLong - refundPeriod + 1
+
+      val basisInput =
+        ctx
+          .newTxBuilder()
+          .outBoxBuilder
+          .value(minValue)
+          .tokens(new ErgoToken(basisTokenId, 1))
+          .registers(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes), ErgoValue.of(refundHeight))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .build()
+          .convertToInputWith(fakeTxId1, fakeIndex)
+          .withContextVars(
+            new ContextVar(0, ErgoValue.of(30: Byte)) // action 3, index 0
+          )
+
+      val refundOutput = createOut(
+        trueScript,
+        minValue - feeValue,
+        Array(),
+        Array(new ErgoToken(basisTokenId, 1))
+      )
+
+      assertTxFails(
+        Array(basisInput),
+        Array(),
+        Array(refundOutput),
+        Array(ownerSecret.toString())
+      )
+    }
+  }
+
+  property("basis complete refund should fail without pending refund") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
+
+      // No R7 register - refund was never initiated
+      val basisInput =
+        ctx
+          .newTxBuilder()
+          .outBoxBuilder
+          .value(minValue)
+          .tokens(new ErgoToken(basisTokenId, 1))
+          .registers(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .build()
+          .convertToInputWith(fakeTxId1, fakeIndex)
+          .withContextVars(
+            new ContextVar(0, ErgoValue.of(30: Byte)) // action 3, index 0
+          )
+
+      val refundOutput = createOut(
+        trueScript,
+        minValue - feeValue,
+        Array(),
+        Array(new ErgoToken(basisTokenId, 1))
+      )
+
+      assertTxFails(
+        Array(basisInput),
+        Array(),
+        Array(refundOutput),
+        Array(ownerSecret.toString())
+      )
+    }
+  }
+
+  property("basis complete refund should fail without owner signature") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
+
+      val refundHeight = ctx.getHeight.toLong - refundPeriod
+
+      val basisInput =
+        ctx
+          .newTxBuilder()
+          .outBoxBuilder
+          .value(minValue)
+          .tokens(new ErgoToken(basisTokenId, 1))
+          .registers(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes), ErgoValue.of(refundHeight))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .build()
+          .convertToInputWith(fakeTxId1, fakeIndex)
+          .withContextVars(
+            new ContextVar(0, ErgoValue.of(30: Byte)) // action 3, index 0
+          )
+
+      val refundOutput = createOut(
+        trueScript,
+        minValue - feeValue,
+        Array(),
+        Array(new ErgoToken(basisTokenId, 1))
+      )
+
+      // Signed with receiver's secret instead of reserve owner's
+      a[Throwable] should be thrownBy {
+        createTx(
+          Array[InputBox](basisInput),
+          Array[InputBox](),
+          Array[OutBoxImpl](refundOutput),
+          fee = None,
+          changeAddress,
+          Array[String](receiverSecret.toString()),
+          false
+        )
+      }
+    }
+  }
+
+  property("basis redemption should work with pending refund (R7 preserved)") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
+      val totalDebt = 500000000L
+      val redeemAmount = totalDebt
+      val timestamp = System.currentTimeMillis()
+      val key = mkKey(ownerPk, receiverPk)
+      val message = mkMessage(key, totalDebt, timestamp)
+      val reserveSigBytes = mkSigBytes(SigUtils.sign(message, ownerSecret))
+      val trackerSigBytes = mkSigBytes(SigUtils.sign(message, trackerSecret))
+      val TreeAndProof(initialTree, nextTree, proofBytes) = mkTreeAndProof(key, redeemAmount, timestamp)
+      val TrackerTreeAndProof(trackerTree, trackerLookupProof) = mkTrackerTreeAndProof(key, totalDebt)
+
+      // Reserve with a pending refund - redemption must still work during the waiting period
+      val refundHeight = ctx.getHeight.toLong
+      val basisInput = mkBasisInput(minValue + totalDebt + feeValue, initialTree,
+        receiverPk, reserveSigBytes, totalDebt, proofBytes, trackerSigBytes, None,
+        Some(trackerLookupProof), timestamp, Some(refundHeight))
+      val trackerDataInput = mkTrackerDataInput(trackerTree)
+
+      // R7 preserved in the reserve output
+      val basisOutput = createOut(Constants.basisContract, minValue + feeValue,
+        Array(ErgoValue.of(ownerPk), nextTree, ErgoValue.of(trackerNFTBytes), ErgoValue.of(refundHeight)),
+        Array(new ErgoToken(basisTokenId, 1)))
+      val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
+
+      noException should be thrownBy {
+        assertTxSucceeds(Array(basisInput), Array(trackerDataInput),
+          Array(basisOutput, redemptionOutput), Array(receiverSecret.toString()))
+      }
+    }
+  }
+
+  property("basis redemption should fail when clearing pending refund flag") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
+      val totalDebt = 500000000L
+      val redeemAmount = totalDebt
+      val timestamp = System.currentTimeMillis()
+      val key = mkKey(ownerPk, receiverPk)
+      val message = mkMessage(key, totalDebt, timestamp)
+      val reserveSigBytes = mkSigBytes(SigUtils.sign(message, ownerSecret))
+      val trackerSigBytes = mkSigBytes(SigUtils.sign(message, trackerSecret))
+      val TreeAndProof(initialTree, nextTree, proofBytes) = mkTreeAndProof(key, redeemAmount, timestamp)
+      val TrackerTreeAndProof(trackerTree, trackerLookupProof) = mkTrackerTreeAndProof(key, totalDebt)
+
+      val refundHeight = ctx.getHeight.toLong
+      val basisInput = mkBasisInput(minValue + totalDebt + feeValue, initialTree,
+        receiverPk, reserveSigBytes, totalDebt, proofBytes, trackerSigBytes, None,
+        Some(trackerLookupProof), timestamp, Some(refundHeight))
+      val trackerDataInput = mkTrackerDataInput(trackerTree)
+
+      // R7 dropped in the reserve output - pending refund must not be cancelled by redemption
+      val basisOutput = createOut(Constants.basisContract, minValue + feeValue,
+        Array(ErgoValue.of(ownerPk), nextTree, ErgoValue.of(trackerNFTBytes)),
+        Array(new ErgoToken(basisTokenId, 1)))
+      val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
+
+      assertTxFails(Array(basisInput), Array(trackerDataInput),
+        Array(basisOutput, redemptionOutput), Array(receiverSecret.toString()))
+    }
+  }
+
+  property("basis top-up should work with pending refund (R7 preserved)") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
+
+      val topUpAmount = 2000000000L // 2 ERG
+      val refundHeight = ctx.getHeight.toLong
+
+      val basisInput =
+        ctx
+          .newTxBuilder()
+          .outBoxBuilder
+          .value(minValue)
+          .tokens(new ErgoToken(basisTokenId, 1))
+          .registers(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes), ErgoValue.of(refundHeight))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .build()
+          .convertToInputWith(fakeTxId1, fakeIndex)
+          .withContextVars(
+            new ContextVar(0, ErgoValue.of(10: Byte)) // action 1, index 0
+          )
+
+      val fundingBox =
+        ctx
+          .newTxBuilder()
+          .outBoxBuilder
+          .value(topUpAmount + feeValue)
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), fakeScript))
+          .build()
+          .convertToInputWith(fakeTxId2, fakeIndex)
+
+      val basisOutput = createOut(
+        Constants.basisContract,
+        minValue + topUpAmount,
+        Array(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes), ErgoValue.of(refundHeight)),
+        Array(new ErgoToken(basisTokenId, 1))
+      )
+
+      noException should be thrownBy {
+        createTx(
+          Array[InputBox](basisInput, fundingBox),
+          Array[InputBox](),
+          Array[OutBoxImpl](basisOutput),
+          fee = None,
+          changeAddress,
+          Array[String](ownerSecret.toString()),
+          false
+        )
+      }
+    }
+  }
+
   property("basis redemption should fail with invalid action code") {
     createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
 
@@ -724,7 +1208,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       val insertProof = insertRes.proof
       val nextTreeErgoValue = plasmaMap.ergoValue
 
-      // Basis reserve input with invalid action code (2)
+      // Basis reserve input with invalid action code (5)
       val basisInput =
         ctx
           .newTxBuilder()
@@ -736,7 +1220,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .build()
           .convertToInputWith(fakeTxId1, fakeIndex)
           .withContextVars(
-            new ContextVar(0, ErgoValue.of(20: Byte)), // Invalid action code 2
+            new ContextVar(0, ErgoValue.of(50: Byte)), // Invalid action code 5
             new ContextVar(1, ErgoValue.of(receiverPk)),
             new ContextVar(2, ErgoValue.of(reserveSigBytes)),
             new ContextVar(3, ErgoValue.of(debtAmount)),
@@ -1295,7 +1779,8 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
     trackerSigBytes: Array[Byte],
     lookupProofBytes: Option[Array[Byte]] = None,
     trackerLookupProofBytes: Option[Array[Byte]] = None,
-    timestamp: Long = System.currentTimeMillis()
+    timestamp: Long = System.currentTimeMillis(),
+    refundHeightOpt: Option[Long] = None
   )(implicit ctx: BlockchainContext): InputBox = {
     val baseVars = Array(
       new ContextVar(0, ErgoValue.of(0: Byte)),
@@ -1314,10 +1799,16 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       case Some(trackerLookupProof) => withLookup :+ new ContextVar(8, ErgoValue.of(trackerLookupProof))
       case None => withLookup
     }
+    val registers: Array[ErgoValue[_]] = refundHeightOpt match {
+      case Some(refundHeight) =>
+        Array(ErgoValue.of(ownerPk), tree, ErgoValue.of(trackerNFTBytes), ErgoValue.of(refundHeight))
+      case None =>
+        Array(ErgoValue.of(ownerPk), tree, ErgoValue.of(trackerNFTBytes))
+    }
     ctx.newTxBuilder().outBoxBuilder
       .value(value)
       .tokens(new ErgoToken(basisTokenId, 1))
-      .registers(ErgoValue.of(ownerPk), tree, ErgoValue.of(trackerNFTBytes))
+      .registers(registers: _*)
       .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
       .build()
       .convertToInputWith(fakeTxId1, fakeIndex)
