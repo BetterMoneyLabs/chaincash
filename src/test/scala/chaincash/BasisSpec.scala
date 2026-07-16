@@ -31,7 +31,8 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
   val fakeScript = "sigmaProp(true)"
 
   val chainCashPlasmaParameters = PlasmaParameters(32, None)
-  def emptyPlasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, chainCashPlasmaParameters)
+  val basisReserveFlags = AvlTreeFlags(insertAllowed = true, updateAllowed = true, removeAllowed = false)
+  def emptyPlasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](basisReserveFlags, chainCashPlasmaParameters)
   val emptyTreeErgoValue: ErgoValue[AvlTree] = emptyPlasmaMap.ergoValue
   val emptyTree: AvlTree = emptyTreeErgoValue.getValue
 
@@ -64,7 +65,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
                 value: Long,
                 registers: Array[ErgoValue[_]],
                 tokens: Array[ErgoToken])(implicit ctx: BlockchainContext): OutBoxImpl = {
-    val c = ErgoScriptContract.create(new org.ergoplatform.appkit.Constants, contract, Constants.networkType)
+    val c = ErgoScriptContract.create(new org.ergoplatform.appkit.Constants, contract, Constants.networkType, 4: Byte)
     val ebc = AppkitHelpers.createBoxCandidate(value, c.getErgoTree, tokens, registers, ctx.getHeight)
     new OutBoxImpl(ebc)
   }
@@ -178,12 +179,12 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       // Create initial tree with existing redeemed debt (0 in this case)
       // Tree value format: timestamp (8 bytes) ++ redeemedAmount (8 bytes) = 16 bytes
       val reservePlasmaParameters = PlasmaParameters(32, None)
-      val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, reservePlasmaParameters)
+      val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](basisReserveFlags, reservePlasmaParameters)
       val inputTreeErgoValue = plasmaMap.ergoValue
 
       // Create proof for inserting new redeemed debt with timestamp
       // Value format: timestamp (8 bytes) ++ newRedeemedAmount (8 bytes)
-      val insertRes2 = plasmaMap.insert(key -> (Longs.toByteArray(timestamp) ++ Longs.toByteArray(newRedeemedDebt)))
+      val insertRes2 = plasmaMap.insertOrUpdate(key -> (Longs.toByteArray(timestamp) ++ Longs.toByteArray(newRedeemedDebt)))
       val insertProof = insertRes2.proof
       val outputTreeErgoValue = plasmaMap.ergoValue
 
@@ -207,7 +208,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
             new ContextVar(2, ErgoValue.of(reserveSigBytes)),
             new ContextVar(3, ErgoValue.of(totalDebt)), // total debt amount
             new ContextVar(4, ErgoValue.of(timestamp)), // timestamp
-            new ContextVar(5, ErgoValue.of(insertProof.bytes)), // proof for insertion
+            new ContextVar(5, ErgoValue.of(insertProof.bytes)), // proof for insertOrUpdate
             new ContextVar(6, ErgoValue.of(trackerSigBytes)),
             new ContextVar(8, ErgoValue.of(trackerLookupProof)) // tracker tree lookup proof
           )
@@ -342,12 +343,12 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
 
       // Create initial tree with existing redeemed debt (0 in this case)
       // Tree value format: timestamp (8 bytes) ++ redeemedAmount (8 bytes) = 16 bytes
-      val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, chainCashPlasmaParameters)
-      val insertRes = plasmaMap.insert(key -> (Longs.toByteArray(0L) ++ Longs.toByteArray(redeemedDebt)))
+      val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](basisReserveFlags, chainCashPlasmaParameters)
+      val insertRes = plasmaMap.insertOrUpdate(key -> (Longs.toByteArray(0L) ++ Longs.toByteArray(redeemedDebt)))
       val lookupProof = insertRes.proof
 
       // Create proof for inserting new redeemed debt with timestamp
-      val insertRes2 = plasmaMap.insert(key -> (Longs.toByteArray(timestamp) ++ Longs.toByteArray(newRedeemedDebt)))
+      val insertRes2 = plasmaMap.insertOrUpdate(key -> (Longs.toByteArray(timestamp) ++ Longs.toByteArray(newRedeemedDebt)))
       val insertProof = insertRes2.proof
       val inputTreeErgoValue = plasmaMap.ergoValue
       val outputTreeErgoValue = plasmaMap.ergoValue
@@ -372,7 +373,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
             new ContextVar(2, ErgoValue.of(reserveSigBytes)),
             new ContextVar(3, ErgoValue.of(totalDebt)), // total debt amount
             new ContextVar(4, ErgoValue.of(timestamp)), // timestamp
-            new ContextVar(5, ErgoValue.of(insertProof.bytes)), // proof for insertion
+            new ContextVar(5, ErgoValue.of(insertProof.bytes)), // proof for insertOrUpdate
             new ContextVar(6, ErgoValue.of(invalidTrackerSigBytes)),
             new ContextVar(7, ErgoValue.of(lookupProof.bytes)), // proof for lookup
             new ContextVar(8, ErgoValue.of(trackerLookupProof)) // tracker tree lookup proof
@@ -453,12 +454,12 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
 
       // Create plasma map for reserve tree - start with empty tree
       // Tree value format: timestamp (8 bytes) ++ redeemedAmount (8 bytes) = 16 bytes
-      val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, chainCashPlasmaParameters)
+      val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](basisReserveFlags, chainCashPlasmaParameters)
       val initialTreeErgoValue = plasmaMap.ergoValue
 
       // Create proof for inserting into tree with timestamp and redeemed amount
       val treeValue = Longs.toByteArray(timestamp) ++ Longs.toByteArray(redeemedAmount)
-      val insertRes = plasmaMap.insert(key -> treeValue)
+      val insertRes = plasmaMap.insertOrUpdate(key -> treeValue)
       val insertProof = insertRes.proof
       val nextTreeErgoValue = plasmaMap.ergoValue
 
@@ -556,12 +557,12 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
 
       // Create plasma map for reserve tree - start with empty tree
       // Tree value format: timestamp (8 bytes) ++ redeemedAmount (8 bytes) = 16 bytes
-      val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, chainCashPlasmaParameters)
+      val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](basisReserveFlags, chainCashPlasmaParameters)
       val initialTreeErgoValue = plasmaMap.ergoValue
 
       // Create proof for inserting into tree with timestamp and redeemed amount
       val treeValue = Longs.toByteArray(timestamp) ++ Longs.toByteArray(redeemedAmount)
-      val insertRes = plasmaMap.insert(key -> treeValue)
+      val insertRes = plasmaMap.insertOrUpdate(key -> treeValue)
       val insertProof = insertRes.proof
       val nextTreeErgoValue = plasmaMap.ergoValue
 
@@ -1199,12 +1200,12 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
 
       // Create plasma map for reserve tree
       // Tree value format: timestamp (8 bytes) ++ redeemedAmount (8 bytes) = 16 bytes
-      val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, chainCashPlasmaParameters)
+      val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](basisReserveFlags, chainCashPlasmaParameters)
       val initialTreeErgoValue = plasmaMap.ergoValue
 
       // Create proof for inserting into tree with timestamp and redeemed amount
       val treeValue = Longs.toByteArray(timestamp) ++ Longs.toByteArray(redeemedAmount)
-      val insertRes = plasmaMap.insert(key -> treeValue)
+      val insertRes = plasmaMap.insertOrUpdate(key -> treeValue)
       val insertProof = insertRes.proof
       val nextTreeErgoValue = plasmaMap.ergoValue
 
@@ -1302,12 +1303,12 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
 
       // Create plasma map for reserve tree
       // Tree value format: timestamp (8 bytes) ++ redeemedAmount (8 bytes) = 16 bytes
-      val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, chainCashPlasmaParameters)
+      val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](basisReserveFlags, chainCashPlasmaParameters)
       val initialTreeErgoValue = plasmaMap.ergoValue
 
       // Create proof for inserting into tree with timestamp and redeemed amount
       val treeValue = Longs.toByteArray(timestamp) ++ Longs.toByteArray(redeemedAmount)
-      val insertRes = plasmaMap.insert(key -> treeValue)
+      val insertRes = plasmaMap.insertOrUpdate(key -> treeValue)
       val insertProof = insertRes.proof
       val nextTreeErgoValue = plasmaMap.ergoValue
 
@@ -1409,12 +1410,12 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
 
       // Create plasma map for reserve tree
       // Tree value format: timestamp (8 bytes) ++ redeemedAmount (8 bytes) = 16 bytes
-      val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, chainCashPlasmaParameters)
+      val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](basisReserveFlags, chainCashPlasmaParameters)
       val initialTreeErgoValue = plasmaMap.ergoValue
 
       // Create proof for inserting into tree with timestamp and redeemed amount
       val treeValue = Longs.toByteArray(timestamp) ++ Longs.toByteArray(redeemedAmount)
-      val insertRes = plasmaMap.insert(key -> treeValue)
+      val insertRes = plasmaMap.insertOrUpdate(key -> treeValue)
       val insertProof = insertRes.proof
       val nextTreeErgoValue = plasmaMap.ergoValue
 
@@ -1511,12 +1512,12 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       val invalidTrackerSigBytes = GroupElementSerializer.toBytes(invalidTrackerSig._1) ++ invalidTrackerSig._2.toByteArray
 
       // Create plasma map for timestamp tree
-      val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, chainCashPlasmaParameters)
+      val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](basisReserveFlags, chainCashPlasmaParameters)
       val initialTreeErgoValue = plasmaMap.ergoValue
       
       // Create proof for inserting into empty tree
       val timestampKeyVal = (key, Longs.toByteArray(timestamp))
-      val insertRes = plasmaMap.insert(timestampKeyVal)
+      val insertRes = plasmaMap.insertOrUpdate(timestampKeyVal)
       val insertProof = insertRes.proof
       val nextTreeErgoValue = plasmaMap.ergoValue
 
@@ -1612,19 +1613,19 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       val trackerSigBytes = GroupElementSerializer.toBytes(trackerSig._1) ++ trackerSig._2.toByteArray
 
       // Create plasma map for timestamp tree
-      val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, chainCashPlasmaParameters)
+      val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](basisReserveFlags, chainCashPlasmaParameters)
       val initialTreeErgoValue = plasmaMap.ergoValue
       
       // Create proof for inserting into empty tree
       val timestampKeyVal = (key, Longs.toByteArray(timestamp))
-      val insertRes = plasmaMap.insert(timestampKeyVal)
+      val insertRes = plasmaMap.insertOrUpdate(timestampKeyVal)
       val insertProof = insertRes.proof
       val nextTreeErgoValue = plasmaMap.ergoValue
 
       // Create invalid proof (use proof for different key)
       val wrongKey = Blake2b256(receiverBytes.toArray ++ ownerKeyBytes.toArray) // Reversed keys
-      val wrongPlasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, chainCashPlasmaParameters)
-      val wrongInsertRes = wrongPlasmaMap.insert((wrongKey, Longs.toByteArray(timestamp)))
+      val wrongPlasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](basisReserveFlags, chainCashPlasmaParameters)
+      val wrongInsertRes = wrongPlasmaMap.insertOrUpdate((wrongKey, Longs.toByteArray(timestamp)))
       val invalidProof = wrongInsertRes.proof
 
       // Basis reserve input
@@ -1738,24 +1739,24 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
 
   case class TreeAndProof(initialTree: ErgoValue[AvlTree], nextTree: ErgoValue[AvlTree], proofBytes: Array[Byte])
 
-  // For first redemption: start with empty tree, prove insertion of (timestamp, redeemedDebt)
-  // Note: The contract uses insert-only tree, so only first redemption per (owner, receiver) pair is supported
+  // For first or subsequent redemption: start with empty tree, prove insertOrUpdate of (timestamp, redeemedDebt)
+  // Note: The contract now uses insertOrUpdate, so repeated redemptions per (owner, receiver) pair are supported
   // Tree value format: timestamp (8 bytes) ++ redeemedAmount (8 bytes) = 16 bytes
   def mkTreeAndProof(key: Array[Byte], redeemedDebt: Long, timestamp: Long = System.currentTimeMillis()): TreeAndProof = {
-    val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, chainCashPlasmaParameters)
+    val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](basisReserveFlags, chainCashPlasmaParameters)
     val initial = plasmaMap.ergoValue  // empty tree
-    // Prove insertion of (timestamp, redeemed debt value)
+    // Prove insertOrUpdate of (timestamp, redeemed debt value)
     val treeValue = Longs.toByteArray(timestamp) ++ Longs.toByteArray(redeemedDebt)
-    val insertRes = plasmaMap.insert((key, treeValue))
+    val insertRes = plasmaMap.insertOrUpdate((key, treeValue))
     TreeAndProof(initial, plasmaMap.ergoValue, insertRes.proof.bytes)
   }
 
-  // Lookup proof for existing redeemed debt (for subsequent redemptions if contract supported them)
+  // Lookup proof for existing redeemed debt (for subsequent redemptions now supported by the contract)
   // Tree value format: timestamp (8 bytes) ++ redeemedAmount (8 bytes) = 16 bytes
   def mkLookupProof(key: Array[Byte], redeemedDebt: Long, timestamp: Long = System.currentTimeMillis()): Array[Byte] = {
-    val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, chainCashPlasmaParameters)
+    val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](basisReserveFlags, chainCashPlasmaParameters)
     val treeValue = Longs.toByteArray(timestamp) ++ Longs.toByteArray(redeemedDebt)
-    val insertRes = plasmaMap.insert((key, treeValue))
+    val insertRes = plasmaMap.insertOrUpdate((key, treeValue))
     plasmaMap.lookUp(key).proof.bytes
   }
 
@@ -1843,6 +1844,8 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
     Iterator.iterate[Throwable](t)(_.getCause).takeWhile(_ != null).exists {
       // Any InterpreterException indicates script-level failure (sigmaProp false, AVL proof invalid, etc.)
       case _: sigma.exceptions.InterpreterException => true
+      // `.get` on None is thrown by the contract when AVL operations (insertOrUpdate etc.) fail to verify
+      case e: java.util.NoSuchElementException if e.getMessage == "None.get" => true
       case _ => false
     }
 
@@ -2087,14 +2090,14 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
 
       // Tree that ALREADY has the key (simulating prior redemption)
       // Value format: timestamp (8 bytes) ++ redeemedAmount (8 bytes) = 16 bytes
-      val existingPlasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, chainCashPlasmaParameters)
-      existingPlasmaMap.insert((key, Longs.toByteArray(timestamp) ++ Longs.toByteArray(redeemedDebt)))
+      val existingPlasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](basisReserveFlags, chainCashPlasmaParameters)
+      existingPlasmaMap.insertOrUpdate((key, Longs.toByteArray(timestamp) ++ Longs.toByteArray(redeemedDebt)))
       val treeWithExistingKey = existingPlasmaMap.ergoValue
 
       // Proof from empty tree (won't work with treeWithExistingKey)
-      val freshPlasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, chainCashPlasmaParameters)
+      val freshPlasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](basisReserveFlags, chainCashPlasmaParameters)
       val emptyTreeEV = freshPlasmaMap.ergoValue
-      val insertRes = freshPlasmaMap.insert((key, Longs.toByteArray(timestamp) ++ Longs.toByteArray(newRedeemedDebt)))
+      val insertRes = freshPlasmaMap.insertOrUpdate((key, Longs.toByteArray(timestamp) ++ Longs.toByteArray(newRedeemedDebt)))
       val proofFromEmptyTree = insertRes.proof.bytes
       val treeAfterInsert = freshPlasmaMap.ergoValue
 

@@ -199,7 +199,7 @@
     // #2 - reserve owner's signature bytes (Schnorr signature on key || totalDebt || timestamp)
     // #3 - current total debt amount (Long)
     // #4 - timestamp of the payment (Long, milliseconds since Unix epoch)
-    // #5 - proof for insertion into reserve's AVL tree (Coll[Byte])
+    // #5 - proof for insertOrUpdate into reserve's AVL tree (Coll[Byte])
     // #6 - tracker's signature bytes (Schnorr signature on key || totalDebt || timestamp)
     // #7 - [OPTIONAL] proof for AVL tree lookup in reserve's tree for hash(ownerKey||receiverKey) -> (timestamp, redeemedDebt)
     //      Not needed for first redemption (when redeemedDebt = 0)
@@ -208,7 +208,7 @@
     // action and reserve output index. By passing them instead of hard-coding, we allow for multiple notes to be
     // redeemed at once, which can be used for atomic mutual debt clearing etc
 
-    // todo: insertOrUpdate & multiple trackers to be supported (see R6 todo) before real world deployments
+    // todo: consider multiple trackers to be supported before real world deployments
 
     val v = getVar[Byte](0).get
     val action = v / 10
@@ -237,7 +237,7 @@
       // #2 - reserve owner's signature bytes for the debt record (Schnorr signature on key || totalDebt || timestamp)
       // #3 - current total debt amount (Long)
       // #4 - timestamp of the payment (Long, milliseconds since Unix epoch)
-      // #5 - proof for insertion into reserve's AVL tree (Coll[Byte])
+      // #5 - proof for insertOrUpdate into reserve's AVL tree (Coll[Byte])
       // #6 - tracker's signature bytes (Schnorr signature on key || totalDebt || timestamp)
       // #7 - [OPTIONAL] proof for AVL tree lookup in reserve's tree for hash(ownerKey||receiverKey) -> (timestamp, redeemedDebt)
       //      Not needed for first redemption (when redeemedDebt = 0)
@@ -373,8 +373,8 @@
       val newRedeemed = redeemedDebt + redeemed
       val treeValue = longToByteArray(timestamp) ++ longToByteArray(newRedeemed)
       val redeemedKeyVal = (key, treeValue)  // key -> (timestamp, redeemed debt value)
-      val insertProof = getVar[Coll[Byte]](5).get // Merkle proof for tree insertion
-      val nextTree: AvlTree = SELF.R5[AvlTree].get.insert(Coll(redeemedKeyVal), insertProof).get // todo: insertOrUpdate after appkit update
+      val insertOrUpdateProof = getVar[Coll[Byte]](5).get // Merkle proof for insertOrUpdate
+      val nextTree: AvlTree = SELF.R5[AvlTree].get.insertOrUpdate(Coll(redeemedKeyVal), insertOrUpdateProof).get
       // Verify tree was properly updated in output
       val properRedemptionTree = nextTree == selfOut.R5[AvlTree].get
 

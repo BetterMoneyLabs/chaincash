@@ -37,7 +37,8 @@ object Constants {
   }
 
   def compile(ergoScript: String): ErgoTree = {
-    AppkitHelpers.compile(new util.HashMap[String, Object](), ergoScript, networkPrefix)
+    // Compile under v6 (blockVersion 4) to enable AvlTree.insertOrUpdate.
+    AppkitHelpers.compile(new util.HashMap[String, Object](), ergoScript, networkPrefix, 4: Byte)
   }
 
 

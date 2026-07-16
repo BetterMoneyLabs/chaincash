@@ -66,7 +66,7 @@ class ChainCashSpec extends PropSpec with Matchers with ScalaCheckDrivenProperty
                 value: Long,
                 registers: Array[ErgoValue[_]],
                 tokens: Array[ErgoToken])(implicit ctx: BlockchainContext): OutBoxImpl = {
-    val c = ErgoScriptContract.create(new org.ergoplatform.appkit.Constants, contract, Constants.networkType)
+    val c = ErgoScriptContract.create(new org.ergoplatform.appkit.Constants, contract, Constants.networkType, 4: Byte)
     val ebc = AppkitHelpers.createBoxCandidate(value, c.getErgoTree, tokens, registers, ctx.getHeight)
     new OutBoxImpl(ebc)
   }

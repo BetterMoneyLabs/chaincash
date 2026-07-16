@@ -15,7 +15,8 @@ resolvers ++= Seq(
 )
 
 libraryDependencies ++= Seq(
-  ("io.github.k-singh" %% "plasma-toolkit" % "1.0.4").exclude("org.ethereum", "leveldbjni-all"),
+  ("io.github.k-singh" %% "plasma-toolkit" % "1.1.0").exclude("org.ethereum", "leveldbjni-all"),
+  "io.swaydb" %% "swaydb" % "0.16.2",
   "com.squareup.okhttp3" % "mockwebserver" % "3.14.9",
   "org.scalatest" %% "scalatest" % "3.0.8" ,
   "org.scalacheck" %% "scalacheck" % "1.14.+"
@@ -33,7 +34,8 @@ libraryDependencies ++= Seq(
 )
 
 libraryDependencies ++= Seq(
-  "org.ergoplatform" %% "ergo-appkit" % "6.0.0"
+  "org.ergoplatform" %% "ergo-appkit" % "6.0.0",
+  "org.ergoplatform" %% "ergo-appkit" % "6.0.0" % Test classifier "tests"
 )
 
 dependencyOverrides += "org.ergoplatform" %% "ergo-appkit" % "6.0.0"
