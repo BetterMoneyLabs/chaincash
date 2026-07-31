@@ -16,6 +16,29 @@ to issue and spend notes without a reserve. It is up to agent's counter-parties
 then whether to accept and so back an issued note with collateral or agent's
 trust or not.
 
+Bitcoin, derivative tokens (such as stablecoins), tokenized real-world assets etc. All the notes share the same unit of account.
+   
+We provide implementation of smart contracts for reserve and note on top of Ergo blockchain. Currently, all the contracts are making progress on the blockchain only, but other options can be considered, for example, note trasfers can be made off-chain (using one of Layer 2 solutions) with only reserves being on-chain.
+
+## Privacy-Enhanced Basis (Proof of Concept)
+
+This repository now includes a **proof-of-concept implementation of Chaumian e-cash style private Basis**, providing unlinkable bearer notes while maintaining on-chain reserve backing and double-spend prevention.
+
+**Key Features**:
+- **Unlinkable Withdrawals and Redemptions**: Blind signatures prevent linking note issuance to redemption
+- **Off-Chain Transfer Privacy**: Notes can be transferred off-chain without tracker visibility
+- **Nullifier-Based Double-Spend Prevention**: On-chain spent-note tracking using random nullifiers
+- **Proof-of-Reserves**: Verifiable on-chain backing for all issued private notes
+
+**Implementation**:
+- ErgoScript Contract: `contracts/offchain/basis_private_reserve.es` - Modified reserve with nullifier checking
+- Rust Tracker: `basis-private-tracker/` - Full lifecycle implementation with tests
+- Documentation: `docs/basis_private_chaumian_poc.md` - Complete protocol specification
+
+See `docs/basis_private_summary_for_pr.md` for a complete summary of changes and privacy analysis.
+
+**Note**: This is a PROOF OF CONCEPT for research and demonstration. Requires cryptographic audit before production use.
+
 As an example, consider a small gold mining cooperative in Ghana issuing a
 note backed by (tokenized) gold. The note is then accepted by the national government as mean of tax payment. Then the government is using the note (which
 is now backed by gold and also trust in Ghana government, so, e.g. convertible
