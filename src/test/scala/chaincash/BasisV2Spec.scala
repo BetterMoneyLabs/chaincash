@@ -460,7 +460,7 @@ class BasisV2Spec extends PropSpec with Matchers with HttpClientTesting {
     }
   }
 
-  property("Basis v2 rejects mutated receiver, payout amount, and reserve-funded fee independently") {
+  property("Basis v2 rejects mutated receiver, payout amount, payout lineage, and reserve-funded fee independently") {
     createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx =>
       val amount = 300000000L
       val key = claimKey(ergDomain, reserveNftA, None)
@@ -491,6 +491,20 @@ class BasisV2Spec extends PropSpec with Matchers with HttpClientTesting {
         Array(
           ergSuccessor(wrongAmountInput, wrongAmountInput.getValue - amount, step.outputTree, reserveNftA, ctx.getHeight + 1000L),
           ergPayout(wrongAmountInput, amount - feeValue)
+        ), secrets = Array(receiverSecret.toString)
+      )
+
+      val wrongLineageInput = input(fakeTxIds(3))
+      val wrongLineagePayout = createOut(
+        p2pkTree(receiverPk), amount,
+        Array[ErgoValue[_]](ErgoValue.of(reserveNftB)),
+        Array.empty[ErgoToken]
+      )
+      a[Throwable] should be thrownBy createTx(
+        Array(wrongLineageInput), Array(trackerInput(tracker)),
+        Array(
+          ergSuccessor(wrongLineageInput, wrongLineageInput.getValue - amount, step.outputTree, reserveNftA, ctx.getHeight + 1000L),
+          wrongLineagePayout
         ), secrets = Array(receiverSecret.toString)
       )
 
