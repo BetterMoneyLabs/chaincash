@@ -561,7 +561,7 @@ class BasisV2Spec extends PropSpec with Matchers with HttpClientTesting {
     }
   }
 
-  property("Basis v2 emergency redemption needs no tracker input, proof, or signature only at the fixed boundary") {
+  property("Basis v2 emergency redemption is tracker-free only at the fixed immutable boundary") {
     createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx =>
       val amount = 300000000L
       val key = claimKey(ergDomain, reserveNftA, None)
@@ -590,6 +590,21 @@ class BasisV2Spec extends PropSpec with Matchers with HttpClientTesting {
         Array(
           ergSuccessor(preBoundaryInput, preBoundaryInput.getValue - amount, step.outputTree, reserveNftA, ctx.getHeight + 1L),
           ergPayout(preBoundaryInput, amount)
+        ), secrets = Array(receiverSecret.toString)
+      )
+
+      val mutatedBoundaryInput = ergReserveInput(
+        fakeTxIds(2), reserveNftA, minValue + totalDebt, step,
+        ctx.getHeight.toLong, redemptionVars(ownerSignature, step, None, None)
+      )
+      a[Throwable] should be thrownBy createTx(
+        Array(mutatedBoundaryInput), Array.empty,
+        Array(
+          ergSuccessor(
+            mutatedBoundaryInput, mutatedBoundaryInput.getValue - amount,
+            step.outputTree, reserveNftA, ctx.getHeight + 1L
+          ),
+          ergPayout(mutatedBoundaryInput, amount)
         ), secrets = Array(receiverSecret.toString)
       )
     }
@@ -757,6 +772,20 @@ class BasisV2Spec extends PropSpec with Matchers with HttpClientTesting {
         ), secrets = Array(ownerSecret.toString)
       )
 
+      val unauthorizedInitiateInput = ergReserveInput(
+        fakeTxIds(4), reserveNftA, minValue, step, emergency,
+        Array(new ContextVar(0, ErgoValue.of(20: Byte)))
+      )
+      a[Throwable] should be thrownBy createTx(
+        Array(unauthorizedInitiateInput), Array.empty,
+        Array(
+          ergSuccessor(
+            unauthorizedInitiateInput, minValue, step.inputTree, reserveNftA,
+            emergency, refundHeight = ctx.getHeight.toLong
+          )
+        )
+      )
+
       val maturedHeight = ctx.getHeight.toLong - 43200L
       val completeInput = ergReserveInput(
         fakeTxIds(1), reserveNftA, minValue, step, emergency,
@@ -811,6 +840,20 @@ class BasisV2Spec extends PropSpec with Matchers with HttpClientTesting {
             refundHeight = ctx.getHeight.toLong
           )
         ), secrets = Array(ownerSecret.toString)
+      )
+
+      val unauthorizedInitiateInput = tokenReserveInput(
+        fakeTxIds(2), minValue, reserveAmount, step, emergency,
+        Array(new ContextVar(0, ErgoValue.of(20: Byte)))
+      )
+      a[Throwable] should be thrownBy createTx(
+        Array(unauthorizedInitiateInput), Array.empty,
+        Array(
+          tokenSuccessor(
+            unauthorizedInitiateInput, minValue, reserveAmount,
+            step.inputTree, emergency, refundHeight = ctx.getHeight.toLong
+          )
+        )
       )
 
       val completeInput = tokenReserveInput(
