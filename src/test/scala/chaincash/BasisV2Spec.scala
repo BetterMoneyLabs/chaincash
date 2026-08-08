@@ -396,6 +396,28 @@ class BasisV2Spec extends PropSpec with Matchers with HttpClientTesting {
       Array(new ErgoToken(reserveTokenId, amount))
     )
 
+  property("Basis v2 claim-key vectors match the runtime ABI") {
+    val fixedReserveNft = Array.fill[Byte](32)(1)
+    val fixedTrackerNft = Array.fill[Byte](32)(2)
+    val fixedTokenId = Array.fill[Byte](32)(5)
+    val fixedOwner = Constants.g.exp(java.math.BigInteger.ONE)
+    val fixedReceiver = Constants.g.exp(java.math.BigInteger.valueOf(2L))
+
+    val ergKey = Blake2b256(
+      ergDomain ++ fixedReserveNft ++ fixedTrackerNft ++
+        fixedOwner.getEncoded.toArray ++ fixedReceiver.getEncoded.toArray
+    )
+    val tokenKey = Blake2b256(
+      tokenDomain ++ fixedReserveNft ++ fixedTokenId ++ fixedTrackerNft ++
+        fixedOwner.getEncoded.toArray ++ fixedReceiver.getEncoded.toArray
+    )
+
+    Base16.encode(ergKey) shouldBe
+      "656c938601a973fe7dd8b5984b70430bf2c885b69a0d91268b0f5c4383a02d73"
+    Base16.encode(tokenKey) shouldBe
+      "db33c7176e8d11041a971258458e6be92b59b56865e06ebfbe8e44e9e007f4a1"
+  }
+
   property("Basis v2 normal redemption accepts an exact receiver payout with external fee funding") {
     createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx =>
       val amount = 300000000L
