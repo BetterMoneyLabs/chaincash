@@ -8,25 +8,25 @@ activation claim.
 
 - Repository base commit:
   `78475e30362571acf56e4e38276a9d6c0a84ce0c`
-- Candidate branch: `a-shannon/basis-v2-contract`
-- Source paths:
-  - `contracts/offchain/basis-v2.es`
-  - `contracts/offchain/basis-token-v2.es`
+- Immutable source and golden commit:
+  `9a274396d5f78f7be5ed76bacee5329c42570317`
+
+| Path | Git blob id |
+| --- | --- |
+| `contracts/offchain/basis-v2.es` | `47b3e0647f90db2dd8e667641294d66e287d8f6a` |
+| `contracts/offchain/basis-token-v2.es` | `48a00b612fe6f4345b322d22408c48100f2cd442` |
+| `contracts/offchain/basis-v2.p2s` | `f806b34edab4b18b89a395625db753d7acdf94db` |
+| `contracts/offchain/basis-token-v2.p2s` | `debc24531f0adc26292f897fff6b53ed06ff4374` |
+| `src/test/scala/chaincash/BasisV2Spec.scala` | `c71a1817cb2f9c0e9b4070670bd0712f7d558c5c` |
+
 - The compiler reads UTF-8 with `getLines.mkString("\n")`. It therefore uses LF
   separators and removes the final line terminator independently of checkout
   line endings.
 
 | Compiler input | SHA-256 of normalized UTF-8 bytes |
 | --- | --- |
-| `basis-v2.es` | `a73f8530b355c26136d2732d6a26766cb8c1cabaa801bc0d2aa30dc548a4d884` |
-| `basis-token-v2.es` | `c82d4c5b5fb7648af81b0104110b0289e0e5cf4d3cc9b6ec3e0b49fc30c8cf60` |
-
-The reviewed Windows checkout used `core.autocrlf=true`. Its raw working-file
-SHA-256 values were respectively
-`db72e1212f89d90555bc7d1e9914fd598ffca0bd2206d2b1b0d604dbf2a68d5d`
-and `7e9c64988c3e9bfbb5577b493d4e6031d858f9014e456b6f7152df2e54d02fa2`.
-Those raw hashes are informative; the normalized hashes above identify the
-actual compiler input.
+| `basis-v2.es` | `31ff4271b1c79302064df83a6bfa3d4f6f5f153747002c1c0206b2f3d88b507a` |
+| `basis-token-v2.es` | `c7e5a0cf6a12aaedefba79ecd012ac7839a48f683931d1d4e10371d287c58573` |
 
 ## Compiler closure
 
@@ -59,8 +59,8 @@ single-line lowercase-hex files:
 
 | Contract | Full-byte file | Byte length | ErgoTree SHA-256 |
 | --- | --- | ---: | --- |
-| ERG reserve | `contracts/offchain/basis-v2.p2s` | 1,631 | `49d6f487b69277191ff064e5e036a5a07b343b9b57d76931620157f0b4bfef80` |
-| token reserve | `contracts/offchain/basis-token-v2.p2s` | 1,912 | `1f8ba4f6a3ef36799372e7555394274aff5d7fe977a2b5b5b2e7ccd4a7bea5f7` |
+| ERG reserve | `contracts/offchain/basis-v2.p2s` | 1,682 | `2690634924efb22359a776f89f5274d77e067bd8ad0619a6e358a2f96697a0c2` |
+| token reserve | `contracts/offchain/basis-token-v2.p2s` | 1,963 | `ba1df64e7d95ecffc4f3d49fcada8baebe59a676eb617737cd010bdb52381cb3` |
 
 `BasisV2Spec` recompiles both normalized sources, compares the complete byte
 arrays to `Constants`, then decodes and compares each committed golden file.
