@@ -8,16 +8,20 @@ activation claim.
 
 - Repository base commit:
   `78475e30362571acf56e4e38276a9d6c0a84ce0c`
-- Immutable source and golden commit:
+- Immutable contract source and golden commit:
   `9a274396d5f78f7be5ed76bacee5329c42570317`
 
-| Path | Git blob id |
+| Path | Exact candidate Git blob id |
 | --- | --- |
 | `contracts/offchain/basis-v2.es` | `47b3e0647f90db2dd8e667641294d66e287d8f6a` |
 | `contracts/offchain/basis-token-v2.es` | `48a00b612fe6f4345b322d22408c48100f2cd442` |
 | `contracts/offchain/basis-v2.p2s` | `f806b34edab4b18b89a395625db753d7acdf94db` |
 | `contracts/offchain/basis-token-v2.p2s` | `debc24531f0adc26292f897fff6b53ed06ff4374` |
-| `src/test/scala/chaincash/BasisV2Spec.scala` | `c71a1817cb2f9c0e9b4070670bd0712f7d558c5c` |
+| `src/test/scala/chaincash/BasisV2Spec.scala` | `10613d30d499a02941f8b8a9c8b55c06568e796b` |
+
+The contract sources and golden byte files above are immutable at the named
+commit. The test blob is pinned independently because later closeout commits
+may strengthen the negative matrix without changing either contract or golden.
 
 - The compiler reads UTF-8 with `getLines.mkString("\n")`. It therefore uses LF
   separators and removes the final line terminator independently of checkout

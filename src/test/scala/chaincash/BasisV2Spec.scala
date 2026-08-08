@@ -12,7 +12,7 @@ import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.hash.Blake2b256
 import scorex.util.encode.Base16
 import sigma.ast.ErgoTree
-import sigma.data.{AvlTreeFlags, ProveDlog}
+import sigma.data.{AvlTreeData, AvlTreeFlags, CAvlTree, ProveDlog}
 import sigma.serialization.GroupElementSerializer
 import sigma.crypto.SecP256K1Group
 import sigma.{AvlTree, GroupElement}
@@ -23,6 +23,7 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths}
 import java.security.MessageDigest
 import java.util
+import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 
 class BasisV2Spec extends PropSpec with Matchers with HttpClientTesting {
@@ -86,22 +87,48 @@ class BasisV2Spec extends PropSpec with Matchers with HttpClientTesting {
   private def message(key: Array[Byte], debt: Long = totalDebt, ts: Long = timestamp): Array[Byte] =
     key ++ Longs.toByteArray(debt) ++ Longs.toByteArray(ts)
 
+  @tailrec
   private def signatureBytes(messageBytes: Array[Byte], secret: BigInt): Array[Byte] = {
     val signature = SigUtils.sign(messageBytes, secret)
-    GroupElementSerializer.toBytes(signature._1) ++ signature._2.toByteArray
+    val zBytes = signature._2.toByteArray
+    if (zBytes.length == 32)
+      GroupElementSerializer.toBytes(signature._1) ++ zBytes
+    else
+      signatureBytes(messageBytes, secret)
   }
 
-  private def forgeIdentityKeySignature(messageBytes: Array[Byte]): Array[Byte] = {
-    val z = SigUtils.randBigInt
+  private def forgeIdentityKeySignature(_messageBytes: Array[Byte]): Array[Byte] = {
+    val z = BigInt(1)
     val a = Constants.g.exp(z.bigInteger)
-    GroupElementSerializer.toBytes(a) ++ z.toByteArray
+    GroupElementSerializer.toBytes(a) ++ Array.fill[Byte](31)(0) ++ z.toByteArray
   }
 
-  private def identityCommitmentSignature(messageBytes: Array[Byte], secret: BigInt): Array[Byte] = {
+  private case class IdentityCommitmentWitness(
+    publicKey: GroupElement,
+    message: Array[Byte],
+    signature: Array[Byte]
+  )
+
+  @tailrec
+  private def identityCommitmentWitness(
+    messageForPublicKey: GroupElement => Array[Byte],
+    candidateSecret: BigInt = BigInt(1)
+  ): IdentityCommitmentWitness = {
+    val secret = candidateSecret.mod(SecP256K1Group.q)
+    val publicKey = Constants.g.exp(secret.bigInteger)
+    val messageBytes = messageForPublicKey(publicKey)
     val aBytes = GroupElementSerializer.toBytes(identityPk)
-    val e = BigInt(Blake2b256(aBytes ++ messageBytes ++ Constants.g.exp(secret.bigInteger).getEncoded.toArray))
+    val e = BigInt(Blake2b256(aBytes ++ messageBytes ++ publicKey.getEncoded.toArray))
     val z = (secret * e).mod(SecP256K1Group.q)
-    aBytes ++ z.toByteArray
+    val rawZ = z.toByteArray
+    if (secret != 0 && z.bitLength <= 255 && rawZ.length <= 32) {
+      val signature = aBytes ++ Array.fill[Byte](32 - rawZ.length)(0) ++ rawZ
+      require(signature.length == 65)
+      require(SigUtils.verify(messageBytes, publicKey, identityPk, z))
+      IdentityCommitmentWitness(publicKey, messageBytes, signature)
+    } else {
+      identityCommitmentWitness(messageForPublicKey, candidateSecret + 1)
+    }
   }
 
   private case class StateStep(
@@ -141,6 +168,17 @@ class BasisV2Spec extends PropSpec with Matchers with HttpClientTesting {
     val tree = new PlasmaMap[Array[Byte], Array[Byte]](flags, parameters)
     tree.insertOrUpdate(key -> encodedDebt.getOrElse(Longs.toByteArray(debt)))
     TrackerState(tree.ergoValue, tree.lookUp(key).proof.bytes)
+  }
+
+  private def trackerStateWithShape(
+    state: TrackerState,
+    flags: AvlTreeFlags,
+    keyLength: Int,
+    valueLengthOpt: Option[Int]
+  ): TrackerState = {
+    val current = state.tree.getValue.asInstanceOf[CAvlTree]
+    val mutated: AvlTreeData = AvlTreeData(current.digest, flags, keyLength, valueLengthOpt)
+    TrackerState(ErgoValue.of(mutated), state.lookupProof)
   }
 
   private def createOut(
@@ -531,46 +569,107 @@ class BasisV2Spec extends PropSpec with Matchers with HttpClientTesting {
     }
   }
 
-  property("Basis ERG and token v2 reject an identity Schnorr commitment independently") {
+  property("Basis ERG and token v2 reject identity owner and tracker Schnorr commitments independently") {
     createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx =>
       val ergAmount = 300000000L
-      val ergKey = claimKey(ergDomain, reserveNftA, None)
-      val ergStep = stateStep(ergKey, None, (timestamp, totalDebt, ergAmount))
-      val ergMessage = message(ergKey)
-      val ergInput = ergReserveInput(
-        fakeTxIds(0), reserveNftA, minValue + totalDebt, ergStep,
+      val ergOwnerWitness = identityCommitmentWitness { owner =>
+        message(claimKey(ergDomain, reserveNftA, None, owner = owner))
+      }
+      val ergOwnerKey = claimKey(ergDomain, reserveNftA, None, owner = ergOwnerWitness.publicKey)
+      val ergOwnerStep = stateStep(ergOwnerKey, None, (timestamp, totalDebt, ergAmount))
+      val ergOwnerInput = ergReserveInput(
+        fakeTxIds(0), reserveNftA, minValue + totalDebt, ergOwnerStep,
         ctx.getHeight.toLong,
-        redemptionVars(identityCommitmentSignature(ergMessage, ownerSecret), ergStep, None, None)
+        redemptionVars(ergOwnerWitness.signature, ergOwnerStep, None, None),
+        owner = ergOwnerWitness.publicKey
       )
       a[Throwable] should be thrownBy createTx(
-        Array(ergInput), Array.empty,
+        Array(ergOwnerInput), Array.empty,
         Array(
           ergSuccessor(
-            ergInput, ergInput.getValue - ergAmount,
-            ergStep.outputTree, reserveNftA, ctx.getHeight.toLong
+            ergOwnerInput, ergOwnerInput.getValue - ergAmount,
+            ergOwnerStep.outputTree, reserveNftA, ctx.getHeight.toLong,
+            owner = ergOwnerWitness.publicKey
           ),
-          ergPayout(ergInput, ergAmount)
+          ergPayout(ergOwnerInput, ergAmount)
         ), secrets = Array(receiverSecret.toString)
       )
 
       val tokenAmount = 300L
       val reserveAmount = 1000L
+      val tokenOwnerWitness = identityCommitmentWitness { owner =>
+        message(claimKey(tokenDomain, tokenReserveNft, Some(reserveTokenId), owner = owner))
+      }
+      val tokenOwnerKey = claimKey(
+        tokenDomain, tokenReserveNft, Some(reserveTokenId), owner = tokenOwnerWitness.publicKey
+      )
+      val tokenOwnerStep = stateStep(tokenOwnerKey, None, (timestamp, totalDebt, tokenAmount))
+      val tokenOwnerInput = tokenReserveInput(
+        fakeTxIds(1), minValue * 2, reserveAmount, tokenOwnerStep,
+        ctx.getHeight.toLong,
+        redemptionVars(tokenOwnerWitness.signature, tokenOwnerStep, None, None),
+        owner = tokenOwnerWitness.publicKey
+      )
+      a[Throwable] should be thrownBy createTx(
+        Array(tokenOwnerInput, feeInput(fakeTxIds(4))), Array.empty,
+        Array(
+          tokenSuccessor(
+            tokenOwnerInput, tokenOwnerInput.getValue, reserveAmount - tokenAmount,
+            tokenOwnerStep.outputTree, ctx.getHeight.toLong,
+            owner = tokenOwnerWitness.publicKey
+          ),
+          tokenPayout(tokenOwnerInput, tokenAmount)
+        ), secrets = Array(receiverSecret.toString)
+      )
+
+      val ergKey = claimKey(ergDomain, reserveNftA, None)
+      val ergStep = stateStep(ergKey, None, (timestamp, totalDebt, ergAmount))
+      val ergMessage = message(ergKey)
+      val ergTracker = trackerState(ergKey)
+      val ergTrackerWitness = identityCommitmentWitness(_ => ergMessage)
+      val ergTrackerInput = ergReserveInput(
+        fakeTxIds(2), reserveNftA, minValue + totalDebt, ergStep,
+        ctx.getHeight + 1000L,
+        redemptionVars(
+          signatureBytes(ergMessage, ownerSecret), ergStep,
+          Some(ergTrackerWitness.signature),
+          Some(ergTracker.lookupProof)
+        )
+      )
+      a[Throwable] should be thrownBy createTx(
+        Array(ergTrackerInput), Array(trackerInput(ergTracker, key = ergTrackerWitness.publicKey)),
+        Array(
+          ergSuccessor(
+            ergTrackerInput, ergTrackerInput.getValue - ergAmount,
+            ergStep.outputTree, reserveNftA, ctx.getHeight + 1000L
+          ),
+          ergPayout(ergTrackerInput, ergAmount)
+        ), secrets = Array(receiverSecret.toString)
+      )
+
       val tokenKey = claimKey(tokenDomain, tokenReserveNft, Some(reserveTokenId))
       val tokenStep = stateStep(tokenKey, None, (timestamp, totalDebt, tokenAmount))
       val tokenMessage = message(tokenKey)
-      val tokenInput = tokenReserveInput(
-        fakeTxIds(1), minValue * 2, reserveAmount, tokenStep,
-        ctx.getHeight.toLong,
-        redemptionVars(identityCommitmentSignature(tokenMessage, ownerSecret), tokenStep, None, None)
+      val tokenTracker = trackerState(tokenKey)
+      val tokenTrackerWitness = identityCommitmentWitness(_ => tokenMessage)
+      val tokenTrackerInput = tokenReserveInput(
+        fakeTxIds(3), minValue * 2, reserveAmount, tokenStep,
+        ctx.getHeight + 1000L,
+        redemptionVars(
+          signatureBytes(tokenMessage, ownerSecret), tokenStep,
+          Some(tokenTrackerWitness.signature),
+          Some(tokenTracker.lookupProof)
+        )
       )
       a[Throwable] should be thrownBy createTx(
-        Array(tokenInput, feeInput(fakeTxIds(4))), Array.empty,
+        Array(tokenTrackerInput, feeInput(fakeTxIds(4))),
+        Array(trackerInput(tokenTracker, key = tokenTrackerWitness.publicKey)),
         Array(
           tokenSuccessor(
-            tokenInput, tokenInput.getValue, reserveAmount - tokenAmount,
-            tokenStep.outputTree, ctx.getHeight.toLong
+            tokenTrackerInput, tokenTrackerInput.getValue, reserveAmount - tokenAmount,
+            tokenStep.outputTree, ctx.getHeight + 1000L
           ),
-          tokenPayout(tokenInput, tokenAmount)
+          tokenPayout(tokenTrackerInput, tokenAmount)
         ), secrets = Array(receiverSecret.toString)
       )
     }
@@ -693,25 +792,38 @@ class BasisV2Spec extends PropSpec with Matchers with HttpClientTesting {
         outputs(wrongNftInput), secrets = Array(receiverSecret.toString)
       )
 
-      val insertOnlyTracker = trackerState(
-        key, flags = AvlTreeFlags(insertAllowed = true, updateAllowed = false, removeAllowed = false)
+      val shapeMutants = Seq(
+        "key length" -> trackerStateWithShape(correctTracker, trackerFlags, 31, Some(8)),
+        "fixed value length" -> trackerStateWithShape(correctTracker, trackerFlags, 32, Some(16)),
+        "variable value length" -> trackerStateWithShape(correctTracker, trackerFlags, 32, None),
+        "insert flag" -> trackerStateWithShape(
+          correctTracker,
+          AvlTreeFlags(insertAllowed = false, updateAllowed = true, removeAllowed = false),
+          32,
+          Some(8)
+        ),
+        "update flag" -> trackerStateWithShape(
+          correctTracker,
+          AvlTreeFlags(insertAllowed = true, updateAllowed = false, removeAllowed = false),
+          32,
+          Some(8)
+        ),
+        "remove flag" -> trackerStateWithShape(
+          correctTracker,
+          AvlTreeFlags(insertAllowed = true, updateAllowed = true, removeAllowed = true),
+          32,
+          Some(8)
+        )
       )
-      val wrongFlagsInput = input(fakeTxIds(1), insertOnlyTracker)
-      a[Throwable] should be thrownBy createTx(
-        Array(wrongFlagsInput), Array(trackerInput(insertOnlyTracker)),
-        outputs(wrongFlagsInput), secrets = Array(receiverSecret.toString)
-      )
-
-      val malformedValueTracker = trackerState(
-        key,
-        parameters = PlasmaParameters(32, Some(16)),
-        encodedDebt = Some(Longs.toByteArray(totalDebt) ++ Longs.toByteArray(0L))
-      )
-      val wrongValueInput = input(fakeTxIds(2), malformedValueTracker)
-      a[Throwable] should be thrownBy createTx(
-        Array(wrongValueInput), Array(trackerInput(malformedValueTracker)),
-        outputs(wrongValueInput), secrets = Array(receiverSecret.toString)
-      )
+      shapeMutants.zipWithIndex.foreach { case ((label, mutant), index) =>
+        val mutatedInput = input(fakeTxIds(1 + (index % 4)), mutant)
+        withClue(s"tracker $label: ") {
+          a[Throwable] should be thrownBy createTx(
+            Array(mutatedInput), Array(trackerInput(mutant)),
+            outputs(mutatedInput), secrets = Array(receiverSecret.toString)
+          )
+        }
+      }
 
       val insufficientTracker = trackerState(key, debt = totalDebt - 1L)
       val insufficientDebtInput = input(fakeTxIds(3), insufficientTracker)
