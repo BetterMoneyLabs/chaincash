@@ -4,6 +4,18 @@ This repository contains whitepaper and some prototyping code for
 ChainCash, a protocol to create money in self-sovereign way via trust or collateral, with collective backing and 
 individual acceptance. 
 
+## Protocol Lifecycle
+
+The original on-chain reserve/note/receipt prototype and the experimental
+Layer-2 prototype are historical, test-only sources. They are not compiled,
+addressed, or activated by production code. See
+[`docs/legacy-contract-retirement.md`](docs/legacy-contract-retirement.md).
+
+The production-code contract surface in this branch contains the Basis and
+Basis-token prototypes. Their presence is not a deployment or production-
+readiness claim; use a separately reviewed, versioned release before handling
+funds.
+
 ## Intro 
 
 We consider money as a set of digital notes, and every note is collectively backed 
@@ -74,15 +86,18 @@ Initial version of [design document](docs/server.md) is also available. The serv
 * Whitepaper - https://github.com/ChainCashLabs/chaincash/blob/master/docs/conf/conf.pdf
 High-level description of ChainCash protocol and its implementation
 
-* Contracts - https://github.com/kushti/chaincash/tree/master/contracts - note and reserve contracts in ErgoScript
+* Contracts - `contracts/offchain/` contains the current Basis prototype
+  sources. The former on-chain and Layer-2 prototypes are pinned historical
+  fixtures under `src/test/resources/contracts/historical/`.
 
 * Modelling - https://github.com/kushti/chaincash/tree/master/src/main/scala/chaincash/model
 Contract-less and blockchain-less models of ChainCash entities and one of notes collateralization 
 estimation options.
-* Tests - https://github.com/kushti/chaincash/blob/master/src/test/scala/kiosk/ChainCashSpec.scala - Kiosk-based tests for transactions involving note
- contracts (note creation, spending, redemption)
-* Offchain part - https://github.com/kushti/chaincash/tree/master/src/main/scala/chaincash/offchain - on-chain data tracking,
-  persistence, transaction builders. This is very rough prototype, at the moment better to look into ChainCash Server which 
+* Tests - `src/test/scala/chaincash/ChainCashSpec.scala` replays the historical
+  note-contract transitions through test-only fixtures.
+* Offchain part - `src/main/scala/chaincash/offchain/` retains rough prototype
+  tracking and persistence code, but no production legacy transaction builder.
+  For application development, prefer ChainCash Server, which
  is available at [https://github.com/BetterMoneyLabs/chaincash-rs](https://github.com/BetterMoneyLabs/chaincash-rs) .
 
 ## Communications
@@ -102,7 +117,7 @@ The repository includes deployment utilities for the Basis reserve contract:
 sbt 'runMain chaincash.contracts.BasisDeployer'
 
 // Or use the contract printer
-sbt 'runMain chaincash.contracts.Constants$Printer'
+sbt 'runMain chaincash.contracts.Printer'
 ```
 
 This generates deployment requests for the Basis reserve contract, which supports:
@@ -113,11 +128,5 @@ This generates deployment requests for the Basis reserve contract, which support
 
 See `src/main/scala/chaincash/contracts/README.md` for detailed usage.
 
-## TODO
-
-* update ReserveData.liabilities and reserveKeys in offchain code
-* offchain code for note redemption
-* support few spendings of a note in the same block (offchain tracking of it)
-* support other tokens in reserves, e.g. SigUSD
-* efficient persistence for own notes (currently, all the notes in the system are iterated over)
-* check ERG preservation in note contracts
+The printer emits only entries in `Constants.publishedContracts`. Historical
+contract addresses are deliberately unavailable from production tooling.

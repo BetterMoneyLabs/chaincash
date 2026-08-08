@@ -172,7 +172,7 @@ class ChainCashSpec extends PropSpec with Matchers with ScalaCheckDrivenProperty
           .value(minValue)
           .tokens(new ErgoToken(noteTokenId, noteValue))
           .registers(Constants.emptyTreeErgoValue, ErgoValue.of(holderPk), ErgoValue.of(position))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.noteContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.noteContract))
           .build()
           .convertToInputWith(fakeTxId1, fakeIndex)
           .withContextVars(
@@ -189,12 +189,12 @@ class ChainCashSpec extends PropSpec with Matchers with ScalaCheckDrivenProperty
           .value(minValue)
           .tokens(new ErgoToken(reserveNFTBytes, 1))
           .registers(ErgoValue.of(holderPk))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.reserveContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.reserveContract))
           .build()
           .convertToInputWith(fakeTxId2, fakeIndex)
 
       val noteOutput = createOut(
-        Constants.noteContract,
+        HistoricalContractFixtures.noteContract,
         minValue,
         Array(outTree, ErgoValue.of(holderPk), ErgoValue.of(position + 1)),
         Array(new ErgoToken(noteTokenId, 1))
@@ -243,7 +243,7 @@ class ChainCashSpec extends PropSpec with Matchers with ScalaCheckDrivenProperty
           .value(minValue + feeValue)
           .tokens(new ErgoToken(noteTokenId, noteValue))
           .registers(historyTree, ErgoValue.of(holderPk))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.noteContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.noteContract))
           .build()
           .convertToInputWith(fakeTxId1, fakeIndex)
           .withContextVars(
@@ -257,7 +257,7 @@ class ChainCashSpec extends PropSpec with Matchers with ScalaCheckDrivenProperty
           .value(minValue)
           .tokens(new ErgoToken(reserveNFTBytes, 1))
           .registers(ErgoValue.of(holderPk))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.reserveContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.reserveContract))
           .build()
           .convertToInputWith(fakeTxId2, fakeIndex)
           .withContextVars(
@@ -291,14 +291,14 @@ class ChainCashSpec extends PropSpec with Matchers with ScalaCheckDrivenProperty
           .convertToInputWith(fakeTxId3, fakeIndex)
 
       val reserveOutput = createOut(
-        Constants.reserveContract,
+        HistoricalContractFixtures.reserveContract,
         minValue - oracleRate * 98 / 100,
         registers = Array(ErgoValue.of(holderPk)),
         tokens = Array(new ErgoToken(reserveNFT, 1))
       )
 
       val receiptOutput = createOut(
-        Constants.receiptContract,
+        HistoricalContractFixtures.receiptContract,
         minValue,
         registers = Array(historyTree, ErgoValue.of(0L), ErgoValue.of(ctx.getHeight - 5), ErgoValue.of(holderPk)),
         tokens = Array(new ErgoToken(noteTokenId, noteValue))
@@ -407,7 +407,7 @@ class ChainCashSpec extends PropSpec with Matchers with ScalaCheckDrivenProperty
           .value(minValue + feeValue)
           .tokens(new ErgoToken(noteTokenId, finalNoteValue))
           .registers(historyTree, ErgoValue.of(holderPk))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.noteContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.noteContract))
           .build()
           .convertToInputWith(fakeTxId1, fakeIndex)
           .withContextVars(
@@ -424,7 +424,7 @@ class ChainCashSpec extends PropSpec with Matchers with ScalaCheckDrivenProperty
           .value(minValue)
           .tokens(new ErgoToken(reserveBNFT, 1))
           .registers(ErgoValue.of(reserveBPk))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.reserveContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.reserveContract))
           .build()
           .convertToInputWith(fakeTxId2, fakeIndex)
           .withContextVars(
@@ -446,14 +446,14 @@ class ChainCashSpec extends PropSpec with Matchers with ScalaCheckDrivenProperty
           .convertToInputWith(fakeTxId5, fakeIndex)
 
       val reserveOutput = createOut(
-        Constants.reserveContract,
+        HistoricalContractFixtures.reserveContract,
         minValue - oracleRate * 98 / 100,
         registers = Array(ErgoValue.of(reserveBPk)),
         tokens = Array(new ErgoToken(reserveBNFT, 1))
       )
 
       val receiptOutput = createOut(
-        Constants.receiptContract,
+        HistoricalContractFixtures.receiptContract,
         minValue,
         registers = Array(historyTree, ErgoValue.of(bPosition), ErgoValue.of(ctx.getHeight - 5), ErgoValue.of(reserveBPk)),
         tokens = Array(new ErgoToken(noteTokenId, finalNoteValue))
@@ -493,7 +493,7 @@ class ChainCashSpec extends PropSpec with Matchers with ScalaCheckDrivenProperty
           .value(minValue)
           .tokens(new ErgoToken(reserveANFT, 1))
           .registers(ErgoValue.of(reserveAPk))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.reserveContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.reserveContract))
           .build()
           .convertToInputWith(fakeTxId5, fakeIndex)
           .withContextVars(
@@ -505,14 +505,14 @@ class ChainCashSpec extends PropSpec with Matchers with ScalaCheckDrivenProperty
           )
 
       val reserveAOutput = createOut(
-        Constants.reserveContract,
+        HistoricalContractFixtures.reserveContract,
         minValue - oracleRate * 98 / 100,
         registers = Array(ErgoValue.of(reserveAPk)),
         tokens = Array(new ErgoToken(reserveANFT, 1))
       )
 
       val receiptAOutput = createOut(
-        Constants.receiptContract,
+        HistoricalContractFixtures.receiptContract,
         minValue,
         registers = Array(historyTree, ErgoValue.of(aPosition), ErgoValue.of(ctx.getHeight - 5), ErgoValue.of(reserveAPk)),
         tokens = Array(new ErgoToken(noteTokenId, finalNoteValue))
@@ -612,7 +612,7 @@ class ChainCashSpec extends PropSpec with Matchers with ScalaCheckDrivenProperty
           .value(minValue)
           .registers(historyTree, ErgoValue.of(bPosition), ErgoValue.of(ctx.getHeight - 5), ErgoValue.of(reserveBPk))
           .tokens(new ErgoToken(noteTokenId, bValue))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.receiptContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.receiptContract))
           .build()
           .convertToInputWith(fakeTxId4, fakeIndex)
 
@@ -626,7 +626,7 @@ class ChainCashSpec extends PropSpec with Matchers with ScalaCheckDrivenProperty
           .value(minValue)
           .tokens(new ErgoToken(reserveCNFT, 1))
           .registers(ErgoValue.of(reserveCPk))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.reserveContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.reserveContract))
           .build()
           .convertToInputWith(fakeTxId5, fakeIndex)
           .withContextVars(
@@ -648,14 +648,14 @@ class ChainCashSpec extends PropSpec with Matchers with ScalaCheckDrivenProperty
           .convertToInputWith(fakeTxId2, fakeIndex)
 
       val reserveCOutput = createOut(
-        Constants.reserveContract,
+        HistoricalContractFixtures.reserveContract,
         minValue - oracleRate * 98 / 100,
         registers = Array(ErgoValue.of(reserveCPk)),
         tokens = Array(new ErgoToken(reserveCNFT, 1))
       )
 
       val receiptCOutput = createOut(
-        Constants.receiptContract,
+        HistoricalContractFixtures.receiptContract,
         minValue,
         registers = Array(historyTree, ErgoValue.of(cPosition), ErgoValue.of(ctx.getHeight - 5), ErgoValue.of(reserveCPk)),
         tokens = Array(new ErgoToken(noteTokenId, finalNoteValue))
@@ -743,7 +743,7 @@ class ChainCashSpec extends PropSpec with Matchers with ScalaCheckDrivenProperty
           .value(minValue + feeValue)
           .tokens(new ErgoToken(note1TokenId, noteValue))
           .registers(historyTree1, ErgoValue.of(holder1Pk))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.noteContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.noteContract))
           .build()
           .convertToInputWith(fakeTxId1, fakeIndex)
           .withContextVars(
@@ -757,7 +757,7 @@ class ChainCashSpec extends PropSpec with Matchers with ScalaCheckDrivenProperty
           .value(minValue + feeValue)
           .tokens(new ErgoToken(note2TokenId, noteValue))
           .registers(historyTree2, ErgoValue.of(holder2Pk))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.noteContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.noteContract))
           .build()
           .convertToInputWith(fakeTxId2, fakeIndex)
           .withContextVars(
@@ -771,7 +771,7 @@ class ChainCashSpec extends PropSpec with Matchers with ScalaCheckDrivenProperty
           .value(minValue)
           .tokens(new ErgoToken(reserve1NFTBytes, 1))
           .registers(ErgoValue.of(holder1Pk))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.reserveContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.reserveContract))
           .build()
           .convertToInputWith(fakeTxId3, fakeIndex)
           .withContextVars(
@@ -790,7 +790,7 @@ class ChainCashSpec extends PropSpec with Matchers with ScalaCheckDrivenProperty
           .value(minValue)
           .tokens(new ErgoToken(reserve2NFTBytes, 1))
           .registers(ErgoValue.of(holder2Pk))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.reserveContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.reserveContract))
           .build()
           .convertToInputWith(fakeTxId4, fakeIndex)
           .withContextVars(
@@ -815,28 +815,28 @@ class ChainCashSpec extends PropSpec with Matchers with ScalaCheckDrivenProperty
           .convertToInputWith(fakeTxId3, fakeIndex)
 
       val reserve1Output = createOut(
-        Constants.reserveContract,
+        HistoricalContractFixtures.reserveContract,
         minValue,
         registers = Array(ErgoValue.of(holder1Pk)),
         tokens = Array(new ErgoToken(reserve1NFT, 1))
       )
 
       val reserve2Output = createOut(
-        Constants.reserveContract,
+        HistoricalContractFixtures.reserveContract,
         minValue,
         registers = Array(ErgoValue.of(holder2Pk)),
         tokens = Array(new ErgoToken(reserve2NFT, 1))
       )
 
       val receipt1Output = createOut(
-        Constants.receiptContract,
+        HistoricalContractFixtures.receiptContract,
         minValue,
         registers = Array(historyTree1, ErgoValue.of(0L), ErgoValue.of(ctx.getHeight - 5), ErgoValue.of(holder1Pk)),
         tokens = Array(new ErgoToken(note1TokenId, noteValue))
       )
 
       val receipt2Output = createOut(
-        Constants.receiptContract,
+        HistoricalContractFixtures.receiptContract,
         minValue,
         registers = Array(historyTree2, ErgoValue.of(0L), ErgoValue.of(ctx.getHeight - 5), ErgoValue.of(holder2Pk)),
         tokens = Array(new ErgoToken(note2TokenId, noteValue))
@@ -897,7 +897,7 @@ class ChainCashSpec extends PropSpec with Matchers with ScalaCheckDrivenProperty
           .value(minValue)
           .tokens(new ErgoToken(firstNoteTokenId, firstNoteValue))
           .registers(Constants.emptyTreeErgoValue, ErgoValue.of(holderPk), ErgoValue.of(firstPosition))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.noteContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.noteContract))
           .build()
           .convertToInputWith(fakeTxId1, fakeIndex)
           .withContextVars(
@@ -915,7 +915,7 @@ class ChainCashSpec extends PropSpec with Matchers with ScalaCheckDrivenProperty
           .value(minValue)
           .tokens(new ErgoToken(secondNoteTokenId, secondNoteValue))
           .registers(Constants.emptyTreeErgoValue, ErgoValue.of(holderPk), ErgoValue.of(secondPosition))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.noteContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.noteContract))
           .build()
           .convertToInputWith(fakeTxId1, fakeIndex)
           .withContextVars(
@@ -942,33 +942,33 @@ class ChainCashSpec extends PropSpec with Matchers with ScalaCheckDrivenProperty
           .value(minValue)
           .tokens(new ErgoToken(reserveNFTBytes, 1))
           .registers(ErgoValue.of(holderPk))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.reserveContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.reserveContract))
           .build()
           .convertToInputWith(fakeTxId2, fakeIndex)
 
       val note1Output = createOut(
-        Constants.noteContract,
+        HistoricalContractFixtures.noteContract,
         minValue,
         registers = Array(outTree1, ErgoValue.of(holderPk), ErgoValue.of(firstPosition + 1)),
         tokens = Array(new ErgoToken(firstNoteTokenId, 50))
       )
 
       val note1Change = createOut(
-        Constants.noteContract,
+        HistoricalContractFixtures.noteContract,
         minValue,
         registers = Array(outTree1, ErgoValue.of(holderPk), ErgoValue.of(firstPosition + 1)),
         tokens = Array(new ErgoToken(firstNoteTokenId, 5))
       )
 
       val note2Output = createOut(
-        Constants.noteContract,
+        HistoricalContractFixtures.noteContract,
         minValue,
         registers = Array(outTree2, ErgoValue.of(holderPk), ErgoValue.of(secondPosition + 1)),
         tokens = Array(new ErgoToken(secondNoteTokenId, 50))
       )
 
       val note2Change = createOut(
-        Constants.noteContract,
+        HistoricalContractFixtures.noteContract,
         minValue,
         registers = Array(outTree2, ErgoValue.of(holderPk), ErgoValue.of(secondPosition + 1)),
         tokens = Array(new ErgoToken(secondNoteTokenId, 10))
@@ -1001,7 +1001,7 @@ class ChainCashSpec extends PropSpec with Matchers with ScalaCheckDrivenProperty
           .value(minValue)
           .tokens(new ErgoToken(reserveNFTBytes, 1))
           .registers(ErgoValue.of(holderPk))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.reserveContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.reserveContract))
           .build()
           .convertToInputWith(fakeTxId2, fakeIndex)
           .withContextVars(
@@ -1018,7 +1018,7 @@ class ChainCashSpec extends PropSpec with Matchers with ScalaCheckDrivenProperty
           .convertToInputWith(fakeTxId1, fakeIndex)
 
       val reserveOutput = createOut(
-        Constants.reserveContract,
+        HistoricalContractFixtures.reserveContract,
         minValue,
         registers = Array(ErgoValue.of(holderPk), ErgoValue.of(ctx.getHeight - 2)),
         tokens = Array(new ErgoToken(reserveNFT, 1))

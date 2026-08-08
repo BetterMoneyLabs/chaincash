@@ -3,13 +3,9 @@ package chaincash.contracts
 import chaincash.offchain.SigUtils._
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.appkit.{AppkitHelpers, ErgoValue, NetworkType}
-import scorex.crypto.hash.Blake2b256
-import scorex.util.encode.Base58
 import sigma.crypto.CryptoConstants
 import sigma.data.AvlTreeFlags
 import sigma.ast.ErgoTree
-import sigma.compiler.{CompilerSettings, SigmaCompiler}
-import sigma.ast.TransformingSigmaBuilder
 import sigma.{AvlTree, GroupElement}
 import work.lithos.plasma.PlasmaParameters
 import work.lithos.plasma.collections.PlasmaMap
@@ -21,17 +17,16 @@ object Constants {
   val networkType = NetworkType.MAINNET
   val networkPrefix = networkType.networkPrefix
   val ergoAddressEncoder = new ErgoAddressEncoder(networkPrefix)
-  private val compiler = SigmaCompiler(CompilerSettings(networkPrefix, TransformingSigmaBuilder, lowerMethodCalls = true))
 
   def getAddressFromErgoTree(ergoTree: ErgoTree) = ergoAddressEncoder.fromProposition(ergoTree).get
 
-  def substitute(contract: String, substitutionMap: Map[String, String] = Map.empty): String = {
+  private def substitute(contract: String, substitutionMap: Map[String, String] = Map.empty): String = {
     substitutionMap.foldLeft(contract){case (c, (k,v)) =>
       c.replace("$"+k, v)
     }
   }
 
-  def readContract(path: String, substitutionMap: Map[String, String] = Map.empty) = {
+  private def readActiveContract(path: String, substitutionMap: Map[String, String] = Map.empty) = {
     val contract = scala.io.Source.fromFile("contracts/" + path, "utf-8").getLines.mkString("\n")
     substitute(contract, substitutionMap)
   }
@@ -55,50 +50,28 @@ object Constants {
 
   val g: GroupElement = CryptoConstants.dlogGroup.generator
 
-  val reserveContract = readContract("onchain/reserve.es", Map.empty)
-  val reserveErgoTree = compile(reserveContract)
-  val reserveAddress = getAddressFromErgoTree(reserveErgoTree)
-  val reserveContractHash = Blake2b256(reserveErgoTree.bytes.tail)
-  val reserveContractHashString = Base58.encode(reserveContractHash)
-
-  val receiptContract = readContract("onchain/receipt.es", Map("reserveContractHash" -> reserveContractHashString))
-  val receiptErgoTree = compile(receiptContract)
-  val receiptAddress = getAddressFromErgoTree(receiptErgoTree)
-  val receiptContractHash = Blake2b256(receiptErgoTree.bytes.tail)
-  val receiptContractHashString = Base58.encode(receiptContractHash)
-
-  val noteContract = readContract("onchain/note.es",
-    Map("reserveContractHash" -> reserveContractHashString, "receiptContractHash" -> receiptContractHashString))
-  val noteErgoTree = compile(noteContract)
-  val noteAddress = getAddressFromErgoTree(noteErgoTree)
-
   // Basis contracts
 
-  val basisContract = readContract("offchain/basis.es", Map())
+  val basisContract = readActiveContract("offchain/basis.es")
   val basisErgoTree = compile(basisContract)
   val basisAddress = getAddressFromErgoTree(basisErgoTree)
 
   // Basis-token contract (token-based reserve)
-  val basisTokenContract = readContract("offchain/basis-token.es", Map())
+  val basisTokenContract = readActiveContract("offchain/basis-token.es")
   val basisTokenErgoTree = compile(basisTokenContract)
   val basisTokenAddress = getAddressFromErgoTree(basisTokenErgoTree)
 
-  // contracts below are experimental and not finished ChainCash-on-Layer2 contracts
-
-  val redemptionContract = scala.io.Source.fromFile("contracts/layer2-old/redemption.es", "utf-8").getLines.mkString("\n")
-  val redemptionErgoTree = compile(redemptionContract)
-  val redemptionAddress = getAddressFromErgoTree(redemptionErgoTree)
-
-  val redemptionProducerContract = scala.io.Source.fromFile("contracts/layer2-old/redproducer.es", "utf-8").getLines.mkString("\n")
-  val redemptionProducerErgoTree = compile(redemptionProducerContract)
-  val redemptionProducerAddress = getAddressFromErgoTree(redemptionProducerErgoTree)
+  /** Contracts intentionally exposed by production address tooling. */
+  val publishedContracts = Vector(
+    "Basis" -> basisAddress,
+    "Basis-token" -> basisTokenAddress
+  )
 }
 
 object Printer extends App {
-  println("Basis p2s address: " + Constants.basisAddress)
-  println("Basis-token p2s address: " + Constants.basisTokenAddress)
-  println("Redemption p2s address: " + Constants.redemptionAddress)
-  println("Redemption producer p2s address: " + Constants.redemptionProducerAddress)
+  Constants.publishedContracts.foreach { case (name, address) =>
+    println(s"$name p2s address: $address")
+  }
 
   // Example deployment info
   println("\nTo deploy Basis reserve:")

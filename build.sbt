@@ -4,8 +4,6 @@ version := "0.2.1"
 organization := "org.ergoplatform"
 scalaVersion := "2.12.17"
 
-Compile / unmanagedClasspath += baseDirectory.value / "contracts"
-
 resolvers ++= Seq(
   "Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/",
   "SonaType" at "https://oss.sonatype.org/content/groups/public",

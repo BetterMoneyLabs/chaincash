@@ -36,7 +36,7 @@ object BasisDeployer extends App {
   val ergoAddressEncoder = new ErgoAddressEncoder(networkPrefix)
 
   // Basis contract configuration
-  val basisContractScript = Constants.readContract("offchain/basis.es", Map.empty)
+  val basisContractScript = Constants.basisContract
 
   val basisErgoTree = Constants.compile(basisContractScript)
   val basisAddress = Constants.getAddressFromErgoTree(basisErgoTree)

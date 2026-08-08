@@ -65,11 +65,12 @@ println(deploymentRequest)
 3. **Reserve Token ID**: Singleton NFT identifying the reserve
 4. **Initial Collateral**: Minimum 1 ERG (1000000000 nanoERG)
 
-### Core ChainCash Contracts
+### Historical ChainCash Contracts
 
-- **Reserve Contract**: On-chain collateral management
-- **Note Contract**: Digital currency issuance and transfer
-- **Receipt Contract**: Redemption receipt management
+The original reserve, note, and receipt contracts are test-only historical
+fixtures. Production code does not compile them, derive their addresses, or
+provide transaction builders for them. See
+`docs/legacy-contract-retirement.md` for the retirement and recovery boundary.
 
 ## Testing
 
@@ -81,8 +82,8 @@ sbt test
 
 ## Deployment Process
 
-1. **Compile Contracts**: Use `Constants` object to compile contracts
-2. **Generate Addresses**: Get pay-to-script addresses for each contract
+1. **Compile Basis Contracts**: Use the versioned Basis source selected for the deployment review
+2. **Generate Addresses**: Confirm the pay-to-script address against the reviewed source-to-byte receipt
 3. **Create Deployment Requests**: Use deployment utilities
 4. **Submit Transactions**: Send deployment transactions to Ergo blockchain
 5. **Monitor**: Use scan requests to monitor contract states
@@ -94,7 +95,8 @@ sbt test
 
 ## Security Notes
 
-- Always test on testnet before mainnet deployment
+- Repository compilation alone is not a production-readiness or deployment claim
+- Always test a reviewed version on testnet before considering mainnet deployment
 - Verify contract addresses before deployment
 - Use proper key management for reserve owners
 - Monitor tracker services for availability

@@ -8,7 +8,7 @@ class BasisDeployerSpec extends PropSpec with Matchers {
 
   property("BasisDeployer should compile Basis contract successfully") {
     // This test verifies that the Basis contract can be compiled
-    val basisContract = Constants.readContract("offchain/basis.es", Map.empty)
+    val basisContract = Constants.basisContract
     basisContract should not be empty
 
     val basisErgoTree = Constants.compile(basisContract)
