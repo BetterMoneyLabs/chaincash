@@ -19,6 +19,7 @@
     val outputIndex = packed % 10
 
     val ownerKey = SELF.R4[GroupElement].get
+    val identity = groupGenerator.exp(byteArrayToBigInt(fromBase16("00")))
     val redeemedTree = SELF.R5[AvlTree].get
     val trackerNftId = SELF.R6[Coll[Byte]].get
     val refundHeight = SELF.R7[Long].get
@@ -44,6 +45,7 @@
       predecessorId.size == 32 &&
       emergencyHeight > 0L &&
       refundHeight >= 0L &&
+      ownerKey != identity &&
       redeemedTreeShape
 
     if (!selfShape) {
@@ -116,6 +118,7 @@
             val e = byteArrayToBigInt(
               blake2b256(aBytes ++ message ++ ownerKey.getEncoded)
             )
+            a != identity &&
             groupGenerator.exp(z) == a.multiply(ownerKey.exp(e))
           } else {
             false
@@ -160,6 +163,7 @@
             selfOut.R8[Long].get == emergencyHeight &&
             selfOut.R9[Coll[Byte]].get == SELF.id
           val receiverCondition = proveDlog(receiver)
+          val receiverValid = receiver != identity
           val amount = SELF.tokens(1)._2 - selfOut.tokens(1)._2
           val payoutBound =
             payout.propositionBytes == receiverCondition.propBytes &&
@@ -246,10 +250,12 @@
                   val e = byteArrayToBigInt(
                     blake2b256(aBytes ++ message ++ trackerKey.getEncoded)
                   )
+                  a != identity &&
                   groupGenerator.exp(z) == a.multiply(trackerKey.exp(e))
                 } else {
                   false
                 }
+                trackerKey != identity &&
                 trackerTreeShape && trackerDebtValid && properTrackerSignature
               }
             }
@@ -257,6 +263,7 @@
 
           sigmaProp(
             successorCommon &&
+            receiverValid &&
             payoutBound &&
             valueFlowValid &&
             priorShape &&

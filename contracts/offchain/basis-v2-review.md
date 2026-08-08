@@ -25,17 +25,18 @@ and wallet change are outside the reserve accounting equations.
 
 | ID | Invariant / enforcement | Downstream consumer | Relaxation failure | Focused evidence |
 | --- | --- | --- | --- | --- |
-| I-01 | Claim key commits v2 tag, reserve NFT, tracker NFT, owner, receiver and token id where applicable. Both signatures and tracker AVL use that key. | tracker builder, note signer, both reserve contracts | one signed liability becomes valid in another reserve, asset or generation | wrong-reserve and wrong-domain signatures rejected independently |
+| I-01 | Claim key commits v2 tag, reserve NFT, tracker NFT, owner, receiver and token id where applicable. Both signatures and tracker AVL use that key. | tracker builder, note signer, both reserve contracts | one signed liability becomes valid in another reserve, asset or generation | owner-only wrong-reserve and tracker-only wrong-domain signatures rejected independently |
 | I-02 | Context 7 always supplies an authenticated R5 membership or non-membership proof. | R5 `insertOrUpdate` and later redemptions | existing state is treated as an unauthenticated zero baseline | omitted proof and stale absence proof rejected |
-| I-03 | R5 values are fixed 24-byte `(timestamp,totalDebt,redeemed)` tuples; same claim may advance `redeemed`, newer claims cannot reduce debt. | partial-redemption builder and restart reconstruction | repeated settlement is blocked or redeemed progress is erased | two consecutive partial settlements use the original signatures |
+| I-03 | R5 values are fixed 24-byte `(timestamp,totalDebt,redeemed)` tuples; same claim may advance `redeemed`, newer claims cannot reduce debt. | partial-redemption builder and restart reconstruction | repeated settlement is blocked, redeemed progress is erased or excess collateral is released | repeated partial settlement passes; same-timestamp debt mutation and over-redemption reject independently |
 | I-04 | Payout is at `successorIndex + 1`, has receiver P2PK bytes, R4=`SELF.id`, and exact released amount. | creditor wallet and multi-input batcher | redirected, underpaid or reused payout | receiver, amount and lineage mutations rejected independently |
 | I-05 | ERG redemption requires `successor.value + payout.value == SELF.value`. | reserve collateral and fee builder | reserve collateral silently pays fees/change | reserve-funded fee mutation rejected; external fee input accepted |
 | I-06 | Token successor preserves ERG, singleton and reserve-token ids; reserve-token decrease equals the payout's sole token amount. | token creditor, later reserve transitions and refund | ERG drain, token leakage or accidental burn | top-up ERG drain, redemption ERG drain and payout leakage rejected |
-| I-07 | Before R8, tracker input has the exact singleton, typed key/tree, fixed tree shape, sufficient committed cumulative debt and valid signature. | normal-redemption liveness and liability admission | forged tracker state or uncommitted claim | exact normal redemption passes; cross-domain evidence rejects |
+| I-07 | Before R8, tracker input has the exact singleton, typed non-identity key/tree, fixed tree shape, sufficient committed cumulative debt and valid signature. | normal-redemption liveness and liability admission | forged tracker state or uncommitted claim | exact normal redemption passes; NFT, flags, value shape, debt and signature-domain mutations reject independently |
 | I-08 | R8 is mandatory and exactly preserved; tracker fields are not evaluated only when `HEIGHT >= R8`. | emergency builder and acceptance policy | mutable tracker creation height postpones exit, or missing tracker still blocks the branch | tracker-free redemption passes at R8, rejects one block before, and rejects a mutated successor R8 |
-| I-09 | Reserve singleton shape is mandatory; every successor R9 and payout R4 equal the predecessor box id. | indexer lineage and multi-input settlement | tokenless state or one output satisfies two inputs | tokenless state and shared-successor transaction rejected |
-| I-10 | Refund R7 is one-shot, owner-authorized, preserved on other branches and checked with subtraction rather than overflowing addition. | creditor monitoring and terminal refund | backdated/reset timer or overflow-assisted early refund | ownerless ERG/token initiation, mature completion, early completion and `Long.MaxValue` seed exercised |
+| I-09 | Reserve singleton shape is mandatory; every successor R9 and payout R4 equal the predecessor box id. | indexer lineage and multi-input settlement | tokenless state or one successor/payout pair satisfies two inputs | externally balanced tokenless state and shared successor/payout transactions rejected |
+| I-10 | Refund R7 is one-shot, owner-authorized, preserved on other branches and checked with subtraction rather than overflowing addition. | creditor monitoring and terminal refund | backdated/reset timer or overflow-assisted early refund | ownerless ERG/token initiation and completion, mature completion, early completion and `Long.MaxValue` seed exercised |
 | I-11 | Constants compile exact normalized source and tests compare full output bytes with committed goldens. | compiler, builders and contract-family selection | readable source, configured P2S and runtime ABI silently diverge | source equality, fresh compile and full-byte golden tests |
+| I-12 | Owner, receiver, tracker and received Schnorr commitments are not the group identity. | reserve admission, creditor authorization and manual Schnorr verification | identity owner/tracker signatures are forgeable and an identity receiver has a publicly known witness | ERG and token transactions mutate owner, receiver, tracker and commitment independently |
 
 Each negative transaction changes only the field named in its test while its
 proofs, signatures, tree roots, tokens and unrelated outputs remain those of a
@@ -56,11 +57,12 @@ three independent transactions; it does not use one compound malformed box.
 
 ## Test closure
 
-`sbt -batch "testOnly chaincash.BasisV2Spec"` currently executes 15 tests. They
+`sbt -batch "testOnly chaincash.BasisV2Spec"` currently executes 21 tests. They
 cover normal and emergency redemption, domain separation, proof omission and
-replay, exact payouts, ERG/token conservation, partial settlement, singleton
-and output injectivity, both top-up branches, both refund families, source
-linkage and full golden bytes.
+replay, non-identity group boundaries, tracker shape and debt admission, R5
+progression, exact payouts, ERG/token conservation, partial settlement,
+singleton and output injectivity, both top-up branches, both refund families,
+source linkage and full golden bytes.
 
 The unchanged v1 suites remain a separate regression gate:
 
@@ -72,7 +74,7 @@ sbt -batch "testOnly chaincash.BasisSpec chaincash.BasisTokenSpec"
 
 | Dimension | Status |
 | --- | --- |
-| Implementation | matrix-covered by local source and 15 focused mockchain tests |
+| Implementation | matrix-covered by local source and 21 focused mockchain tests |
 | Independent review | pending on the exact candidate commit |
 | CI | not run |
 | Target node | not run; no live or broadcast action authorized |

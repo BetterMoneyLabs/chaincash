@@ -47,6 +47,11 @@ The same `claimKey` indexes the tracker AVL tree and the reserve redemption AVL
 tree. A signature for another reserve NFT, reserve token, network or contract
 generation therefore does not authorize this reserve.
 
+All owner, receiver and tracker `GroupElement` values must be non-identity.
+Both manual Schnorr verifiers also reject an identity commitment before
+checking the response equation. This is a semantic group check; a 33-byte
+encoding alone is not treated as evidence that a point is non-identity.
+
 The signed claim is cumulative, not a request for one payout. The creditor's
 transaction proof and the contract's exact payout predicate authorize each
 partial settlement. This permits repeated partial settlement with the original

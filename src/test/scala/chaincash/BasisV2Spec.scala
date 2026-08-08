@@ -14,6 +14,7 @@ import scorex.util.encode.Base16
 import sigma.ast.ErgoTree
 import sigma.data.{AvlTreeFlags, ProveDlog}
 import sigma.serialization.GroupElementSerializer
+import sigma.crypto.SecP256K1Group
 import sigma.{AvlTree, GroupElement}
 import work.lithos.plasma.PlasmaParameters
 import work.lithos.plasma.collections.PlasmaMap
@@ -36,6 +37,7 @@ class BasisV2Spec extends PropSpec with Matchers with HttpClientTesting {
   private val otherPk = Constants.g.exp(otherSecret.bigInteger)
   private val trackerSecret = SigUtils.randBigInt
   private val trackerPk = Constants.g.exp(trackerSecret.bigInteger)
+  private val identityPk = Constants.g.exp(java.math.BigInteger.ZERO)
 
   private val reserveNftA = hex("4b2d8b7beb3eaac8234d9e61792d270898a43934d6a27275e4f3a044609c9f2a")
   private val reserveNftB = hex("5b2d8b7beb3eaac8234d9e61792d270898a43934d6a27275e4f3a044609c9f2b")
@@ -73,11 +75,12 @@ class BasisV2Spec extends PropSpec with Matchers with HttpClientTesting {
     domain: Array[Byte],
     reserveNft: Array[Byte],
     assetId: Option[Array[Byte]],
-    receiver: GroupElement = receiverPk
+    receiver: GroupElement = receiverPk,
+    owner: GroupElement = ownerPk
   ): Array[Byte] =
     Blake2b256(
       domain ++ reserveNft ++ assetId.getOrElse(Array.emptyByteArray) ++
-        trackerNft ++ ownerPk.getEncoded.toArray ++ receiver.getEncoded.toArray
+        trackerNft ++ owner.getEncoded.toArray ++ receiver.getEncoded.toArray
     )
 
   private def message(key: Array[Byte], debt: Long = totalDebt, ts: Long = timestamp): Array[Byte] =
@@ -86,6 +89,19 @@ class BasisV2Spec extends PropSpec with Matchers with HttpClientTesting {
   private def signatureBytes(messageBytes: Array[Byte], secret: BigInt): Array[Byte] = {
     val signature = SigUtils.sign(messageBytes, secret)
     GroupElementSerializer.toBytes(signature._1) ++ signature._2.toByteArray
+  }
+
+  private def forgeIdentityKeySignature(messageBytes: Array[Byte]): Array[Byte] = {
+    val z = SigUtils.randBigInt
+    val a = Constants.g.exp(z.bigInteger)
+    GroupElementSerializer.toBytes(a) ++ z.toByteArray
+  }
+
+  private def identityCommitmentSignature(messageBytes: Array[Byte], secret: BigInt): Array[Byte] = {
+    val aBytes = GroupElementSerializer.toBytes(identityPk)
+    val e = BigInt(Blake2b256(aBytes ++ messageBytes ++ Constants.g.exp(secret.bigInteger).getEncoded.toArray))
+    val z = (secret * e).mod(SecP256K1Group.q)
+    aBytes ++ z.toByteArray
   }
 
   private case class StateStep(
@@ -115,9 +131,15 @@ class BasisV2Spec extends PropSpec with Matchers with HttpClientTesting {
 
   private case class TrackerState(tree: ErgoValue[AvlTree], lookupProof: Array[Byte])
 
-  private def trackerState(key: Array[Byte], debt: Long = totalDebt): TrackerState = {
-    val tree = new PlasmaMap[Array[Byte], Array[Byte]](trackerFlags, trackerParameters)
-    tree.insertOrUpdate(key -> Longs.toByteArray(debt))
+  private def trackerState(
+    key: Array[Byte],
+    debt: Long = totalDebt,
+    flags: AvlTreeFlags = trackerFlags,
+    parameters: PlasmaParameters = trackerParameters,
+    encodedDebt: Option[Array[Byte]] = None
+  ): TrackerState = {
+    val tree = new PlasmaMap[Array[Byte], Array[Byte]](flags, parameters)
+    tree.insertOrUpdate(key -> encodedDebt.getOrElse(Longs.toByteArray(debt)))
     TrackerState(tree.ergoValue, tree.lookUp(key).proof.bytes)
   }
 
@@ -178,11 +200,13 @@ class BasisV2Spec extends PropSpec with Matchers with HttpClientTesting {
     tree: ErgoValue[AvlTree],
     emergencyHeight: Long,
     predecessor: Array[Byte] = zeroId,
-    refundHeight: Long = 0L
+    refundHeight: Long = 0L,
+    owner: GroupElement = ownerPk,
+    trackerId: Array[Byte] = trackerNft
   ): Array[ErgoValue[_]] = Array(
-    ErgoValue.of(ownerPk),
+    ErgoValue.of(owner),
     tree,
-    ErgoValue.of(trackerNft),
+    ErgoValue.of(trackerId),
     ErgoValue.of(refundHeight),
     ErgoValue.of(emergencyHeight),
     ErgoValue.of(predecessor)
@@ -218,12 +242,14 @@ class BasisV2Spec extends PropSpec with Matchers with HttpClientTesting {
     step: StateStep,
     emergencyHeight: Long,
     vars: Array[ContextVar],
-    refundHeight: Long = 0L
+    refundHeight: Long = 0L,
+    owner: GroupElement = ownerPk,
+    trackerId: Array[Byte] = trackerNft
   )(implicit ctx: BlockchainContext): InputBox =
     ctx.newTxBuilder.outBoxBuilder
       .value(value)
       .tokens(new ErgoToken(reserveNft, 1))
-      .registers(reserveRegisters(step.inputTree, emergencyHeight, refundHeight = refundHeight): _*)
+      .registers(reserveRegisters(step.inputTree, emergencyHeight, refundHeight = refundHeight, owner = owner, trackerId = trackerId): _*)
       .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisV2Contract))
       .build()
       .convertToInputWith(txId, fakeIndex)
@@ -236,22 +262,29 @@ class BasisV2Spec extends PropSpec with Matchers with HttpClientTesting {
     step: StateStep,
     emergencyHeight: Long,
     vars: Array[ContextVar],
-    refundHeight: Long = 0L
+    refundHeight: Long = 0L,
+    owner: GroupElement = ownerPk,
+    trackerId: Array[Byte] = trackerNft
   )(implicit ctx: BlockchainContext): InputBox =
     ctx.newTxBuilder.outBoxBuilder
       .value(value)
       .tokens(new ErgoToken(tokenReserveNft, 1), new ErgoToken(reserveTokenId, reserveAmount))
-      .registers(reserveRegisters(step.inputTree, emergencyHeight, refundHeight = refundHeight): _*)
+      .registers(reserveRegisters(step.inputTree, emergencyHeight, refundHeight = refundHeight, owner = owner, trackerId = trackerId): _*)
       .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisTokenV2Contract))
       .build()
       .convertToInputWith(txId, fakeIndex)
       .withContextVars(vars: _*)
 
-  private def trackerInput(state: TrackerState)(implicit ctx: BlockchainContext): InputBox =
+  private def trackerInput(
+    state: TrackerState,
+    key: GroupElement = trackerPk,
+    nftId: Array[Byte] = trackerNft,
+    nftAmount: Long = 1L
+  )(implicit ctx: BlockchainContext): InputBox =
     ctx.newTxBuilder.outBoxBuilder
       .value(minValue)
-      .tokens(new ErgoToken(trackerNft, 1))
-      .registers(ErgoValue.of(trackerPk), state.tree)
+      .tokens(new ErgoToken(nftId, nftAmount))
+      .registers(ErgoValue.of(key), state.tree)
       .contract(ctx.compileContract(ConstantsBuilder.empty(), "sigmaProp(true)"))
       .build()
       .convertToInputWith(fakeTxIds(5), fakeIndex)
@@ -273,12 +306,14 @@ class BasisV2Spec extends PropSpec with Matchers with HttpClientTesting {
     tree: ErgoValue[AvlTree],
     reserveNft: Array[Byte],
     emergencyHeight: Long,
-    refundHeight: Long = 0L
+    refundHeight: Long = 0L,
+    owner: GroupElement = ownerPk,
+    trackerId: Array[Byte] = trackerNft
   )(implicit ctx: BlockchainContext): OutBoxImpl =
     createOut(
       Constants.basisV2Contract,
       value,
-      reserveRegisters(tree, emergencyHeight, input.getId.getBytes, refundHeight),
+      reserveRegisters(tree, emergencyHeight, input.getId.getBytes, refundHeight, owner, trackerId),
       Array(new ErgoToken(reserveNft, 1))
     )
 
@@ -288,12 +323,14 @@ class BasisV2Spec extends PropSpec with Matchers with HttpClientTesting {
     reserveAmount: Long,
     tree: ErgoValue[AvlTree],
     emergencyHeight: Long,
-    refundHeight: Long = 0L
+    refundHeight: Long = 0L,
+    owner: GroupElement = ownerPk,
+    trackerId: Array[Byte] = trackerNft
   )(implicit ctx: BlockchainContext): OutBoxImpl =
     createOut(
       Constants.basisTokenV2Contract,
       value,
-      reserveRegisters(tree, emergencyHeight, input.getId.getBytes, refundHeight),
+      reserveRegisters(tree, emergencyHeight, input.getId.getBytes, refundHeight, owner, trackerId),
       Array(new ErgoToken(tokenReserveNft, 1), new ErgoToken(reserveTokenId, reserveAmount))
     )
 
@@ -347,7 +384,199 @@ class BasisV2Spec extends PropSpec with Matchers with HttpClientTesting {
     }
   }
 
-  property("Basis v2 rejects cross-reserve and cross-domain signed claims independently") {
+  property("Basis ERG v2 rejects identity owner, receiver, and tracker independently") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx =>
+      val amount = 300000000L
+
+      val ownerIdentityKey = claimKey(ergDomain, reserveNftA, None, owner = identityPk)
+      val ownerIdentityStep = stateStep(ownerIdentityKey, None, (timestamp, totalDebt, amount))
+      val ownerIdentityMessage = message(ownerIdentityKey)
+      val ownerIdentityInput = ergReserveInput(
+        fakeTxIds(0), reserveNftA, minValue + totalDebt, ownerIdentityStep,
+        ctx.getHeight.toLong,
+        redemptionVars(forgeIdentityKeySignature(ownerIdentityMessage), ownerIdentityStep, None, None),
+        owner = identityPk
+      )
+      a[Throwable] should be thrownBy createTx(
+        Array(ownerIdentityInput), Array.empty,
+        Array(
+          ergSuccessor(
+            ownerIdentityInput, ownerIdentityInput.getValue - amount,
+            ownerIdentityStep.outputTree, reserveNftA, ctx.getHeight.toLong,
+            owner = identityPk
+          ),
+          ergPayout(ownerIdentityInput, amount)
+        ), secrets = Array(receiverSecret.toString)
+      )
+
+      val receiverIdentityKey = claimKey(ergDomain, reserveNftA, None, receiver = identityPk)
+      val receiverIdentityStep = stateStep(receiverIdentityKey, None, (timestamp, totalDebt, amount))
+      val receiverIdentityMessage = message(receiverIdentityKey)
+      val receiverIdentityInput = ergReserveInput(
+        fakeTxIds(1), reserveNftA, minValue + totalDebt, receiverIdentityStep,
+        ctx.getHeight.toLong,
+        redemptionVars(
+          signatureBytes(receiverIdentityMessage, ownerSecret), receiverIdentityStep,
+          None, None, receiver = identityPk
+        )
+      )
+      a[Throwable] should be thrownBy createTx(
+        Array(receiverIdentityInput), Array.empty,
+        Array(
+          ergSuccessor(
+            receiverIdentityInput, receiverIdentityInput.getValue - amount,
+            receiverIdentityStep.outputTree, reserveNftA, ctx.getHeight.toLong
+          ),
+          ergPayout(receiverIdentityInput, amount, identityPk)
+        ), secrets = Array("0")
+      )
+
+      val trackerIdentityKey = claimKey(ergDomain, reserveNftA, None)
+      val trackerIdentityStep = stateStep(trackerIdentityKey, None, (timestamp, totalDebt, amount))
+      val trackerIdentityState = trackerState(trackerIdentityKey)
+      val trackerIdentityMessage = message(trackerIdentityKey)
+      val trackerIdentityInput = ergReserveInput(
+        fakeTxIds(2), reserveNftA, minValue + totalDebt, trackerIdentityStep,
+        ctx.getHeight + 1000L,
+        redemptionVars(
+          signatureBytes(trackerIdentityMessage, ownerSecret), trackerIdentityStep,
+          Some(forgeIdentityKeySignature(trackerIdentityMessage)),
+          Some(trackerIdentityState.lookupProof)
+        )
+      )
+      a[Throwable] should be thrownBy createTx(
+        Array(trackerIdentityInput), Array(trackerInput(trackerIdentityState, key = identityPk)),
+        Array(
+          ergSuccessor(
+            trackerIdentityInput, trackerIdentityInput.getValue - amount,
+            trackerIdentityStep.outputTree, reserveNftA, ctx.getHeight + 1000L
+          ),
+          ergPayout(trackerIdentityInput, amount)
+        ), secrets = Array(receiverSecret.toString)
+      )
+    }
+  }
+
+  property("Basis token v2 rejects identity owner, receiver, and tracker independently") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx =>
+      val amount = 300L
+      val reserveAmount = 1000L
+
+      val ownerIdentityKey = claimKey(tokenDomain, tokenReserveNft, Some(reserveTokenId), owner = identityPk)
+      val ownerIdentityStep = stateStep(ownerIdentityKey, None, (timestamp, totalDebt, amount))
+      val ownerIdentityMessage = message(ownerIdentityKey)
+      val ownerIdentityInput = tokenReserveInput(
+        fakeTxIds(0), minValue * 2, reserveAmount, ownerIdentityStep,
+        ctx.getHeight.toLong,
+        redemptionVars(forgeIdentityKeySignature(ownerIdentityMessage), ownerIdentityStep, None, None),
+        owner = identityPk
+      )
+      a[Throwable] should be thrownBy createTx(
+        Array(ownerIdentityInput, feeInput(fakeTxIds(4))), Array.empty,
+        Array(
+          tokenSuccessor(
+            ownerIdentityInput, ownerIdentityInput.getValue, reserveAmount - amount,
+            ownerIdentityStep.outputTree, ctx.getHeight.toLong, owner = identityPk
+          ),
+          tokenPayout(ownerIdentityInput, amount)
+        ), secrets = Array(receiverSecret.toString)
+      )
+
+      val receiverIdentityKey = claimKey(tokenDomain, tokenReserveNft, Some(reserveTokenId), receiver = identityPk)
+      val receiverIdentityStep = stateStep(receiverIdentityKey, None, (timestamp, totalDebt, amount))
+      val receiverIdentityMessage = message(receiverIdentityKey)
+      val receiverIdentityInput = tokenReserveInput(
+        fakeTxIds(1), minValue * 2, reserveAmount, receiverIdentityStep,
+        ctx.getHeight.toLong,
+        redemptionVars(
+          signatureBytes(receiverIdentityMessage, ownerSecret), receiverIdentityStep,
+          None, None, receiver = identityPk
+        )
+      )
+      a[Throwable] should be thrownBy createTx(
+        Array(receiverIdentityInput, feeInput(fakeTxIds(4))), Array.empty,
+        Array(
+          tokenSuccessor(
+            receiverIdentityInput, receiverIdentityInput.getValue, reserveAmount - amount,
+            receiverIdentityStep.outputTree, ctx.getHeight.toLong
+          ),
+          tokenPayout(receiverIdentityInput, amount, identityPk)
+        ), secrets = Array("0")
+      )
+
+      val trackerIdentityKey = claimKey(tokenDomain, tokenReserveNft, Some(reserveTokenId))
+      val trackerIdentityStep = stateStep(trackerIdentityKey, None, (timestamp, totalDebt, amount))
+      val trackerIdentityState = trackerState(trackerIdentityKey)
+      val trackerIdentityMessage = message(trackerIdentityKey)
+      val trackerIdentityInput = tokenReserveInput(
+        fakeTxIds(2), minValue * 2, reserveAmount, trackerIdentityStep,
+        ctx.getHeight + 1000L,
+        redemptionVars(
+          signatureBytes(trackerIdentityMessage, ownerSecret), trackerIdentityStep,
+          Some(forgeIdentityKeySignature(trackerIdentityMessage)),
+          Some(trackerIdentityState.lookupProof)
+        )
+      )
+      a[Throwable] should be thrownBy createTx(
+        Array(trackerIdentityInput, feeInput(fakeTxIds(4))),
+        Array(trackerInput(trackerIdentityState, key = identityPk)),
+        Array(
+          tokenSuccessor(
+            trackerIdentityInput, trackerIdentityInput.getValue, reserveAmount - amount,
+            trackerIdentityStep.outputTree, ctx.getHeight + 1000L
+          ),
+          tokenPayout(trackerIdentityInput, amount)
+        ), secrets = Array(receiverSecret.toString)
+      )
+    }
+  }
+
+  property("Basis ERG and token v2 reject an identity Schnorr commitment independently") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx =>
+      val ergAmount = 300000000L
+      val ergKey = claimKey(ergDomain, reserveNftA, None)
+      val ergStep = stateStep(ergKey, None, (timestamp, totalDebt, ergAmount))
+      val ergMessage = message(ergKey)
+      val ergInput = ergReserveInput(
+        fakeTxIds(0), reserveNftA, minValue + totalDebt, ergStep,
+        ctx.getHeight.toLong,
+        redemptionVars(identityCommitmentSignature(ergMessage, ownerSecret), ergStep, None, None)
+      )
+      a[Throwable] should be thrownBy createTx(
+        Array(ergInput), Array.empty,
+        Array(
+          ergSuccessor(
+            ergInput, ergInput.getValue - ergAmount,
+            ergStep.outputTree, reserveNftA, ctx.getHeight.toLong
+          ),
+          ergPayout(ergInput, ergAmount)
+        ), secrets = Array(receiverSecret.toString)
+      )
+
+      val tokenAmount = 300L
+      val reserveAmount = 1000L
+      val tokenKey = claimKey(tokenDomain, tokenReserveNft, Some(reserveTokenId))
+      val tokenStep = stateStep(tokenKey, None, (timestamp, totalDebt, tokenAmount))
+      val tokenMessage = message(tokenKey)
+      val tokenInput = tokenReserveInput(
+        fakeTxIds(1), minValue * 2, reserveAmount, tokenStep,
+        ctx.getHeight.toLong,
+        redemptionVars(identityCommitmentSignature(tokenMessage, ownerSecret), tokenStep, None, None)
+      )
+      a[Throwable] should be thrownBy createTx(
+        Array(tokenInput, feeInput(fakeTxIds(4))), Array.empty,
+        Array(
+          tokenSuccessor(
+            tokenInput, tokenInput.getValue, reserveAmount - tokenAmount,
+            tokenStep.outputTree, ctx.getHeight.toLong
+          ),
+          tokenPayout(tokenInput, tokenAmount)
+        ), secrets = Array(receiverSecret.toString)
+      )
+    }
+  }
+
+  property("Basis v2 rejects a cross-reserve owner signature with a correct tracker signature") {
     createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx =>
       val amount = 300000000L
       val keyA = claimKey(ergDomain, reserveNftA, None)
@@ -359,7 +588,7 @@ class BasisV2Spec extends PropSpec with Matchers with HttpClientTesting {
         fakeTxIds(0), reserveNftB, minValue + totalDebt, stepB, ctx.getHeight + 1000L,
         redemptionVars(
           signatureBytes(wrongMessage, ownerSecret), stepB,
-          Some(signatureBytes(wrongMessage, trackerSecret)), Some(trackerB.lookupProof)
+          Some(signatureBytes(message(keyB), trackerSecret)), Some(trackerB.lookupProof)
         )
       )
 
@@ -372,6 +601,12 @@ class BasisV2Spec extends PropSpec with Matchers with HttpClientTesting {
         secrets = Array(receiverSecret.toString)
       )
 
+    }
+  }
+
+  property("Basis v2 rejects a cross-domain tracker signature with a correct owner signature") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx =>
+      val amount = 300000000L
       val expectedKey = claimKey(ergDomain, reserveNftA, None)
       val wrongDomainKey = claimKey(tokenDomain, reserveNftA, None)
       val expectedStep = stateStep(expectedKey, None, (timestamp, totalDebt, amount))
@@ -381,7 +616,7 @@ class BasisV2Spec extends PropSpec with Matchers with HttpClientTesting {
         fakeTxIds(1), reserveNftA, minValue + totalDebt, expectedStep,
         ctx.getHeight + 1000L,
         redemptionVars(
-          signatureBytes(wrongDomainMessage, ownerSecret), expectedStep,
+          signatureBytes(message(expectedKey), ownerSecret), expectedStep,
           Some(signatureBytes(wrongDomainMessage, trackerSecret)),
           Some(expectedTracker.lookupProof)
         )
@@ -422,6 +657,118 @@ class BasisV2Spec extends PropSpec with Matchers with HttpClientTesting {
         Array(
           ergSuccessor(input, input.getValue - amount, step.outputTree, reserveNftA, ctx.getHeight + 1000L),
           ergPayout(input, amount)
+        ), secrets = Array(receiverSecret.toString)
+      )
+    }
+  }
+
+  property("Basis v2 rejects tracker singleton, tree flags, value shape, and insufficient debt independently") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx =>
+      val amount = 300000000L
+      val key = claimKey(ergDomain, reserveNftA, None)
+      val step = stateStep(key, None, (timestamp, totalDebt, amount))
+      val claimMessage = message(key)
+
+      def input(txId: String, tracker: TrackerState) = ergReserveInput(
+        txId, reserveNftA, minValue + totalDebt, step, ctx.getHeight + 1000L,
+        redemptionVars(
+          signatureBytes(claimMessage, ownerSecret), step,
+          Some(signatureBytes(claimMessage, trackerSecret)), Some(tracker.lookupProof)
+        )
+      )
+
+      def outputs(reserveInput: InputBox) = Array(
+        ergSuccessor(
+          reserveInput, reserveInput.getValue - amount,
+          step.outputTree, reserveNftA, ctx.getHeight + 1000L
+        ),
+        ergPayout(reserveInput, amount)
+      )
+
+      val correctTracker = trackerState(key)
+      val wrongNftInput = input(fakeTxIds(0), correctTracker)
+      a[Throwable] should be thrownBy createTx(
+        Array(wrongNftInput),
+        Array(trackerInput(correctTracker, nftId = reserveNftB)),
+        outputs(wrongNftInput), secrets = Array(receiverSecret.toString)
+      )
+
+      val insertOnlyTracker = trackerState(
+        key, flags = AvlTreeFlags(insertAllowed = true, updateAllowed = false, removeAllowed = false)
+      )
+      val wrongFlagsInput = input(fakeTxIds(1), insertOnlyTracker)
+      a[Throwable] should be thrownBy createTx(
+        Array(wrongFlagsInput), Array(trackerInput(insertOnlyTracker)),
+        outputs(wrongFlagsInput), secrets = Array(receiverSecret.toString)
+      )
+
+      val malformedValueTracker = trackerState(
+        key,
+        parameters = PlasmaParameters(32, Some(16)),
+        encodedDebt = Some(Longs.toByteArray(totalDebt) ++ Longs.toByteArray(0L))
+      )
+      val wrongValueInput = input(fakeTxIds(2), malformedValueTracker)
+      a[Throwable] should be thrownBy createTx(
+        Array(wrongValueInput), Array(trackerInput(malformedValueTracker)),
+        outputs(wrongValueInput), secrets = Array(receiverSecret.toString)
+      )
+
+      val insufficientTracker = trackerState(key, debt = totalDebt - 1L)
+      val insufficientDebtInput = input(fakeTxIds(3), insufficientTracker)
+      a[Throwable] should be thrownBy createTx(
+        Array(insufficientDebtInput), Array(trackerInput(insufficientTracker)),
+        outputs(insufficientDebtInput), secrets = Array(receiverSecret.toString)
+      )
+    }
+  }
+
+  property("Basis v2 rejects invalid R5 claim progression and over-redemption independently") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx =>
+      val priorRedeemed = 100000000L
+      val amount = 100000000L
+      val key = claimKey(ergDomain, reserveNftA, None)
+
+      val regressingStep = stateStep(
+        key,
+        Some((timestamp, totalDebt, priorRedeemed)),
+        (timestamp, totalDebt + 1L, priorRedeemed + amount)
+      )
+      val regressingMessage = message(key, totalDebt + 1L, timestamp)
+      val regressingInput = ergReserveInput(
+        fakeTxIds(0), reserveNftA, minValue + totalDebt - priorRedeemed,
+        regressingStep, ctx.getHeight.toLong,
+        redemptionVars(
+          signatureBytes(regressingMessage, ownerSecret), regressingStep,
+          None, None, debt = totalDebt + 1L
+        )
+      )
+      a[Throwable] should be thrownBy createTx(
+        Array(regressingInput), Array.empty,
+        Array(
+          ergSuccessor(
+            regressingInput, regressingInput.getValue - amount,
+            regressingStep.outputTree, reserveNftA, ctx.getHeight.toLong
+          ),
+          ergPayout(regressingInput, amount)
+        ), secrets = Array(receiverSecret.toString)
+      )
+
+      val overAmount = totalDebt + 1L
+      val overStep = stateStep(key, None, (timestamp, totalDebt, overAmount))
+      val claimMessage = message(key)
+      val overInput = ergReserveInput(
+        fakeTxIds(1), reserveNftA, minValue + overAmount, overStep,
+        ctx.getHeight.toLong,
+        redemptionVars(signatureBytes(claimMessage, ownerSecret), overStep, None, None)
+      )
+      a[Throwable] should be thrownBy createTx(
+        Array(overInput), Array.empty,
+        Array(
+          ergSuccessor(
+            overInput, overInput.getValue - overAmount,
+            overStep.outputTree, reserveNftA, ctx.getHeight.toLong
+          ),
+          ergPayout(overInput, overAmount)
         ), secrets = Array(receiverSecret.toString)
       )
     }
@@ -610,7 +957,7 @@ class BasisV2Spec extends PropSpec with Matchers with HttpClientTesting {
     }
   }
 
-  property("Basis v2 rejects tokenless reserve state and two reserve inputs sharing one successor") {
+  property("Basis v2 rejects tokenless reserve state and two reserve inputs sharing one successor or payout pair") {
     createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx =>
       val key = claimKey(ergDomain, reserveNftA, None)
       val step = stateStep(key, None, (timestamp, totalDebt, 1L))
@@ -626,7 +973,11 @@ class BasisV2Spec extends PropSpec with Matchers with HttpClientTesting {
         Constants.basisV2Contract, minValue + 100000000L,
         reserveRegisters(step.inputTree, emergency, tokenless.getId.getBytes), Array.empty[ErgoToken]
       )
-      a[Throwable] should be thrownBy createTx(Array(tokenless), Array.empty, Array(tokenlessOut))
+      a[Throwable] should be thrownBy createTx(
+        Array(tokenless, feeInput(fakeTxIds(5), value = 100000000L)),
+        Array.empty,
+        Array(tokenlessOut)
+      )
 
       def topUpInput(txId: String) = ctx.newTxBuilder.outBoxBuilder
         .value(minValue)
@@ -640,6 +991,30 @@ class BasisV2Spec extends PropSpec with Matchers with HttpClientTesting {
       val second = topUpInput(fakeTxIds(2))
       val shared = ergSuccessor(first, minValue + 100000000L, step.inputTree, reserveNftA, emergency)
       a[Throwable] should be thrownBy createTx(Array(first, second), Array.empty, Array(shared))
+
+      val amount = 300000000L
+      val redemptionStep = stateStep(key, None, (timestamp, totalDebt, amount))
+      val tracker = trackerState(key)
+      val claimMessage = message(key)
+      def redemptionInput(txId: String) = ergReserveInput(
+        txId, reserveNftA, minValue + totalDebt, redemptionStep, emergency,
+        redemptionVars(
+          signatureBytes(claimMessage, ownerSecret), redemptionStep,
+          Some(signatureBytes(claimMessage, trackerSecret)), Some(tracker.lookupProof)
+        )
+      )
+      val firstRedemption = redemptionInput(fakeTxIds(3))
+      val secondRedemption = redemptionInput(fakeTxIds(4))
+      a[Throwable] should be thrownBy createTx(
+        Array(firstRedemption, secondRedemption), Array(trackerInput(tracker)),
+        Array(
+          ergSuccessor(
+            firstRedemption, firstRedemption.getValue - amount,
+            redemptionStep.outputTree, reserveNftA, emergency
+          ),
+          ergPayout(firstRedemption, amount)
+        ), secrets = Array(receiverSecret.toString)
+      )
     }
   }
 
@@ -799,6 +1174,9 @@ class BasisV2Spec extends PropSpec with Matchers with HttpClientTesting {
         Array(completeInput), Array.empty, Array(ownerOutput),
         secrets = Array(ownerSecret.toString)
       )
+      a[Throwable] should be thrownBy createTx(
+        Array(completeInput), Array.empty, Array(ownerOutput)
+      )
 
       val earlyInput = ergReserveInput(
         fakeTxIds(2), reserveNftA, minValue, step, emergency,
@@ -871,6 +1249,9 @@ class BasisV2Spec extends PropSpec with Matchers with HttpClientTesting {
       noException should be thrownBy createTx(
         Array(completeInput), Array.empty, Array(ownerOutput),
         secrets = Array(ownerSecret.toString)
+      )
+      a[Throwable] should be thrownBy createTx(
+        Array(completeInput), Array.empty, Array(ownerOutput)
       )
     }
   }
