@@ -199,7 +199,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .value(minValue + totalDebt + feeValue) // Total reserve value
           .tokens(new ErgoToken(basisTokenId, 1))
           .registers(ErgoValue.of(ownerPk), inputTreeErgoValue, ErgoValue.of(trackerNFTBytes))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.basisContract))
           .build()
           .convertToInputWith(fakeTxId1, fakeIndex)
           .withContextVars(
@@ -228,7 +228,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
 
       // Basis output (updated reserve with new redeemed debt)
       val basisOutput = createOut(
-        Constants.basisContract,
+        HistoricalContractFixtures.basisContract,
         minValue + totalDebt - redeemAmount + feeValue, // Reduce value by the amount being redeemed
         Array(ErgoValue.of(ownerPk), outputTreeErgoValue, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1))
@@ -273,7 +273,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .value(minValue)
           .tokens(new ErgoToken(basisTokenId, 1))
           .registers(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.basisContract))
           .build()
           .convertToInputWith(fakeTxId1, fakeIndex)
           .withContextVars(
@@ -292,7 +292,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
 
       // Basis output (with increased value)
       val basisOutput = createOut(
-        Constants.basisContract,
+        HistoricalContractFixtures.basisContract,
         minValue + topUpAmount,
         Array(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1))
@@ -364,7 +364,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .value(minValue + totalDebt + feeValue) // Total reserve value
           .tokens(new ErgoToken(basisTokenId, 1))
           .registers(ErgoValue.of(ownerPk), inputTreeErgoValue, ErgoValue.of(trackerNFTBytes))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.basisContract))
           .build()
           .convertToInputWith(fakeTxId1, fakeIndex)
           .withContextVars(
@@ -395,7 +395,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
 
       // Basis output
       val basisOutput = createOut(
-        Constants.basisContract,
+        HistoricalContractFixtures.basisContract,
         minValue + totalDebt - redeemAmount + feeValue, // Reduce value by the amount being redeemed
         Array(ErgoValue.of(ownerPk), outputTreeErgoValue, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1))
@@ -471,7 +471,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .value(minValue + debtAmount - 100000000L + feeValue) // Less than debt amount
           .tokens(new ErgoToken(basisTokenId, 1))
           .registers(ErgoValue.of(ownerPk), initialTreeErgoValue, ErgoValue.of(trackerNFTBytes))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.basisContract))
           .build()
           .convertToInputWith(fakeTxId1, fakeIndex)
           .withContextVars(
@@ -500,7 +500,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
 
       // Basis output
       val basisOutput = createOut(
-        Constants.basisContract,
+        HistoricalContractFixtures.basisContract,
         minValue + feeValue - 100000000L,
         Array(ErgoValue.of(ownerPk), nextTreeErgoValue, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1))
@@ -574,7 +574,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .value(minValue + debtAmount + feeValue)
           .tokens(new ErgoToken(basisTokenId, 1))
           .registers(ErgoValue.of(ownerPk), initialTreeErgoValue, ErgoValue.of(trackerNFTBytes))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.basisContract))
           .build()
           .convertToInputWith(fakeTxId1, fakeIndex)
           .withContextVars(
@@ -603,7 +603,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
 
       // Basis output
       val basisOutput = createOut(
-        Constants.basisContract,
+        HistoricalContractFixtures.basisContract,
         minValue + feeValue,
         Array(ErgoValue.of(ownerPk), nextTreeErgoValue, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1))
@@ -648,7 +648,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .value(minValue)
           .tokens(new ErgoToken(basisTokenId, 1))
           .registers(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.basisContract))
           .build()
           .convertToInputWith(fakeTxId1, fakeIndex)
           .withContextVars(
@@ -667,7 +667,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
 
       // Basis output (with insufficient top-up)
       val basisOutput = createOut(
-        Constants.basisContract,
+        HistoricalContractFixtures.basisContract,
         minValue + topUpAmount,
         Array(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1))
@@ -706,7 +706,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .value(minValue)
           .tokens(new ErgoToken(basisTokenId, 1))
           .registers(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.basisContract))
           .build()
           .convertToInputWith(fakeTxId1, fakeIndex)
           .withContextVars(
@@ -726,7 +726,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       // Basis output with R7 set to initiation height. Slightly future-dated height is
       // allowed (>= HEIGHT) to tolerate delayed inclusion into a block.
       val basisOutput = createOut(
-        Constants.basisContract,
+        HistoricalContractFixtures.basisContract,
         minValue,
         Array(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes), ErgoValue.of(ctx.getHeight.toLong + 5)),
         Array(new ErgoToken(basisTokenId, 1))
@@ -756,7 +756,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .value(minValue)
           .tokens(new ErgoToken(basisTokenId, 1))
           .registers(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.basisContract))
           .build()
           .convertToInputWith(fakeTxId1, fakeIndex)
           .withContextVars(
@@ -773,7 +773,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .convertToInputWith(fakeTxId2, fakeIndex)
 
       val basisOutput = createOut(
-        Constants.basisContract,
+        HistoricalContractFixtures.basisContract,
         minValue,
         Array(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes), ErgoValue.of(ctx.getHeight.toLong)),
         Array(new ErgoToken(basisTokenId, 1))
@@ -805,7 +805,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .value(minValue)
           .tokens(new ErgoToken(basisTokenId, 1))
           .registers(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes), ErgoValue.of(500L))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.basisContract))
           .build()
           .convertToInputWith(fakeTxId1, fakeIndex)
           .withContextVars(
@@ -822,7 +822,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .convertToInputWith(fakeTxId2, fakeIndex)
 
       val basisOutput = createOut(
-        Constants.basisContract,
+        HistoricalContractFixtures.basisContract,
         minValue,
         Array(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes), ErgoValue.of(ctx.getHeight.toLong)),
         Array(new ErgoToken(basisTokenId, 1))
@@ -847,7 +847,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .value(minValue)
           .tokens(new ErgoToken(basisTokenId, 1))
           .registers(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.basisContract))
           .build()
           .convertToInputWith(fakeTxId1, fakeIndex)
           .withContextVars(
@@ -865,7 +865,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
 
       // Backdating R7 would shorten the creditor protection window - must be rejected
       val basisOutput = createOut(
-        Constants.basisContract,
+        HistoricalContractFixtures.basisContract,
         minValue,
         Array(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes), ErgoValue.of(ctx.getHeight.toLong - 10)),
         Array(new ErgoToken(basisTokenId, 1))
@@ -890,7 +890,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .value(minValue)
           .tokens(new ErgoToken(basisTokenId, 1))
           .registers(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.basisContract))
           .build()
           .convertToInputWith(fakeTxId1, fakeIndex)
           .withContextVars(
@@ -899,7 +899,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
 
       // Output value decreased (fee is paid from the reserve) - not allowed at initiation
       val basisOutput = createOut(
-        Constants.basisContract,
+        HistoricalContractFixtures.basisContract,
         minValue - feeValue,
         Array(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes), ErgoValue.of(ctx.getHeight.toLong)),
         Array(new ErgoToken(basisTokenId, 1))
@@ -927,7 +927,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .value(minValue)
           .tokens(new ErgoToken(basisTokenId, 1))
           .registers(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes), ErgoValue.of(refundHeight))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.basisContract))
           .build()
           .convertToInputWith(fakeTxId1, fakeIndex)
           .withContextVars(
@@ -966,7 +966,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .value(minValue)
           .tokens(new ErgoToken(basisTokenId, 1))
           .registers(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes), ErgoValue.of(refundHeight))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.basisContract))
           .build()
           .convertToInputWith(fakeTxId1, fakeIndex)
           .withContextVars(
@@ -1000,7 +1000,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .value(minValue)
           .tokens(new ErgoToken(basisTokenId, 1))
           .registers(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.basisContract))
           .build()
           .convertToInputWith(fakeTxId1, fakeIndex)
           .withContextVars(
@@ -1035,7 +1035,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .value(minValue)
           .tokens(new ErgoToken(basisTokenId, 1))
           .registers(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes), ErgoValue.of(refundHeight))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.basisContract))
           .build()
           .convertToInputWith(fakeTxId1, fakeIndex)
           .withContextVars(
@@ -1084,7 +1084,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       val trackerDataInput = mkTrackerDataInput(trackerTree)
 
       // R7 preserved in the reserve output
-      val basisOutput = createOut(Constants.basisContract, minValue + feeValue,
+      val basisOutput = createOut(HistoricalContractFixtures.basisContract, minValue + feeValue,
         Array(ErgoValue.of(ownerPk), nextTree, ErgoValue.of(trackerNFTBytes), ErgoValue.of(refundHeight)),
         Array(new ErgoToken(basisTokenId, 1)))
       val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
@@ -1115,7 +1115,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       val trackerDataInput = mkTrackerDataInput(trackerTree)
 
       // R7 dropped in the reserve output - pending refund must not be cancelled by redemption
-      val basisOutput = createOut(Constants.basisContract, minValue + feeValue,
+      val basisOutput = createOut(HistoricalContractFixtures.basisContract, minValue + feeValue,
         Array(ErgoValue.of(ownerPk), nextTree, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
       val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
@@ -1138,7 +1138,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .value(minValue)
           .tokens(new ErgoToken(basisTokenId, 1))
           .registers(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes), ErgoValue.of(refundHeight))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.basisContract))
           .build()
           .convertToInputWith(fakeTxId1, fakeIndex)
           .withContextVars(
@@ -1155,7 +1155,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .convertToInputWith(fakeTxId2, fakeIndex)
 
       val basisOutput = createOut(
-        Constants.basisContract,
+        HistoricalContractFixtures.basisContract,
         minValue + topUpAmount,
         Array(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes), ErgoValue.of(refundHeight)),
         Array(new ErgoToken(basisTokenId, 1))
@@ -1217,7 +1217,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .value(minValue + debtAmount + feeValue)
           .tokens(new ErgoToken(basisTokenId, 1))
           .registers(ErgoValue.of(ownerPk), initialTreeErgoValue, ErgoValue.of(trackerNFTBytes))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.basisContract))
           .build()
           .convertToInputWith(fakeTxId1, fakeIndex)
           .withContextVars(
@@ -1246,7 +1246,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
 
       // Basis output
       val basisOutput = createOut(
-        Constants.basisContract,
+        HistoricalContractFixtures.basisContract,
         minValue + feeValue,
         Array(ErgoValue.of(ownerPk), nextTreeErgoValue, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1))
@@ -1324,7 +1324,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .value(minValue + debtAmount + feeValue)
           .tokens(new ErgoToken(basisTokenId, 1))
           .registers(ErgoValue.of(ownerPk), initialTreeErgoValue, ErgoValue.of(wrongTrackerNFTBytes))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.basisContract))
           .build()
           .convertToInputWith(fakeTxId1, fakeIndex)
           .withContextVars(
@@ -1353,7 +1353,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
 
       // Basis output
       val basisOutput = createOut(
-        Constants.basisContract,
+        HistoricalContractFixtures.basisContract,
         minValue + feeValue,
         Array(ErgoValue.of(ownerPk), nextTreeErgoValue, ErgoValue.of(wrongTrackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1))
@@ -1427,7 +1427,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .value(minValue + debtAmount + feeValue)
           .tokens(new ErgoToken(basisTokenId, 1))
           .registers(ErgoValue.of(ownerPk), initialTreeErgoValue, ErgoValue.of(trackerNFTBytes))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.basisContract))
           .build()
           .convertToInputWith(fakeTxId1, fakeIndex)
           .withContextVars(
@@ -1456,7 +1456,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
 
       // Basis output
       val basisOutput = createOut(
-        Constants.basisContract,
+        HistoricalContractFixtures.basisContract,
         minValue + feeValue,
         Array(ErgoValue.of(ownerPk), nextTreeErgoValue, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1))
@@ -1529,7 +1529,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .value(minValue + debtAmount + feeValue)
           .tokens(new ErgoToken(basisTokenId, 1))
           .registers(ErgoValue.of(ownerPk), initialTreeErgoValue, ErgoValue.of(trackerNFTBytes))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.basisContract))
           .build()
           .convertToInputWith(fakeTxId1, fakeIndex)
           .withContextVars(
@@ -1556,7 +1556,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
 
       // Basis output
       val basisOutput = createOut(
-        Constants.basisContract,
+        HistoricalContractFixtures.basisContract,
         minValue + feeValue,
         Array(ErgoValue.of(ownerPk), nextTreeErgoValue, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1))
@@ -1636,7 +1636,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           .value(minValue + debtAmount + feeValue)
           .tokens(new ErgoToken(basisTokenId, 1))
           .registers(ErgoValue.of(ownerPk), initialTreeErgoValue, ErgoValue.of(trackerNFTBytes))
-          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.basisContract))
           .build()
           .convertToInputWith(fakeTxId1, fakeIndex)
           .withContextVars(
@@ -1663,7 +1663,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
 
       // Basis output
       val basisOutput = createOut(
-        Constants.basisContract,
+        HistoricalContractFixtures.basisContract,
         minValue + feeValue,
         Array(ErgoValue.of(ownerPk), nextTreeErgoValue, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1))
@@ -1696,25 +1696,18 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
   }
 
   // ========== CONTRACT LINKAGE VERIFICATION ==========
-  // Verifies tests use the exact contract from contracts/offchain/basis.es
+  // Verifies historical tests are bound to the exact test-only v1 fixture.
 
-  property("Constants.basisContract matches contracts/offchain/basis.es (text-equivalent)") {
-    import java.nio.charset.StandardCharsets
-    import java.nio.file.{Files, Paths}
-    // Anchor to project root via user.dir (sbt sets this to project root)
-    val projectRoot = Paths.get(sys.props("user.dir"))
-    val contractPath = projectRoot.resolve("contracts/offchain/basis.es")
-    require(Files.exists(contractPath), s"Missing contract file: $contractPath (user.dir=${sys.props("user.dir")})")
-    val fileBytes = Files.readAllBytes(contractPath)
-    val fileText = new String(fileBytes, StandardCharsets.UTF_8)
-    // Constants.readContract normalizes to \n via getLines.mkString("\n")
-    Constants.basisContract shouldEqual fileText.replace("\r\n", "\n").stripSuffix("\n")
+  property("historical Basis v1 source fixture retains its canonical digest") {
+    HistoricalContractFixtures.basisContract should not be empty
+    HistoricalContractFixtures.expectedCanonicalLfSha256("offchain/basis.es") shouldEqual
+      "56f6d229207469a45764c2a9657c5b37d6c5faf9025a9d3fc0636f1dd6120823"
   }
 
-  property("compiled basisErgoTree matches fresh compilation of basis.es") {
+  property("historical Basis v1 tree matches a fresh fixture compilation") {
     createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
-      val freshlyCompiled = ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract)
-      Constants.basisErgoTree.bytes shouldEqual freshlyCompiled.getErgoTree.bytes
+      val freshlyCompiled = ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.basisContract)
+      HistoricalContractFixtures.basisErgoTree.bytes shouldEqual freshlyCompiled.getErgoTree.bytes
     }
   }
 
@@ -1810,7 +1803,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       .value(value)
       .tokens(new ErgoToken(basisTokenId, 1))
       .registers(registers: _*)
-      .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+      .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.basisContract))
       .build()
       .convertToInputWith(fakeTxId1, fakeIndex)
       .withContextVars(allVars: _*)
@@ -1932,7 +1925,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
         Array(badBasisOutput, redemptionOutput), Array(receiverSecret.toString()))
 
       // CONTROL: Use correct contract → tx succeeds
-      val goodBasisOutput = createOut(Constants.basisContract, minValue + feeValue,
+      val goodBasisOutput = createOut(HistoricalContractFixtures.basisContract, minValue + feeValue,
         Array(ErgoValue.of(ownerPk), nextTree, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
       noException should be thrownBy {
@@ -1966,7 +1959,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
 
       // FAIL CASE: basis output missing token (moved to redemption) - violates selfPreserved.tokens
-      val badBasisOutput = createOut(Constants.basisContract, minValue + feeValue,
+      val badBasisOutput = createOut(HistoricalContractFixtures.basisContract, minValue + feeValue,
         Array(ErgoValue.of(ownerPk), nextTree, ErgoValue.of(trackerNFTBytes)),
         Array()) // basis token missing here -> contract should fail
       val redemptionOutputWithToken = createOut(trueScript, redeemAmount,
@@ -1975,7 +1968,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
         Array(badBasisOutput, redemptionOutputWithToken), Array(receiverSecret.toString()))
 
       // CONTROL: Include correct token → tx succeeds
-      val goodBasisOutput = createOut(Constants.basisContract, minValue + feeValue,
+      val goodBasisOutput = createOut(HistoricalContractFixtures.basisContract, minValue + feeValue,
         Array(ErgoValue.of(ownerPk), nextTree, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
       noException should be thrownBy {
@@ -2011,14 +2004,14 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
 
       // FAIL CASE: Output with DIFFERENT owner key in R4 - violates selfPreserved.R4
-      val badBasisOutput = createOut(Constants.basisContract, minValue + feeValue,
+      val badBasisOutput = createOut(HistoricalContractFixtures.basisContract, minValue + feeValue,
         Array(ErgoValue.of(differentOwnerPk), nextTree, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
       assertTxFails(Array(basisInput), Array(trackerDataInput),
         Array(badBasisOutput, redemptionOutput), Array(receiverSecret.toString()))
 
       // CONTROL: Fix owner key → tx succeeds
-      val goodBasisOutput = createOut(Constants.basisContract, minValue + feeValue,
+      val goodBasisOutput = createOut(HistoricalContractFixtures.basisContract, minValue + feeValue,
         Array(ErgoValue.of(ownerPk), nextTree, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
       noException should be thrownBy {
@@ -2054,14 +2047,14 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
 
       // FAIL CASE: Output with DIFFERENT tracker NFT ID in R6 - violates selfPreserved.R6
-      val badBasisOutput = createOut(Constants.basisContract, minValue + feeValue,
+      val badBasisOutput = createOut(HistoricalContractFixtures.basisContract, minValue + feeValue,
         Array(ErgoValue.of(ownerPk), nextTree, ErgoValue.of(differentTrackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
       assertTxFails(Array(basisInput), Array(trackerDataInput),
         Array(badBasisOutput, redemptionOutput), Array(receiverSecret.toString()))
 
       // CONTROL: Fix tracker NFT ID → tx succeeds
-      val goodBasisOutput = createOut(Constants.basisContract, minValue + feeValue,
+      val goodBasisOutput = createOut(HistoricalContractFixtures.basisContract, minValue + feeValue,
         Array(ErgoValue.of(ownerPk), nextTree, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
       noException should be thrownBy {
@@ -2112,7 +2105,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
         .value(minValue + totalDebt + feeValue)
         .tokens(new ErgoToken(basisTokenId, 1))
         .registers(ErgoValue.of(ownerPk), treeWithExistingKey, ErgoValue.of(trackerNFTBytes))
-        .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+        .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.basisContract))
         .build()
         .convertToInputWith(fakeTxId1, fakeIndex)
         .withContextVars(
@@ -2125,7 +2118,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           new ContextVar(6, ErgoValue.of(trackerSigBytes)),
           new ContextVar(8, ErgoValue.of(trackerLookupProof))
         )
-      val badBasisOutput = createOut(Constants.basisContract, minValue + feeValue,
+      val badBasisOutput = createOut(HistoricalContractFixtures.basisContract, minValue + feeValue,
         Array(ErgoValue.of(ownerPk), treeAfterInsert, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
       assertTxFails(Array(badBasisInput), Array(trackerDataInput),
@@ -2136,7 +2129,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
         .value(minValue + totalDebt + feeValue)
         .tokens(new ErgoToken(basisTokenId, 1))
         .registers(ErgoValue.of(ownerPk), emptyTreeEV, ErgoValue.of(trackerNFTBytes))
-        .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+        .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.basisContract))
         .build()
         .convertToInputWith(fakeTxId1, fakeIndex)
         .withContextVars(
@@ -2149,7 +2142,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
           new ContextVar(6, ErgoValue.of(trackerSigBytes)),
           new ContextVar(8, ErgoValue.of(trackerLookupProof))
         )
-      val goodBasisOutput = createOut(Constants.basisContract, minValue + feeValue,
+      val goodBasisOutput = createOut(HistoricalContractFixtures.basisContract, minValue + feeValue,
         Array(ErgoValue.of(ownerPk), treeAfterInsert, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
       noException should be thrownBy {
@@ -2174,7 +2167,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
         .value(minValue)
         .tokens(new ErgoToken(basisTokenId, 1))
         .registers(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes))
-        .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.basisContract))
+        .contract(ctx.compileContract(ConstantsBuilder.empty(), HistoricalContractFixtures.basisContract))
         .build()
         .convertToInputWith(fakeTxId1, fakeIndex)
         .withContextVars(new ContextVar(0, ErgoValue.of(10: Byte)))
@@ -2186,13 +2179,13 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
         .convertToInputWith(fakeTxId2, fakeIndex)
 
       // FAIL CASE: Output with DIFFERENT tree - violates top-up tree preservation
-      val badBasisOutput = createOut(Constants.basisContract, minValue + topUpAmount,
+      val badBasisOutput = createOut(HistoricalContractFixtures.basisContract, minValue + topUpAmount,
         Array(ErgoValue.of(ownerPk), differentTree, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
       assertTxFails(Array(basisInput, fundingBox), Array(), Array(badBasisOutput), Array(ownerSecret.toString()))
 
       // CONTROL: Use same tree → tx succeeds
-      val goodBasisOutput = createOut(Constants.basisContract, minValue + topUpAmount,
+      val goodBasisOutput = createOut(HistoricalContractFixtures.basisContract, minValue + topUpAmount,
         Array(ErgoValue.of(ownerPk), emptyTreeErgoValue, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
       noException should be thrownBy {
@@ -2229,7 +2222,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       val basisInput = mkBasisInput(minValue + totalDebt + feeValue, initialTree,
         receiverPk, reserveSigBytes, totalDebt, proofBytes, trackerSigBytes, None, Some(trackerLookupProof), timestamp)
       val trackerDataInput = mkTrackerDataInput(trackerTree)
-      val basisOutput = createOut(Constants.basisContract, minValue + feeValue,
+      val basisOutput = createOut(HistoricalContractFixtures.basisContract, minValue + feeValue,
         Array(ErgoValue.of(ownerPk), nextTree, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
       val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
@@ -2269,7 +2262,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       val basisInput = mkBasisInput(minValue + totalDebt + feeValue, initialTree,
         receiverPk, reserveSigBytes, totalDebt, proofBytes, invalidTrackerSigBytes, None, None, timestamp)
       val trackerDataInput = mkTrackerDataInput(trackerTree)
-      val basisOutput = createOut(Constants.basisContract, minValue + feeValue,
+      val basisOutput = createOut(HistoricalContractFixtures.basisContract, minValue + feeValue,
         Array(ErgoValue.of(ownerPk), nextTree, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
       val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
@@ -2304,7 +2297,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       val basisInput = mkBasisInput(minValue + totalDebt + feeValue, initialTree,
         receiverPk, reserveSigBytes, totalDebt, proofBytes, invalidTrackerSigBytes, None, None, timestamp)
       val trackerDataInput = mkTrackerDataInput(trackerTree)
-      val basisOutput = createOut(Constants.basisContract, minValue + feeValue,
+      val basisOutput = createOut(HistoricalContractFixtures.basisContract, minValue + feeValue,
         Array(ErgoValue.of(ownerPk), nextTree, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
       val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
@@ -2347,7 +2340,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
         receiverPk, reserveSigBytes, totalDebt, proofBytes, trackerSigBytes, None, Some(trackerLookupProof), timestamp)
       // Tracker is more than 3 days old (3 * 720 = 2160 blocks)
       val trackerDataInput = mkTrackerDataInput(trackerTree, Some(3 * 720 + 1))
-      val basisOutput = createOut(Constants.basisContract, minValue + feeValue,
+      val basisOutput = createOut(HistoricalContractFixtures.basisContract, minValue + feeValue,
         Array(ErgoValue.of(ownerPk), nextTree, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
       val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
@@ -2380,7 +2373,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
         receiverPk, reserveSigBytes, totalDebt, proofBytes, trackerSigBytes, None, Some(trackerLookupProof), timestamp)
       // Tracker is more than 3 days old
       val trackerDataInput = mkTrackerDataInput(trackerTree, Some(3 * 720 + 1))
-      val basisOutput = createOut(Constants.basisContract, minValue + feeValue,
+      val basisOutput = createOut(HistoricalContractFixtures.basisContract, minValue + feeValue,
         Array(ErgoValue.of(ownerPk), nextTree, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
       val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
@@ -2413,7 +2406,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
         receiverPk, reserveSigBytes, totalDebt, proofBytes, invalidTrackerSigBytes, None, Some(trackerLookupProof), timestamp)
       // Tracker is more than 3 days old (but invalid signature should still fail)
       val trackerDataInput = mkTrackerDataInput(trackerTree, Some(3 * 720 + 1))
-      val basisOutput = createOut(Constants.basisContract, minValue + feeValue,
+      val basisOutput = createOut(HistoricalContractFixtures.basisContract, minValue + feeValue,
         Array(ErgoValue.of(ownerPk), nextTree, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
       val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
@@ -2466,7 +2459,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       // After emergency period, redemption should be possible without tracker signature
       val trackerDataInput = mkTrackerDataInput(trackerTree, Some(3 * 720 + 1))
 
-      val basisOutput = createOut(Constants.basisContract, minValue + feeValue,
+      val basisOutput = createOut(HistoricalContractFixtures.basisContract, minValue + feeValue,
         Array(ErgoValue.of(ownerPk), nextTree, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
       val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
@@ -2506,7 +2499,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       // Tracker is NOT old enough (only 1 day old, need 3 days)
       val trackerDataInput = mkTrackerDataInput(trackerTree, Some(1 * 720)) // Only 1 day
 
-      val basisOutput = createOut(Constants.basisContract, minValue + feeValue,
+      val basisOutput = createOut(HistoricalContractFixtures.basisContract, minValue + feeValue,
         Array(ErgoValue.of(ownerPk), nextTree, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
       val redemptionOutput = createOut(trueScript, redeemAmount, Array(), Array())
@@ -2583,7 +2576,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       )
       val trackerDataInputAB = mkTrackerDataInput(trackerTreeAB.tree)
       val redemptionOutputBob = createOut(trueScript, remainingDebtToBob, Array(), Array())
-      val basisOutputBob = createOut(Constants.basisContract,
+      val basisOutputBob = createOut(HistoricalContractFixtures.basisContract,
         reserveValueForBob - remainingDebtToBob,
         Array(ErgoValue.of(aliceKey), nextTreeBob, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
@@ -2608,7 +2601,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       )
       val trackerDataInputAC = mkTrackerDataInput(trackerTreeAC.tree)
       val redemptionOutputCarol = createOut(trueScript, transferAmount, Array(), Array())
-      val basisOutputCarol = createOut(Constants.basisContract,
+      val basisOutputCarol = createOut(HistoricalContractFixtures.basisContract,
         reserveValueForCarol - transferAmount,
         Array(ErgoValue.of(aliceKey), nextTreeCarol, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
@@ -2730,7 +2723,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
         trackerSigBobBytes, None, Some(trackerTreeBob.lookupProofBytes), timestamp
       )
       val trackerInputBob = mkTrackerDataInput(trackerTreeBob.tree)
-      val basisOutputBob = createOut(Constants.basisContract, reserveBob - debtToBob,
+      val basisOutputBob = createOut(HistoricalContractFixtures.basisContract, reserveBob - debtToBob,
         Array(ErgoValue.of(aliceKey), treeBobOut, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
       val redemptionBob = createOut(trueScript, debtToBob, Array(), Array())
@@ -2848,7 +2841,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
         trackerSigBobBytes, None, Some(trackerTreeBob.lookupProofBytes), timestamp1
       )
       val trackerInputBob = mkTrackerDataInput(trackerTreeBob.tree)
-      val basisOutputBob = createOut(Constants.basisContract, reserveBob - bobRemaining,
+      val basisOutputBob = createOut(HistoricalContractFixtures.basisContract, reserveBob - bobRemaining,
         Array(ErgoValue.of(aliceKey), treeBobOut, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
       val redemptionBob = createOut(trueScript, bobRemaining, Array(), Array())
@@ -2868,7 +2861,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
         reserveBob2, treeBobReplay, bobKey, reserveSigBobBytes, bobRemaining, proofReplay,
         trackerSigBobBytes, Some(proofBob), Some(trackerTreeBob.lookupProofBytes), timestamp1
       )
-      val basisOutputReplay = createOut(Constants.basisContract, reserveBob2,
+      val basisOutputReplay = createOut(HistoricalContractFixtures.basisContract, reserveBob2,
         Array(ErgoValue.of(aliceKey), treeBobReplayOut, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
       val redemptionReplay = createOut(trueScript, bobRemaining, Array(), Array())
@@ -2923,7 +2916,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
       )
       val trackerInputBob = mkTrackerDataInput(trackerTreeBob.tree)
       // Try to output more than reserve has
-      val basisOutputBob = createOut(Constants.basisContract, insufficientReserve - bobRemaining, // Would be negative!
+      val basisOutputBob = createOut(HistoricalContractFixtures.basisContract, insufficientReserve - bobRemaining, // Would be negative!
         Array(ErgoValue.of(aliceKey), treeBobOut, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
       val redemptionBob = createOut(trueScript, bobRemaining, Array(), Array())
@@ -2966,7 +2959,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
         emptyTree, receiverPk, reserveSig1, totalDebt, proof1,
         trackerSig1, None, Some(tracker.lookupProofBytes), t1
       )
-      val basisOutput1 = createOut(Constants.basisContract,
+      val basisOutput1 = createOut(HistoricalContractFixtures.basisContract,
         minValue + totalDebt - redeem1 + feeValue,
         Array(ErgoValue.of(ownerPk), tree1, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
@@ -3002,7 +2995,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
         new ContextVar(8, ErgoValue.of(tracker.lookupProofBytes))
       )
 
-      val basisOutput2 = createOut(Constants.basisContract,
+      val basisOutput2 = createOut(HistoricalContractFixtures.basisContract,
         minValue + totalDebt - redeem1 - redeem2 + feeValue,
         Array(ErgoValue.of(ownerPk), tree2, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))
@@ -3040,7 +3033,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
         new ContextVar(8, ErgoValue.of(tracker.lookupProofBytes))
       )
 
-      val basisOutput3 = createOut(Constants.basisContract,
+      val basisOutput3 = createOut(HistoricalContractFixtures.basisContract,
         minValue + totalDebt - redeem1 - redeem2 - redeem3 + feeValue,
         Array(ErgoValue.of(ownerPk), tree3, ErgoValue.of(trackerNFTBytes)),
         Array(new ErgoToken(basisTokenId, 1)))

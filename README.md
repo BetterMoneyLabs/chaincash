@@ -4,6 +4,18 @@ This repository contains whitepaper and some prototyping code for
 ChainCash, a protocol to create money in self-sovereign way via trust or collateral, with collective backing and 
 individual acceptance. 
 
+## Protocol Lifecycle
+
+The original on-chain reserve/note/receipt prototype and the experimental
+Layer-2 prototype are historical, test-only sources. They are not compiled,
+addressed, or activated by production code. See
+[`docs/legacy-contract-retirement.md`](docs/legacy-contract-retirement.md).
+
+The production-code contract surface contains only the reviewed Basis v2
+candidate sources and their frozen full-ErgoTree goldens. Basis v1 is also
+retired to test-only fixtures. No deployment, signing, submission, broadcast
+or in-place migration path is provided.
+
 ## Intro 
 
 We consider money as a set of digital notes, and every note is collectively backed 
@@ -47,21 +59,12 @@ More introductory materials:
 * [Video presentation from Ergo Summit](https://www.youtube.com/watch?v=NxIlIpO6ZVI)
 * [Video: ChainCash, part two](https://www.youtube.com/watch?v=fk8ZFvNFDYc)
 
-## Basis Demo
+## Retired Basis v1 demos
 
-A simple demonstration of the Basis reserve protocol is available in `demo/basis/simple/`:
-
-```bash
-cd demo/basis/simple
-
-# Generate redemption transaction
-sbt "runMain chaincash.contracts.BasisNoteRedeemer --note-json note.json --reserve-box auto --tracker-box auto --fee-box <box1>,<box2>,<box3>,<box4> --output sign_request.json"
-
-# Sign with Ergo node
-curl -X POST "http://localhost:9053/wallet/transaction/sign" -H "api_key: hello" -d @sign_request.json
-```
-
-See `demo/basis/simple/README.md` for detailed instructions.
+The former Basis v1 examples and operational walkthroughs are removed from the
+working tree so they cannot be mistaken for supported execution or deployment
+paths. They remain recoverable from Git history at commit
+`78475e30362571acf56e4e38276a9d6c0a84ce0c` for historical research.
 
 ## ChainCash Server
 
@@ -74,15 +77,19 @@ Initial version of [design document](docs/server.md) is also available. The serv
 * Whitepaper - https://github.com/ChainCashLabs/chaincash/blob/master/docs/conf/conf.pdf
 High-level description of ChainCash protocol and its implementation
 
-* Contracts - https://github.com/kushti/chaincash/tree/master/contracts - note and reserve contracts in ErgoScript
+* Contracts - `contracts/offchain/` contains only the Basis v2 candidate family
+  and its exact `.p2s` goldens. Basis v1 and the former on-chain and Layer-2
+  prototypes are pinned historical fixtures under
+  `src/test/resources/contracts/historical/`.
 
 * Modelling - https://github.com/kushti/chaincash/tree/master/src/main/scala/chaincash/model
 Contract-less and blockchain-less models of ChainCash entities and one of notes collateralization 
 estimation options.
-* Tests - https://github.com/kushti/chaincash/blob/master/src/test/scala/kiosk/ChainCashSpec.scala - Kiosk-based tests for transactions involving note
- contracts (note creation, spending, redemption)
-* Offchain part - https://github.com/kushti/chaincash/tree/master/src/main/scala/chaincash/offchain - on-chain data tracking,
-  persistence, transaction builders. This is very rough prototype, at the moment better to look into ChainCash Server which 
+* Tests - `src/test/scala/chaincash/ChainCashSpec.scala` replays the historical
+  note-contract transitions through test-only fixtures.
+* Offchain part - `src/main/scala/chaincash/offchain/` retains rough prototype
+  tracking and persistence code, but no production legacy transaction builder.
+  For application development, prefer ChainCash Server, which
  is available at [https://github.com/BetterMoneyLabs/chaincash-rs](https://github.com/BetterMoneyLabs/chaincash-rs) .
 
 ## Communications
@@ -91,33 +98,16 @@ Join discussion groups for developers and users:
 
 * Telegram: [https://t.me/chaincashtalks](https://t.me/chaincashtalks)
 
-## Deployment Utilities
+## Candidate-byte inspection
 
-### Basis Reserve Contract Deployment
-
-The repository includes deployment utilities for the Basis reserve contract:
+The production commands print only the v2 candidate addresses and the
+source-to-ErgoTree receipt material:
 
 ```scala
-// Run deployment utility
-sbt 'runMain chaincash.contracts.BasisDeployer'
-
-// Or use the contract printer
-sbt 'runMain chaincash.contracts.Constants$Printer'
+sbt 'runMain chaincash.contracts.Printer'
+sbt 'runMain chaincash.contracts.BasisV2ReceiptPrinter'
 ```
 
-This generates deployment requests for the Basis reserve contract, which supports:
-- Off-chain payments with credit creation
-- Redemption with 2% fee
-- Emergency redemption after 7 days
-- Tracker-based debt tracking
-
-See `src/main/scala/chaincash/contracts/README.md` for detailed usage.
-
-## TODO
-
-* update ReserveData.liabilities and reserveKeys in offchain code
-* offchain code for note redemption
-* support few spendings of a note in the same block (offchain tracking of it)
-* support other tokens in reserves, e.g. SigUSD
-* efficient persistence for own notes (currently, all the notes in the system are iterated over)
-* check ERG preservation in note contracts
+These commands do not generate transactions. The printer emits only entries in
+`Constants.publishedContracts`; all v1 and legacy addresses and builders are
+deliberately unavailable from production tooling.

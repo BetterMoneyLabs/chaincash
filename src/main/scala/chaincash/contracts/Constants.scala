@@ -3,13 +3,9 @@ package chaincash.contracts
 import chaincash.offchain.SigUtils._
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.appkit.{AppkitHelpers, ErgoValue, NetworkType}
-import scorex.crypto.hash.Blake2b256
-import scorex.util.encode.Base58
 import sigma.crypto.CryptoConstants
 import sigma.data.AvlTreeFlags
 import sigma.ast.ErgoTree
-import sigma.compiler.{CompilerSettings, SigmaCompiler}
-import sigma.ast.TransformingSigmaBuilder
 import sigma.{AvlTree, GroupElement}
 import work.lithos.plasma.PlasmaParameters
 import work.lithos.plasma.collections.PlasmaMap
@@ -21,7 +17,6 @@ object Constants {
   val networkType = NetworkType.MAINNET
   val networkPrefix = networkType.networkPrefix
   val ergoAddressEncoder = new ErgoAddressEncoder(networkPrefix)
-  private val compiler = SigmaCompiler(CompilerSettings(networkPrefix, TransformingSigmaBuilder, lowerMethodCalls = true))
 
   def getAddressFromErgoTree(ergoTree: ErgoTree) = ergoAddressEncoder.fromProposition(ergoTree).get
 
@@ -31,7 +26,7 @@ object Constants {
     }
   }
 
-  def readContract(path: String, substitutionMap: Map[String, String] = Map.empty) = {
+  private def readActiveContract(path: String, substitutionMap: Map[String, String] = Map.empty) = {
     val contract = scala.io.Source.fromFile("contracts/" + path, "utf-8").getLines.mkString("\n")
     substitute(contract, substitutionMap)
   }
@@ -46,74 +41,32 @@ object Constants {
   // keyLength = 40 (positionBytes ++ reserveId = 8 + 32 bytes)
   // valueLength = None (dynamic, for Long values)
   val chainCashPlasmaParameters = PlasmaParameters(40, None)
-  // Basis AVL tree parameters
-  // keyLength = 32 (Blake2b256 hash of ownerKey || receiverKey)
-  val basisPlasmaParameters = PlasmaParameters(32, None)
   def emptyPlasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, chainCashPlasmaParameters)
   val emptyTreeErgoValue: ErgoValue[AvlTree] = emptyPlasmaMap.ergoValue
   val emptyTree: AvlTree = emptyTreeErgoValue.getValue
 
   val g: GroupElement = CryptoConstants.dlogGroup.generator
 
-  val reserveContract = readContract("onchain/reserve.es", Map.empty)
-  val reserveErgoTree = compile(reserveContract)
-  val reserveAddress = getAddressFromErgoTree(reserveErgoTree)
-  val reserveContractHash = Blake2b256(reserveErgoTree.bytes.tail)
-  val reserveContractHashString = Base58.encode(reserveContractHash)
-
-  val receiptContract = readContract("onchain/receipt.es", Map("reserveContractHash" -> reserveContractHashString))
-  val receiptErgoTree = compile(receiptContract)
-  val receiptAddress = getAddressFromErgoTree(receiptErgoTree)
-  val receiptContractHash = Blake2b256(receiptErgoTree.bytes.tail)
-  val receiptContractHashString = Base58.encode(receiptContractHash)
-
-  val noteContract = readContract("onchain/note.es",
-    Map("reserveContractHash" -> reserveContractHashString, "receiptContractHash" -> receiptContractHashString))
-  val noteErgoTree = compile(noteContract)
-  val noteAddress = getAddressFromErgoTree(noteErgoTree)
-
-  // Basis contracts
-
-  val basisContract = readContract("offchain/basis.es", Map())
-  val basisErgoTree = compile(basisContract)
-  val basisAddress = getAddressFromErgoTree(basisErgoTree)
-
-  // Basis-token contract (token-based reserve)
-  val basisTokenContract = readContract("offchain/basis-token.es", Map())
-  val basisTokenErgoTree = compile(basisTokenContract)
-  val basisTokenAddress = getAddressFromErgoTree(basisTokenErgoTree)
-
-  // Basis v2 is a separate immutable contract family. Keeping distinct names
-  // prevents builders from silently mixing the v1 and v2 register/message ABI.
-  val basisV2Contract = readContract("offchain/basis-v2.es", Map())
+  // Basis v2 is the only contract generation exposed by production tooling.
+  // Historical v1 sources live under src/test/resources and cannot be loaded
+  // through this object.
+  val basisV2Contract = readActiveContract("offchain/basis-v2.es")
   val basisV2ErgoTree = compile(basisV2Contract)
   val basisV2Address = getAddressFromErgoTree(basisV2ErgoTree)
 
-  val basisTokenV2Contract = readContract("offchain/basis-token-v2.es", Map())
+  val basisTokenV2Contract = readActiveContract("offchain/basis-token-v2.es")
   val basisTokenV2ErgoTree = compile(basisTokenV2Contract)
   val basisTokenV2Address = getAddressFromErgoTree(basisTokenV2ErgoTree)
 
-  // contracts below are experimental and not finished ChainCash-on-Layer2 contracts
-
-  val redemptionContract = scala.io.Source.fromFile("contracts/layer2-old/redemption.es", "utf-8").getLines.mkString("\n")
-  val redemptionErgoTree = compile(redemptionContract)
-  val redemptionAddress = getAddressFromErgoTree(redemptionErgoTree)
-
-  val redemptionProducerContract = scala.io.Source.fromFile("contracts/layer2-old/redproducer.es", "utf-8").getLines.mkString("\n")
-  val redemptionProducerErgoTree = compile(redemptionProducerContract)
-  val redemptionProducerAddress = getAddressFromErgoTree(redemptionProducerErgoTree)
+  /** Contracts intentionally exposed by production address tooling. */
+  val publishedContracts = Vector(
+    "Basis v2" -> basisV2Address,
+    "Basis-token v2" -> basisTokenV2Address
+  )
 }
 
 object Printer extends App {
-  println("Basis p2s address: " + Constants.basisAddress)
-  println("Basis-token p2s address: " + Constants.basisTokenAddress)
-  println("Basis v2 p2s address: " + Constants.basisV2Address)
-  println("Basis-token v2 p2s address: " + Constants.basisTokenV2Address)
-  println("Redemption p2s address: " + Constants.redemptionAddress)
-  println("Redemption producer p2s address: " + Constants.redemptionProducerAddress)
-
-  // Example deployment info
-  println("\nTo deploy Basis reserve:")
-  println("1. Run BasisDeployer.main() for deployment requests")
-  println("2. Use createBasisDeploymentRequest() with actual values")
+  Constants.publishedContracts.foreach { case (name, address) =>
+    println(s"$name p2s address: $address")
+  }
 }

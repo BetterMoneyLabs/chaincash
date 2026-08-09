@@ -1,10 +1,10 @@
+import scala.collection.JavaConverters._
+
 name := "chaincash"
 
 version := "0.2.1"
 organization := "org.ergoplatform"
 scalaVersion := "2.12.17"
-
-Compile / unmanagedClasspath += baseDirectory.value / "contracts"
 
 resolvers ++= Seq(
   "Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/",
@@ -39,3 +39,55 @@ libraryDependencies ++= Seq(
 )
 
 dependencyOverrides += "org.ergoplatform" %% "ergo-appkit" % "6.0.0"
+
+lazy val verifyMainJarRetirement = taskKey[Unit](
+  "Fail if the production JAR contains retired ChainCash or Basis v1 classes/resources"
+)
+
+verifyMainJarRetirement := {
+  val jarPath = (Compile / packageBin).value
+  val log = streams.value.log
+  val jar = new java.util.jar.JarFile(jarPath)
+  try {
+    val entries = jar.entries().asScala.map(_.getName).toVector
+    val forbiddenClassPrefixes = Vector(
+      "chaincash/contracts/BasisDeployer",
+      "chaincash/contracts/BasisConstants",
+      "chaincash/contracts/BasisNoteCreator",
+      "chaincash/contracts/ContractsPrinter",
+      "chaincash/contracts/ParticipantKeys",
+      "chaincash/contracts/ParticipantSecretsReader",
+      "chaincash/offchain/NoteUtils",
+      "chaincash/offchain/ReserveUtils",
+      "chaincash/offchain/Tester"
+    )
+    val forbiddenResources = Set(
+      "contracts/offchain/basis.es",
+      "contracts/offchain/basis-token.es"
+    )
+    val forbiddenResourcePrefixes = Vector(
+      "contracts/historical/",
+      "contracts/onchain/",
+      "contracts/layer2-old/"
+    )
+
+    val forbiddenEntries = entries.filter { entry =>
+      forbiddenClassPrefixes.exists(entry.startsWith) ||
+      forbiddenResources.contains(entry) ||
+      forbiddenResourcePrefixes.exists(entry.startsWith)
+    }
+
+    if (forbiddenEntries.nonEmpty) {
+      sys.error(
+        "Retired ChainCash/Basis v1 entries leaked into the production JAR: " +
+          forbiddenEntries.sorted.mkString(", ")
+      )
+    }
+
+    log.info(s"Verified ${entries.size} production JAR entries: no retired ChainCash/Basis v1 surface")
+  } finally {
+    jar.close()
+  }
+}
+
+Test / test := (Test / test).dependsOn(verifyMainJarRetirement).value
