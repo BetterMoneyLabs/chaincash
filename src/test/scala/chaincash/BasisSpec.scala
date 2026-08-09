@@ -1707,7 +1707,7 @@ class BasisSpec extends PropSpec with Matchers with ScalaCheckDrivenPropertyChec
     require(Files.exists(contractPath), s"Missing contract file: $contractPath (user.dir=${sys.props("user.dir")})")
     val fileBytes = Files.readAllBytes(contractPath)
     val fileText = new String(fileBytes, StandardCharsets.UTF_8)
-    // Constants.readContract normalizes to \n via getLines.mkString("\n")
+    // The Constants source loader normalizes to \n via getLines.mkString("\n")
     Constants.basisContract shouldEqual fileText.replace("\r\n", "\n").stripSuffix("\n")
   }
 

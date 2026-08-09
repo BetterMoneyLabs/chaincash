@@ -71,11 +71,22 @@ class LegacyContractRetirementSpec extends PropSpec with Matchers {
     output should not include "Reserve contract address"
   }
 
-  property("historical contract sources retain their pinned upstream bytes") {
-    HistoricalContractFixtures.expectedSha256.keys.foreach { path =>
+  property("historical contract sources retain their pinned canonical-LF bytes") {
+    HistoricalContractFixtures.expectedCanonicalLfSha256.keys.foreach { path =>
       withClue(path) {
         HistoricalContractFixtures.archivedSource(path) should not be empty
       }
     }
+  }
+
+  property("historical source identity is equal for LF and CRLF checkouts") {
+    val lf = "first line\nsecond line\n".getBytes(StandardCharsets.UTF_8)
+    val crlf = "first line\r\nsecond line\r\n".getBytes(StandardCharsets.UTF_8)
+    val changed = "first line\nchanged line\n".getBytes(StandardCharsets.UTF_8)
+
+    HistoricalContractFixtures.canonicalLfSha256(crlf) shouldEqual
+      HistoricalContractFixtures.canonicalLfSha256(lf)
+    HistoricalContractFixtures.canonicalLfSha256(changed) should not equal
+      HistoricalContractFixtures.canonicalLfSha256(lf)
   }
 }

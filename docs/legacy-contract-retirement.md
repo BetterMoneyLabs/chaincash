@@ -32,7 +32,7 @@ so this change makes no claim that no such boxes exist.
 | No legacy-specific source, tree, or address getter is exported | `Constants` production API | Address and deployment tooling | A caller can accidentally publish an unreviewed legacy P2S | Reflection rejects every retired getter |
 | Address output is allowlisted | `publishedContracts` | `Printer` | A historical address can be presented as deployable | Captured printer output contains only the two registry entries |
 | Direct legacy activation helpers are not compiled | SBT source layout | Downstream applications | Old transaction builders or scan-rule generation remain callable | Clean test classpath cannot load the four retired classes |
-| Historical regression inputs remain exact | Test-resource SHA-256 manifest | `ChainCashSpec` | Tests silently exercise changed source while retaining the old name | All seven fixture digests are checked before use; the historical suite still runs |
+| Historical regression inputs remain exact across checkout line endings | Canonical UTF-8 LF SHA-256 manifest | `ChainCashSpec` | Tests silently exercise changed source while retaining the old name, or fail only because Git checked out CRLF | All seven canonical fixture digests are checked before use; LF and CRLF produce the same identity; the historical suite still runs |
 | Existing immutable boxes are not treated as migrated | Operational retirement rule | Any future recovery tool | New code incorrectly assumes authority over an old box | Recovery requires a separate inventory and replay of an authorization branch in the exact old tree |
 
 ## Recovery boundary
