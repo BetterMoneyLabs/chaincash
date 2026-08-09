@@ -16,9 +16,13 @@ class LegacyContractRetirementSpec extends PropSpec with Matchers {
     val retiredGetters = Set(
       "readContract",
       "reserveContract",
+      "reserveContractHash",
+      "reserveContractHashString",
       "reserveErgoTree",
       "reserveAddress",
       "receiptContract",
+      "receiptContractHash",
+      "receiptContractHashString",
       "receiptErgoTree",
       "receiptAddress",
       "noteContract",

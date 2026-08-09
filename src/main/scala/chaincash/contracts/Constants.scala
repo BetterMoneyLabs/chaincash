@@ -20,7 +20,7 @@ object Constants {
 
   def getAddressFromErgoTree(ergoTree: ErgoTree) = ergoAddressEncoder.fromProposition(ergoTree).get
 
-  private def substitute(contract: String, substitutionMap: Map[String, String] = Map.empty): String = {
+  def substitute(contract: String, substitutionMap: Map[String, String] = Map.empty): String = {
     substitutionMap.foldLeft(contract){case (c, (k,v)) =>
       c.replace("$"+k, v)
     }
