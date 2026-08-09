@@ -83,6 +83,16 @@ object Constants {
   val basisTokenErgoTree = compile(basisTokenContract)
   val basisTokenAddress = getAddressFromErgoTree(basisTokenErgoTree)
 
+  // Basis v2 is a separate immutable contract family. Keeping distinct names
+  // prevents builders from silently mixing the v1 and v2 register/message ABI.
+  val basisV2Contract = readContract("offchain/basis-v2.es", Map())
+  val basisV2ErgoTree = compile(basisV2Contract)
+  val basisV2Address = getAddressFromErgoTree(basisV2ErgoTree)
+
+  val basisTokenV2Contract = readContract("offchain/basis-token-v2.es", Map())
+  val basisTokenV2ErgoTree = compile(basisTokenV2Contract)
+  val basisTokenV2Address = getAddressFromErgoTree(basisTokenV2ErgoTree)
+
   // contracts below are experimental and not finished ChainCash-on-Layer2 contracts
 
   val redemptionContract = scala.io.Source.fromFile("contracts/layer2-old/redemption.es", "utf-8").getLines.mkString("\n")
@@ -97,6 +107,8 @@ object Constants {
 object Printer extends App {
   println("Basis p2s address: " + Constants.basisAddress)
   println("Basis-token p2s address: " + Constants.basisTokenAddress)
+  println("Basis v2 p2s address: " + Constants.basisV2Address)
+  println("Basis-token v2 p2s address: " + Constants.basisTokenV2Address)
   println("Redemption p2s address: " + Constants.redemptionAddress)
   println("Redemption producer p2s address: " + Constants.redemptionProducerAddress)
 
