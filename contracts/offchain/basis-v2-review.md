@@ -57,7 +57,7 @@ three independent transactions; it does not use one compound malformed box.
 
 ## Test closure
 
-`sbt -batch "testOnly chaincash.BasisV2Spec"` currently executes 21 tests. They
+`sbt -batch "testOnly chaincash.BasisV2Spec"` currently executes 22 tests. They
 cover normal and emergency redemption, domain separation, proof omission and
 replay, non-identity group boundaries, tracker shape and debt admission, R5
 progression, exact payouts, ERG/token conservation, partial settlement,
@@ -74,8 +74,8 @@ sbt -batch "testOnly chaincash.BasisSpec chaincash.BasisTokenSpec"
 
 | Dimension | Status |
 | --- | --- |
-| Implementation | matrix-covered by local source and 21 focused mockchain tests |
-| Independent review | pending on the exact candidate commit |
+| Implementation | matrix-covered by local source and 22 focused mockchain tests |
+| Independent review | passed locally for the exact contract/golden candidate and the claim-key vector delta |
 | CI | not run |
 | Target node | not run; no live or broadcast action authorized |
 | Readiness | local draft for maintainer review |
