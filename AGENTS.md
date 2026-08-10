@@ -6,7 +6,22 @@ This document describes the agent-based architecture of the ChainCash protocol -
 
 ChainCash implements a decentralized monetary system where different agents manage the lifecycle of digital notes backed by collateral and trust. The system enables self-sovereign banking where each participant can issue, transfer, and redeem digital currency.
 
-## Core On-Chain Agents
+## Current Lifecycle Boundary
+
+Only the Basis v2 and Basis-token v2 candidate sources remain in the production
+contract surface. Basis v1, the original `contracts/onchain` family, the
+`contracts/layer2-old` experiments, their transaction builders, participant
+secret helpers, and their address/scan-rule printers are retired. Exact old
+source snapshots now live under `src/test/resources` solely for historical
+regression tests; never use them to derive an address, build a transaction, or
+infer deployment status. The removed Scala helpers remain available in Git
+history at the pinned commit below.
+
+The sections describing the original ChainCash on-chain agents and flows below
+are historical design context. Their old paths refer to the source layout at
+commit `78475e30362571acf56e4e38276a9d6c0a84ce0c`, not active production files.
+
+## Historical On-Chain Agents
 
 ### Reserve Contract Agent
 **File**: `contracts/onchain/reserve.es`
@@ -56,6 +71,10 @@ ChainCash implements a decentralized monetary system where different agents mana
 - `autoBurn`: Self-destruct after expiration
 
 ## Off-Chain Management Agents
+
+The legacy reserve/note construction helpers described in this section are
+historical and are no longer compiled. Read-only tracking code remains only to
+support a future, separately reviewed inventory of any old state.
 
 ### Wallet Agent
 **File**: `src/main/scala/chaincash/offchain/WalletUtils.scala`
@@ -114,7 +133,10 @@ ChainCash implements a decentralized monetary system where different agents mana
 - Event processing and persistence
 
 ### Basis Tracker Agent
-**File**: `contracts/offchain/tracker.md` (documentation), `demo/basis/simple/src/TrackerBoxSetup.scala` (setup)
+**Historical files**:
+`src/test/resources/contracts/historical/offchain/tracker.md`. The former
+`demo/basis/simple/src/TrackerBoxSetup.scala` walkthrough is available only in
+Git history at commit `78475e30362571acf56e4e38276a9d6c0a84ce0c`.
 
 **Responsibilities**:
 - Tracks complete state of debt for all issuers (with or without on-chain reserves)
@@ -141,7 +163,9 @@ ChainCash implements a decentralized monetary system where different agents mana
   - Enables true escape from tracker unavailability
 - Anti-censorship protection (previously witnessed notes can still be redeemed)
 
-**See Also**: `contracts/offchain/basis.md` for Basis protocol design, `contracts/offchain/tracker.md` for detailed tracker architecture
+**See Also**: the test-only `offchain/basis.md` and `offchain/tracker.md`
+fixtures for the historical v1 design; use `contracts/offchain/basis-v2.md` for
+the active candidate ABI.
 
 ## Server Agent
 
@@ -227,8 +251,9 @@ Creditor → Reserve Agent (after timeout)
 ```
 
 ### Reserve Owner Refund (Censorship-Resistant Exit)
-Implemented in both `contracts/offchain/basis.es` (ERG reserve) and
-`contracts/offchain/basis-token.es` (token reserve).
+Historically implemented in the test-only fixtures
+`src/test/resources/contracts/historical/offchain/basis.es` (ERG reserve) and
+`src/test/resources/contracts/historical/offchain/basis-token.es` (token reserve).
 ```
 Reserve Owner (two-phase, unilateral)
 1. Initiate refund (action #2): owner signs tx setting R7 to initiation height

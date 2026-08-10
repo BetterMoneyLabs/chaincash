@@ -1,13 +1,12 @@
 package chaincash.contracts
 
+import chaincash.offchain.SigUtils._
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.P2PKAddress
-import scorex.crypto.encode.{Base16, Base58}
-import chaincash.offchain.SigUtils._
+import scorex.crypto.encode.Base16
 import sigma.crypto.CryptoConstants
 import sigma.serialization.GroupElementSerializer
 import sigma.GroupElement
-import sigma.ast._
 
 /**
  * Object for deriving public keys from Ergo addresses.
@@ -117,154 +116,5 @@ object AddressUtils {
    */
   def deriveErgoTreeFromContract(ergoTree: sigma.ast.ErgoTree): String = {
     Base16.encode(ergoTree.bytes)
-  }
-}
-
-/**
- * Constants for known participants in the Basis system.
- *
- * Public keys are derived from Ergo addresses at runtime.
- * Secrets are loaded from secrets/participants.csv (or participants.local.csv).
- * The secrets file is git-ignored and must be created from participants.csv.template.
- */
-object ParticipantKeys {
-
-  // Load secrets from CSV file
-  private val secrets = ParticipantSecretsReader.readSecrets()
-
-  private def getSecret(name: String): BigInt = {
-    secrets.get(name) match {
-      case Some(p) => BigInt(p.secretHex, 16)
-      case None => throw new IllegalArgumentException(
-        s"Secret for '$name' not found in secrets file. " +
-        s"Available participants: ${secrets.keys.mkString(", ")}"
-      )
-    }
-  }
-
-  private def getAddress(name: String): String = {
-    secrets.get(name) match {
-      case Some(p) => p.address
-      case None => throw new IllegalArgumentException(
-        s"Address for '$name' not found in secrets file. " +
-        s"Available participants: ${secrets.keys.mkString(", ")}"
-      )
-    }
-  }
-
-  /**
-   * Tracker's Ergo address and secret (mainnet)
-   * The secret is verified to correspond to the address.
-   */
-  val trackerAddress: String = getAddress("tracker")
-  val trackerSecret: BigInt = getSecret("tracker")
-
-  // Verify that tracker's secret corresponds to its address
-  require(
-    AddressUtils.verifySecretMatchesAddress(trackerAddress, trackerSecret),
-    s"Tracker's secret does not correspond to address $trackerAddress"
-  )
-
-  /**
-   * Alice's (reserve owner) Ergo address and secret (mainnet)
-   * The secret is verified to correspond to the address.
-   */
-  val aliceAddress: String = getAddress("alice")
-  val aliceSecret: BigInt = getSecret("alice")
-
-  // Verify that Alice's secret corresponds to her address
-  require(
-    AddressUtils.verifySecretMatchesAddress(aliceAddress, aliceSecret),
-    s"Alice's secret does not correspond to address $aliceAddress"
-  )
-
-  /**
-   * Bob's Ergo address and secret.
-   *
-   * Bob is the payee/receiver in the Basis protocol. His signature is required
-   * for redemption transactions due to the contract's receiverCondition check:
-   * `val receiverCondition = proveDlog(receiver)`
-   *
-   * Note: Bob's secret is used by the Ergo node for transaction signing,
-   * not directly in this codebase. The node automatically signs inputs
-   * corresponding to addresses in the wallet when signing a transaction.
-   */
-  val bobAddress: String = getAddress("bob")
-  val bobSecret: BigInt = getSecret("bob")
-
-  /**
-   * Tracker's public key derived from address
-   */
-  lazy val trackerPublicKey: GroupElement = 
-    AddressUtils.derivePublicKeyFromAddress(trackerAddress)
-
-  /**
-   * Alice's public key derived from address
-   */
-  lazy val alicePublicKey: GroupElement = 
-    AddressUtils.derivePublicKeyFromAddress(aliceAddress)
-
-  /**
-   * Bob's public key derived from address
-   */
-  lazy val bobPublicKey: GroupElement =
-    AddressUtils.derivePublicKeyFromAddress(bobAddress)
-
-  /**
-   * Bob's ergoTree derived from address (P2PK)
-   */
-  lazy val bobErgoTree: String = AddressUtils.deriveErgoTreeFromAddress(bobAddress)
-
-  /**
-   * Reserve (Basis) ergoTree derived from compiled contract
-   */
-  lazy val reserveErgoTree: String = AddressUtils.deriveErgoTreeFromContract(Constants.basisErgoTree)
-
-  /**
-   * Reserve (Basis) address derived from ergoTree
-   */
-  lazy val reserveAddress: String = Constants.basisAddress.toString
-
-  /**
-   * Tracker's public key as hex string
-   */
-  lazy val trackerPublicKeyHex: String = 
-    Base16.encode(trackerPublicKey.getEncoded.toArray)
-
-  /**
-   * Alice's public key as hex string
-   */
-  lazy val alicePublicKeyHex: String = 
-    Base16.encode(alicePublicKey.getEncoded.toArray)
-
-  /**
-   * Bob's public key as hex string
-   */
-  lazy val bobPublicKeyHex: String = 
-    Base16.encode(bobPublicKey.getEncoded.toArray)
-
-  /**
-   * Print all participant information
-   */
-  def printParticipantInfo(): Unit = {
-    println("=== Participant Keys ===")
-    println()
-    println("Tracker:")
-    println(s"  Address: $trackerAddress")
-    println(s"  Public Key: $trackerPublicKeyHex")
-    println(s"  Secret: ${trackerSecret.toString(16)}")
-    println(s"  (Secret verified to match address)")
-    println()
-    println("Alice (Reserve Owner):")
-    println(s"  Address: $aliceAddress")
-    println(s"  Public Key: $alicePublicKeyHex")
-    println(s"  Secret: ${aliceSecret.toString(16)}")
-    println(s"  (Secret verified to match address)")
-    println()
-    println("Bob (Payee):")
-    println(s"  Address: $bobAddress")
-    println(s"  Secret: ${bobSecret.toString(16)}")
-    println(s"  Public Key: $bobPublicKeyHex")
-    println()
   }
 }
