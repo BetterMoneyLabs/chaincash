@@ -72,6 +72,25 @@ object Constants {
   val noteErgoTree = compile(noteContract)
   val noteAddress = getAddressFromErgoTree(noteErgoTree)
 
+  // On-chain custom token reserve contracts (using Spectrum ERG/Token LP pool for token/ERG rate)
+  val lpNftId = "56b0062d262c32e963d41c2463a2a0b4a269f3b4a07171f0f582376810d990b1"
+  val reserveTokenContract = readContract("onchain/reserve-token.es", Map("lpNftId" -> lpNftId))
+  val reserveTokenErgoTree = compile(reserveTokenContract)
+  val reserveTokenAddress = getAddressFromErgoTree(reserveTokenErgoTree)
+  val reserveTokenContractHash = Blake2b256(reserveTokenErgoTree.bytes.tail)
+  val reserveTokenContractHashString = Base58.encode(reserveTokenContractHash)
+
+  val receiptTokenContract = readContract("onchain/receipt.es", Map("reserveContractHash" -> reserveTokenContractHashString))
+  val receiptTokenErgoTree = compile(receiptTokenContract)
+  val receiptTokenAddress = getAddressFromErgoTree(receiptTokenErgoTree)
+  val receiptTokenContractHash = Blake2b256(receiptTokenErgoTree.bytes.tail)
+  val receiptTokenContractHashString = Base58.encode(receiptTokenContractHash)
+
+  val noteTokenReserveContract = readContract("onchain/note.es",
+    Map("reserveContractHash" -> reserveTokenContractHashString, "receiptContractHash" -> receiptTokenContractHashString))
+  val noteTokenReserveErgoTree = compile(noteTokenReserveContract)
+  val noteTokenReserveAddress = getAddressFromErgoTree(noteTokenReserveErgoTree)
+
   // Basis contracts
 
   val basisContract = readContract("offchain/basis.es", Map())

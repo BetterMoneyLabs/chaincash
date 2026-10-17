@@ -1053,4 +1053,167 @@ class ChainCashSpec extends PropSpec with Matchers with ScalaCheckDrivenProperty
     // todo:
   }
 
+  property("custom token reserve redemption should work") {
+    createMockedErgoClient(MockData(Nil, Nil)).execute { implicit ctx: BlockchainContext =>
+      val position = 0L
+
+      val positionBytes = Longs.toByteArray(position)
+      val msg: Array[Byte] = positionBytes ++ Longs.toByteArray(noteValue) ++ Base16.decode(noteTokenId).get
+      val sig = SigUtils.sign(msg, holderSecret)
+
+      val plasmaMap = new PlasmaMap[Array[Byte], Array[Byte]](AvlTreeFlags.InsertOnly, chainCashPlasmaParameters)
+      val sigBytes = GroupElementSerializer.toBytes(sig._1) ++ sig._2.toByteArray
+      val keyBytes = positionBytes ++ reserveNFTBytes
+      val insertRes = plasmaMap.insert(keyBytes -> sigBytes)
+      val _ = insertRes.proof
+      val historyTree = plasmaMap.ergoValue
+
+      val lookupRes = plasmaMap.lookUp(keyBytes)
+      val lookupProof = lookupRes.proof
+
+      val customTokenId = "03faf2cb329f2e90d6d23b58d91bbb6c046aa143261cc21f52fbe2824bfcbf04"
+      val customTokenIdBytes = Base16.decode(customTokenId).get
+      val lpTokenId = "11faf2cb329f2e90d6d23b58d91bbb6c046aa143261cc21f52fbe2824bfcbf04"
+      val lpNftBytes = Base16.decode(Constants.lpNftId).get
+
+      // Spectrum pool reserves: 1 ERG (10^9 nanoErg) = 200 custom token units (e.g. $2.00 in SigUSD cents)
+      val lpErgReserves = 100000000000L // 100 ERG
+      val lpTokenReserves = 20000L      // 20,000 token units
+      val initialReserveTokens = 10000L
+
+      val oracleRate = 500000000L // 0.5 ERG per mg of gold -> 100 token units per mg before 2% fee
+
+      // Expected maxToRedeem = (1 * 500000000 * 20000 * 98) / (100000000000 * 100) = 98 token units
+      val redeemedTokens = (BigInt(noteValue) * oracleRate * lpTokenReserves * 98 / (BigInt(lpErgReserves) * 100)).toLong
+      val toOracleTokens = redeemedTokens * 2 / 1000
+
+      val noteInput =
+        ctx
+          .newTxBuilder()
+          .outBoxBuilder
+          .value(minValue + feeValue)
+          .tokens(new ErgoToken(noteTokenId, noteValue))
+          .registers(historyTree, ErgoValue.of(holderPk))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.noteTokenReserveContract))
+          .build()
+          .convertToInputWith(fakeTxId1, fakeIndex)
+          .withContextVars(
+            new ContextVar(0, ErgoValue.of(-1: Byte))
+          )
+
+      val reserveInput =
+        ctx
+          .newTxBuilder()
+          .outBoxBuilder
+          .value(minValue)
+          .tokens(new ErgoToken(reserveNFTBytes, 1), new ErgoToken(customTokenIdBytes, initialReserveTokens))
+          .registers(ErgoValue.of(holderPk))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), Constants.reserveTokenContract))
+          .build()
+          .convertToInputWith(fakeTxId2, fakeIndex)
+          .withContextVars(
+            new ContextVar(0, ErgoValue.of(0: Byte)),
+            new ContextVar(1, ErgoValue.of(lookupProof.bytes)),
+            new ContextVar(2, ErgoValue.of(Longs.toByteArray(noteValue))),
+            new ContextVar(3, ErgoValue.of(position)),
+            new ContextVar(4, ErgoValue.of(false))
+          )
+
+      val buyBackInput =
+        ctx
+          .newTxBuilder()
+          .outBoxBuilder
+          .value(minValue)
+          .tokens(new ErgoToken(buyBackNftId, 1), new ErgoToken(customTokenIdBytes, 10L))
+          .contract(trueErgoContract)
+          .build()
+          .convertToInputWith(fakeTxId5, fakeIndex)
+
+      val oracleDataInput =
+        ctx
+          .newTxBuilder()
+          .outBoxBuilder
+          .value(minValue)
+          .tokens(new ErgoToken(oracleNFTBytes, 1))
+          .registers(ErgoValue.of(oracleRate * 1000000))
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), "{false}"))
+          .build()
+          .convertToInputWith(fakeTxId3, fakeIndex)
+
+      val lpDataInput =
+        ctx
+          .newTxBuilder()
+          .outBoxBuilder
+          .value(lpErgReserves)
+          .tokens(
+            new ErgoToken(lpNftBytes, 1),
+            new ErgoToken(lpTokenId, 1000000L),
+            new ErgoToken(customTokenIdBytes, lpTokenReserves)
+          )
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), "{false}"))
+          .build()
+          .convertToInputWith(fakeTxId4, fakeIndex)
+
+      val reserveOutput = createOut(
+        Constants.reserveTokenContract,
+        minValue,
+        registers = Array(ErgoValue.of(holderPk)),
+        tokens = Array(
+          new ErgoToken(reserveNFT, 1),
+          new ErgoToken(customTokenId, initialReserveTokens - redeemedTokens)
+        )
+      )
+
+      val receiptOutput = createOut(
+        Constants.receiptTokenContract,
+        minValue,
+        registers = Array(historyTree, ErgoValue.of(0L), ErgoValue.of(ctx.getHeight - 5), ErgoValue.of(holderPk)),
+        tokens = Array(new ErgoToken(noteTokenId, noteValue))
+      )
+
+      val buyBackOutput = createOut(
+        trueScript,
+        buyBackInput.getValue,
+        registers = Array(),
+        tokens = Array(
+          new ErgoToken(buyBackNftId, 1),
+          new ErgoToken(customTokenId, 10L + toOracleTokens)
+        )
+      )
+
+      val redeemerPayoutOutput = createOut(
+        trueScript,
+        minValue,
+        registers = Array(),
+        tokens = Array(new ErgoToken(customTokenId, redeemedTokens - toOracleTokens))
+      )
+
+      val fundingBox =
+        ctx
+          .newTxBuilder()
+          .outBoxBuilder
+          .value(minValue)
+          .contract(ctx.compileContract(ConstantsBuilder.empty(), fakeScript))
+          .build()
+          .convertToInputWith(fakeTxId1, 2.toShort)
+
+      val inputs = Array[InputBox](noteInput, reserveInput, buyBackInput, fundingBox)
+      val dataInputs = Array[InputBox](oracleDataInput, lpDataInput)
+      val outputs = Array[OutBoxImpl](reserveOutput, receiptOutput, buyBackOutput, redeemerPayoutOutput)
+
+      noException shouldBe thrownBy {
+        createTx(
+          inputs,
+          dataInputs,
+          outputs,
+          fee = None,
+          changeAddress,
+          Array[String](holderSecret.toString()),
+          false
+        )
+      }
+    }
+  }
+
 }
+
